@@ -9,6 +9,16 @@ export const SITE = {
   country: "Colombia",
 } as const;
 
+export const SHIPPING = {
+  freeThreshold: 200000,
+  flatFee: 15000,
+  methodName: "Nacional",
+} as const;
+
+export function shippingFee(subtotal: number): number {
+  return subtotal >= SHIPPING.freeThreshold ? 0 : SHIPPING.flatFee;
+}
+
 export function whatsappLink(
   message: string = SITE.whatsappMessage,
   number: string = SITE.whatsappNumber,
