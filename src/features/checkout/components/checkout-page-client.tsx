@@ -11,8 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useCartStore } from "@/shared/stores/cart-store";
-import { SHIPPING, shippingFee, whatsappLink, SITE } from "@/shared/config/site";
+import { SHIPPING, shippingFee, SITE } from "@/shared/config/site";
 import { formatPrice } from "@/lib/utils";
+import { processMockPayment } from "@/features/payments/services/mock-payment";
 import {
   checkoutFormSchema,
   type CheckoutFormValues,
@@ -26,7 +27,8 @@ export function CheckoutPageClient() {
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<"form" | "payment">("form");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
-  const [confirmed, setConfirmed] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
+  const [payReference, setPayReference] = useState("");
 
   useEffect(() => setMounted(true), []);
 
@@ -79,10 +81,17 @@ export function CheckoutPageClient() {
 
   const onValid = () => setStep("payment");
 
-  const confirmOrder = () => {
-    if (!paymentMethod) return;
-    setConfirmed(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const payNow = async () => {
+    if (paymentStatus !== "idle") return;
+    setPaymentStatus("processing");
+    const result = await processMockPayment({ method: paymentMethod, amount: total });
+    if (result.ok) {
+      setPayReference(result.reference);
+      setPaymentStatus("success");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      setPaymentStatus("failed");
+    }
   };
 
   return (
@@ -206,22 +215,44 @@ export function CheckoutPageClient() {
                 </div>
               </section>
 
-              {confirmed ? (
-                <div className="rounded-xl border border-border bg-card p-5 text-center">
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    El procesamiento de pagos se está configurando. Para completar tu pedido hoy,
-                    escríbenos por WhatsApp y te lo confirmamos por ese medio.
+              {paymentStatus === "processing" && (
+                <div className="rounded-xl border border-border bg-card p-8 text-center">
+                  <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+                  <p className="mt-4 text-sm font-medium">Procesando pago simulado…</p>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    Modo demo: no se realiza ningún cobro real ni se solicitan datos de tarjeta.
                   </p>
-                  <Button className="mt-4" asChild>
-                    <Link href={whatsappLink(
-                      `Hola ${SITE.brand}, quiero completar mi pedido (${formatPrice(total)}). ¿Cómo pago?`,
-                    )}>
-                      Completar por WhatsApp
-                    </Link>
+                </div>
+              )}
+
+              {paymentStatus === "success" && (
+                <div className="rounded-xl border border-border bg-card p-6 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <ShieldCheck className="h-6 w-6" />
+                  </div>
+                  <h3 className="mt-4 font-display text-xl font-bold uppercase tracking-tight">
+                    Pago aprobado
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                    Simulación aprobada por {formatPrice(total)} con{" "}
+                    {paymentMethod === "CARD" ? "tarjeta" : paymentMethod === "PSE" ? "PSE" : "Nequi"}.
+                    Referencia {payReference}. En el siguiente paso se crea tu pedido y recibirás la
+                    confirmación por correo.
+                  </p>
+                </div>
+              )}
+
+              {paymentStatus === "failed" && (
+                <div className="rounded-xl border border-border bg-card p-6 text-center">
+                  <p className="text-sm font-medium">No se pudo procesar la simulación.</p>
+                  <Button className="mt-4" onClick={() => setPaymentStatus("idle")}>
+                    Reintentar
                   </Button>
                 </div>
-              ) : (
-                <Button onClick={confirmOrder} className="w-full sm:w-auto">
+              )}
+
+              {paymentStatus === "idle" && (
+                <Button onClick={payNow} className="w-full sm:w-auto">
                   Pagar {formatPrice(total)} <ShieldCheck className="h-4 w-4" />
                 </Button>
               )}
