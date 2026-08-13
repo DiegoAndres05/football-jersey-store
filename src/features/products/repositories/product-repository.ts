@@ -59,15 +59,17 @@ export async function getProducts(filters: ProductFilters): Promise<ProductListR
     ).map((p) => p.id);
 
     const rangesByProductId = await getPriceRangesByProductIds(candidateIds);
-    const stocksByProductId = hasAvailabilityFilter
-      ? await getStocksByProductIds(candidateIds)
+    const variantInfosByProductId = hasAvailabilityFilter
+      ? await getVariantInfosByProductIds(candidateIds)
       : undefined;
 
     let allowedIds = candidateIds;
 
     if (hasAvailabilityFilter) {
       allowedIds = candidateIds.filter((id) => {
-        const isAvailable = (stocksByProductId?.get(id) ?? []).some((stock) => stock > 0);
+        const isAvailable = (variantInfosByProductId?.get(id) ?? []).some(
+          (info) => info.stock > 0,
+        );
         return filters.availability === "AVAILABLE" ? isAvailable : !isAvailable;
       });
     }
@@ -96,7 +98,7 @@ export async function getProducts(filters: ProductFilters): Promise<ProductListR
       .filter((p): p is NonNullable<typeof p> => p !== undefined);
     const mapped = await mapProductCards(ordered, {
       rangesByProductId,
-      stocksByProductId,
+      variantInfosByProductId,
     });
     return { products: mapped, total, page, totalPages: Math.ceil(total / PAGE_SIZE) };
   }
@@ -287,24 +289,35 @@ async function mapProductCards(
   products: Prisma.ProductGetPayload<{ select: typeof productCardSelect }>[],
   known?: {
     rangesByProductId?: Map<string, { min: number; max: number }>;
-    stocksByProductId?: Map<string, number[]>;
+    variantInfosByProductId?: Map<string, VariantInfo[]>;
   },
 ): Promise<ProductCardData[]> {
   const ids = products.map((p) => p.id);
-  const [rangesByProductId, stocksByProductId] = await Promise.all([
+  const [rangesByProductId, variantInfosByProductId] = await Promise.all([
     known?.rangesByProductId ??
       (ids.length > 0
         ? getPriceRangesByProductIds(ids)
         : Promise.resolve(new Map<string, { min: number; max: number }>())),
-    known?.stocksByProductId ??
+    known?.variantInfosByProductId ??
       (ids.length > 0
-        ? getStocksByProductIds(ids)
-        : Promise.resolve(new Map<string, number[]>())),
+        ? getVariantInfosByProductIds(ids)
+        : Promise.resolve(new Map<string, VariantInfo[]>())),
   ]);
 
   return products.map((p) => {
     const range = rangesByProductId.get(p.id) ?? { min: 0, max: 0 };
-    const stocks = stocksByProductId.get(p.id) ?? [];
+    const infos = (variantInfosByProductId.get(p.id) ?? []).sort(
+      (a, b) => a.sizePosition - b.sizePosition,
+    );
+    const stocks = infos.map((info) => info.stock);
+    const availableSizes = [...new Set(infos.filter((i) => i.stock > 0).map((i) => i.sizeCode))];
+    const versionNames = [
+      ...new Set(
+        [...infos]
+          .sort((a, b) => a.versionAdjustment - b.versionAdjustment)
+          .map((i) => i.versionName),
+      ),
+    ];
     return {
       id: p.id,
       slug: p.slug,
@@ -319,6 +332,8 @@ async function mapProductCards(
       minPrice: range.min,
       maxPrice: range.max,
       availability: availabilityFromStocks(stocks),
+      availableSizes,
+      versionNames,
     } satisfies ProductCardData;
   });
 }
@@ -356,18 +371,38 @@ async function getStockByVariantIds(variantIds: string[]): Promise<Map<string, n
   return new Map(rows.map((r) => [r.variantId, r._sum.quantity ?? 0]));
 }
 
-async function getStocksByProductIds(productIds: string[]): Promise<Map<string, number[]>> {
+type VariantInfo = {
+  stock: number;
+  sizeCode: string;
+  sizePosition: number;
+  versionName: string;
+  versionAdjustment: number;
+};
+
+async function getVariantInfosByProductIds(productIds: string[]): Promise<Map<string, VariantInfo[]>> {
   if (productIds.length === 0) return new Map();
   const variants = await prisma.productVariant.findMany({
     where: { productId: { in: productIds } },
-    select: { id: true, productId: true },
+    select: {
+      id: true,
+      productId: true,
+      size: { select: { code: true, position: true } },
+      version: { select: { name: true, priceAdjustment: true } },
+    },
   });
   const stockByVariantId = await getStockByVariantIds(variants.map((v) => v.id));
-  const byProduct = new Map<string, number[]>();
+  const byProduct = new Map<string, VariantInfo[]>();
   for (const v of variants) {
-    const stocks = byProduct.get(v.productId) ?? [];
-    stocks.push(stockByVariantId.get(v.id) ?? 0);
-    byProduct.set(v.productId, stocks);
+    const info: VariantInfo = {
+      stock: stockByVariantId.get(v.id) ?? 0,
+      sizeCode: v.size.code,
+      sizePosition: v.size.position,
+      versionName: v.version.name,
+      versionAdjustment: v.version.priceAdjustment,
+    };
+    const list = byProduct.get(v.productId) ?? [];
+    list.push(info);
+    byProduct.set(v.productId, list);
   }
   return byProduct;
 }

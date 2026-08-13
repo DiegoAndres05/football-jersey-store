@@ -16,6 +16,8 @@ export type ProductCardData = {
   minPrice: number;
   maxPrice: number;
   availability: Availability;
+  availableSizes: string[];
+  versionNames: string[];
 };
 
 export type Availability = "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK";

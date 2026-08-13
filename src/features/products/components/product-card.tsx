@@ -32,29 +32,54 @@ export function ProductCard({ product, priority }: { product: ProductCardData; p
           {isOutlet && (
             <Badge tone="warning" size="sm">Retro</Badge>
           )}
-          {product.availability === "OUT_OF_STOCK" && (
-            <Badge tone="danger" size="sm">Agotada</Badge>
-          )}
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col p-3 gap-1">
+      <div className="flex-1 flex flex-col p-3.5 gap-1.5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground truncate">
           {product.team.name}
-          {product.season.isRetro ? ` · ${product.season.name}` : ""}
+          {product.team.league && (
+            <>
+              <span aria-hidden> · </span>
+              {product.team.league.name}
+            </>
+          )}
         </p>
-        <h3 className="text-sm font-medium leading-tight line-clamp-2 group-hover:text-foreground transition-colors">
+
+        <h3 className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-foreground transition-colors">
           {product.name}
         </h3>
 
-        <div className="mt-auto pt-2 flex items-baseline gap-1.5">
-          <span className="text-sm text-muted-foreground">Desde</span>
-          <span className="text-base font-bold">{formatPriceShort(product.minPrice)}</span>
-          {product.maxPrice > product.minPrice && (
-            <span className="text-xs text-muted-foreground">
-              hasta {formatPriceShort(product.maxPrice)}
-            </span>
+        <p className="text-xs text-muted-foreground">
+          {product.season.name}
+          {product.versionNames.length > 0 && (
+            <>
+              <span aria-hidden> · </span>
+              {product.versionNames.join(" / ")}
+            </>
           )}
+        </p>
+
+        <div className="mt-auto pt-2">
+          {product.availability === "OUT_OF_STOCK" ? (
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-destructive">
+              Agotada
+            </p>
+          ) : product.availableSizes.length > 0 ? (
+            <p className="text-[11px] tracking-wider text-muted-foreground">
+              Tallas: <span className="text-foreground">{product.availableSizes.join(" · ")}</span>
+            </p>
+          ) : null}
+
+          <div className="flex items-baseline gap-1.5 mt-1">
+            <span className="text-sm text-muted-foreground">Desde</span>
+            <span className="text-base font-bold">{formatPriceShort(product.minPrice)}</span>
+            {product.maxPrice > product.minPrice && (
+              <span className="text-xs text-muted-foreground">
+                hasta {formatPriceShort(product.maxPrice)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </Link>

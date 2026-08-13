@@ -14,6 +14,7 @@ export const productAvailabilitySchema = z.enum(["AVAILABLE", "OUT_OF_STOCK"]);
 export const productFiltersParamsSchema = z.object({
   q: z.string().trim().max(100).optional(),
   liga: z.string().max(60).optional(),
+  equipo: z.string().max(60).optional(),
   temporada: z.string().max(60).optional(),
   version: z.string().max(60).optional(),
   talla: z.string().max(10).optional(),
