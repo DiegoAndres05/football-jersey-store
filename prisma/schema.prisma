@@ -1,0 +1,404 @@
+// Football Jersey Store — Modelo de Dominio v2 Consolidado
+// MVP simplificado: 20 entidades, 7 bounded contexts, 6 aggregate roots
+//
+// Principios de diseño:
+// 1. Producto y Variante desacoplados
+// 2. Stock como estado derivado de InventoryMovement (fuente de verdad)
+// 3. Precios explícitos por variante (costPrice, salePrice, compareAtPrice)
+// 4. Customer existe sin User (guest checkout)
+// 5. Imágenes como entidad (múltiples, ordenadas, con alt text)
+// 6. Sin sobreingeniería: Brand, Collection, Promotion, Coupon, ShippingMethod
+//    se implementarán en V2 cuando el negocio las demande
+// 7. Sin cascade delete en datos de auditoría (InventoryMovement, OrderItem, etc.)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// SQLite para desarrollo local. Cambiar a postgresql para producción.
+// En producción: provider = "postgresql"
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =========================================================================
+// NOTA: SQLite no soporta enums nativos.
+// Todos los campos enum-like se definen como String.
+// La validación se hace en la capa de aplicación.
+// Si se migra a PostgreSQL se puede cambiar por enum nativo.
+// =========================================================================
+
+// =========================================================================
+// BOUNDED CONTEXT: CATALOG
+// =========================================================================
+
+model League {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  country   String?
+  logoUrl   String?
+  teams     Team[]
+  createdAt DateTime @default(now())
+}
+
+model Team {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  name      String
+  shortName String?
+  country   String?
+  crestUrl  String?
+  leagueId  String
+  league    League    @relation(fields: [leagueId], references: [id])
+  products  Product[]
+  createdAt DateTime  @default(now())
+}
+
+model Season {
+  id       String    @id @default(cuid())
+  slug     String    @unique
+  name     String
+  isRetro  Boolean   @default(false)
+  year     Int?
+  products Product[]
+}
+
+model Version {
+  id        String         @id @default(cuid())
+  slug      String         @unique
+  name      String
+  priceAdjustment Int      @default(0)
+  variants  ProductVariant[]
+}
+
+model Size {
+  id       String         @id @default(cuid())
+  code     String         @unique
+  name     String
+  position Int            @default(0)
+  variants ProductVariant[]
+}
+
+model Product {
+  id              String         @id @default(cuid())
+  slug            String         @unique
+  name            String
+  shortName       String?
+  description     String?
+  kitType         String  // LOCAL | VISITANTE | TERCERA | ENTRENAMIENTO | ESPECIAL
+  brand           String?
+  isFeatured      Boolean        @default(false)
+  isActive        Boolean        @default(true)
+
+  customizationsEnabled  Boolean  @default(true)
+  customizationSurcharge Int      @default(0)
+  hasPlayerPrint         Boolean  @default(false)
+
+  teamId          String
+  team            Team           @relation(fields: [teamId], references: [id])
+  seasonId        String
+  season          Season         @relation(fields: [seasonId], references: [id])
+
+  images          ProductImage[]
+  variants        ProductVariant[]
+  supplierProducts SupplierProduct[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([teamId])
+  @@index([seasonId])
+  @@index([isFeatured])
+  @@index([isActive])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String?
+  order     Int      @default(0)
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+model ProductVariant {
+  id              String           @id @default(cuid())
+  productId       String
+  product         Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  versionId       String
+  version         Version          @relation(fields: [versionId], references: [id])
+  sizeId          String
+  size            Size             @relation(fields: [sizeId], references: [id])
+  sku             String           @unique
+
+  costPrice       Int
+  salePrice       Int
+  compareAtPrice  Int?
+
+  lowStockAt      Int?
+  weight          Int              @default(400)
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([productId, versionId, sizeId])
+  @@index([sku])
+}
+
+// =========================================================================
+// BOUNDED CONTEXT: INVENTORY
+// =========================================================================
+// Fuente de verdad del stock. SUM(quantity) = stock actual.
+// quantity SIEMPRE es positivo. La dirección se determina por MovementType.
+// IN, RETURN, CANCELLATION = suman al stock
+// OUT, SALE, RESERVATION = restan del stock
+// ADJUSTMENT usa adjustmentDirection para indicar incremento o decremento.
+
+model InventoryMovement {
+  id                  String       @id @default(cuid())
+  variantId           String
+  type                String  // IN | OUT | SALE | RESERVATION | RETURN | ADJUSTMENT | CANCELLATION
+  quantity            Int
+  adjustmentDirection String?      // "INCREMENT" | "DECREMENT" — solo para ADJUSTMENT
+
+  reference           String?      // código de orden, PO, etc.
+  reason              String?
+  orderReference      String?      // Order.code (sin FK — referencia débil cross-context)
+  userReference       String?      // User.email o Customer.email (sin FK)
+  createdAt           DateTime     @default(now())
+
+  @@index([variantId])
+  @@index([orderReference])
+  @@index([createdAt])
+}
+
+// =========================================================================
+// BOUNDED CONTEXT: SUPPLIER
+// =========================================================================
+
+model Supplier {
+  id            String          @id @default(cuid())
+  slug          String          @unique
+  name          String
+  contactName   String?
+  email         String?
+  phone         String?
+  country       String?
+  leadTimeDays  Int             @default(15)
+  purchaseNotes String?
+  priority      Int             @default(0)
+  isActive      Boolean         @default(true)
+  products      SupplierProduct[]
+  orders        SupplierOrder[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model SupplierProduct {
+  id           String   @id @default(cuid())
+  supplierId   String
+  supplier     Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  costPrice    Int
+  isAvailable  Boolean  @default(true)
+  notes        String?
+  leadTimeDays Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([supplierId, productId])
+}
+
+model SupplierOrder {
+  id            String             @id @default(cuid())
+  code          String             @unique
+  supplierId    String
+  supplier      Supplier           @relation(fields: [supplierId], references: [id])
+  status        String  @default("PENDING")  // PENDING | SENT | CONFIRMED | SHIPPED | RECEIVED | CANCELLED
+  totalCost     Int                @default(0)
+  trackingNotes String?
+  orderedAt     DateTime?
+  receivedAt    DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  items         SupplierOrderItem[]
+}
+
+model SupplierOrderItem {
+  id              String        @id @default(cuid())
+  supplierOrderId String
+  supplierOrder   SupplierOrder @relation(fields: [supplierOrderId], references: [id], onDelete: Cascade)
+  productName     String
+  variantLabel    String
+  quantity        Int
+  unitCost        Int
+}
+
+// =========================================================================
+// BOUNDED CONTEXT: CUSTOMER
+// =========================================================================
+
+model Customer {
+  id        String    @id @default(cuid())
+  email     String?
+  name      String?
+  phone     String?
+  notes     String?
+
+  userId    String?   @unique
+  user      User?     @relation(fields: [userId], references: [id])
+
+  addresses Address[]
+  orders    Order[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([email])
+}
+
+model Address {
+  id         String    @id @default(cuid())
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  fullName   String
+  phone      String
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  zipCode    String?
+  country    String    @default("Colombia")
+  isDefault  Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([customerId])
+}
+
+// =========================================================================
+// BOUNDED CONTEXT: USER & AUTH
+// =========================================================================
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  phone     String?
+  role      String  @default("CUSTOMER")  // CUSTOMER | ADMIN | SUPER_ADMIN
+  isActive  Boolean   @default(true)
+
+  customer  Customer?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// =========================================================================
+// BOUNDED CONTEXT: ORDER
+// =========================================================================
+
+model Order {
+  id              String              @id @default(cuid())
+  code            String              @unique
+  status          String  @default("PENDING_PAYMENT")  // PENDING_PAYMENT | PAID | VALIDATING | RESERVED | SUPPLIER_REQUESTED | IN_TRANSIT | PREPARING | SHIPPED | DELIVERED | COMPLETED | CANCELLED | REFUNDED | RETURNED | PAYMENT_FAILED
+
+  customerId      String?
+  customer        Customer?           @relation(fields: [customerId], references: [id])
+
+  customerName    String
+  customerEmail   String
+  customerPhone   String
+
+  subtotal        Int
+  personalizationFee Int              @default(0)
+  shippingFee     Int                 @default(0)
+  discountAmount  Int                 @default(0)
+  total           Int
+
+  shippingMethod  String              @default("Nacional")
+  shippingFullName String
+  shippingPhone    String
+  shippingLine1    String
+  shippingLine2    String?
+  shippingCity     String
+  shippingState    String
+  shippingZipCode  String?
+  shippingCountry  String             @default("Colombia")
+
+  notes           String?
+  trackingNumber  String?
+  trackingCarrier String?
+
+  paymentMethod   String  @default("CARD")  // CARD | PSE | NEQUI | DAVIPLATA
+  paymentRef      String?
+  paidAt          DateTime?
+
+  items           OrderItem[]
+  history         OrderStatusHistory[]
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([status])
+  @@index([customerEmail])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id              String             @id @default(cuid())
+  orderId         String
+  order           Order              @relation(fields: [orderId], references: [id])
+
+  productId       String?
+  variantId       String?
+
+  productName     String
+  teamName        String
+  versionName     String
+  sizeName        String
+  unitPrice       Int
+  quantity        Int
+  subtotal        Int
+
+  customizationType  String  @default("NONE")  // NONE | CUSTOM | OFFICIAL_PLAYER
+  customizationName  String?
+  customizationNumber String?
+  officialPlayer     String?
+
+  sourceType      String  @default("LOCAL")  // LOCAL | SUPPLIER
+  supplierId      String?
+
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([orderId])
+}
+
+model OrderStatusHistory {
+  id          String       @id @default(cuid())
+  orderId     String
+  order       Order        @relation(fields: [orderId], references: [id])
+  fromStatus  String?  // OrderStatus as string
+  toStatus    String  // OrderStatus as string
+  note        String?
+  createdBy   String?
+  createdAt   DateTime     @default(now())
+
+  @@index([orderId])
+}
+
+// =========================================================================
+// SYSTEM
+// =========================================================================
+
+model Setting {
+  key   String @id
+  value String
+}
