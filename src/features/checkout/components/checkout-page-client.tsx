@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, ArrowRight, CreditCard, Landmark, Smartphone, ShieldCheck } from "lucide-react";
@@ -14,6 +15,7 @@ import { useCartStore } from "@/shared/stores/cart-store";
 import { SHIPPING, shippingFee, SITE } from "@/shared/config/site";
 import { formatPrice } from "@/lib/utils";
 import { processMockPayment } from "@/features/payments/services/mock-payment";
+import { submitOrder } from "@/features/orders/server/order-actions";
 import {
   checkoutFormSchema,
   type CheckoutFormValues,
@@ -21,14 +23,18 @@ import {
 } from "@/features/checkout/schemas/checkout-schema";
 
 export function CheckoutPageClient() {
+  const router = useRouter();
   const items = useCartStore((s) => s.items);
   const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
+  const clearCart = useCartStore((s) => s.clear);
 
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<"form" | "payment">("form");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
   const [payReference, setPayReference] = useState("");
+  const [payError, setPayError] = useState("");
+  const formRef = useRef<CheckoutFormValues | null>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -79,19 +85,46 @@ export function CheckoutPageClient() {
     );
   }
 
-  const onValid = () => setStep("payment");
+  const onValid = (values: CheckoutFormValues) => {
+    formRef.current = values;
+    setStep("payment");
+  };
 
   const payNow = async () => {
-    if (paymentStatus !== "idle") return;
+    if (paymentStatus !== "idle" || !formRef.current) return;
     setPaymentStatus("processing");
-    const result = await processMockPayment({ method: paymentMethod, amount: total });
-    if (result.ok) {
-      setPayReference(result.reference);
-      setPaymentStatus("success");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
+    setPayError("");
+    const payment = await processMockPayment({ method: paymentMethod, amount: total });
+
+    if (!payment.ok) {
+      setPayError(payment.reason);
       setPaymentStatus("failed");
+      return;
     }
+
+    const result = await submitOrder({
+      form: formRef.current,
+      lines: items.map((i) => ({
+        variantId: i.variantId,
+        quantity: i.quantity,
+        customizationType: i.customizationType,
+        customizationName: i.customizationName,
+        customizationNumber: i.customizationNumber,
+      })),
+      paymentMethod,
+      paymentReference: payment.reference,
+    });
+
+    if (!result.ok) {
+      setPayError(result.error);
+      setPaymentStatus("failed");
+      return;
+    }
+
+    setPayReference(payment.reference);
+    setPaymentStatus("success");
+    clearCart();
+    router.replace(`/pedido/confirmado/${result.code}`);
   };
 
   return (
@@ -236,15 +269,14 @@ export function CheckoutPageClient() {
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     Simulación aprobada por {formatPrice(total)} con{" "}
                     {paymentMethod === "CARD" ? "tarjeta" : paymentMethod === "PSE" ? "PSE" : "Nequi"}.
-                    Referencia {payReference}. En el siguiente paso se crea tu pedido y recibirás la
-                    confirmación por correo.
+                    Referencia {payReference}. Creando tu pedido…
                   </p>
                 </div>
               )}
 
               {paymentStatus === "failed" && (
                 <div className="rounded-xl border border-border bg-card p-6 text-center">
-                  <p className="text-sm font-medium">No se pudo procesar la simulación.</p>
+                  <p className="text-sm font-medium">{payError || "No se pudo procesar la simulación."}</p>
                   <Button className="mt-4" onClick={() => setPaymentStatus("idle")}>
                     Reintentar
                   </Button>
