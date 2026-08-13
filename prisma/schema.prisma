@@ -53,7 +53,21 @@ model Team {
   leagueId  String
   league    League    @relation(fields: [leagueId], references: [id])
   products  Product[]
+  players   Player[]
   createdAt DateTime  @default(now())
+}
+
+model Player {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id])
+  name      String
+  number    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, number])
+  @@index([teamId])
 }
 
 model Season {

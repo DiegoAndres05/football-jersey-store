@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn, formatPriceShort } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 type Version = { id: string; slug: string; name: string; priceAdjustment: number };
@@ -36,6 +36,7 @@ export function ProductVariantSelector({
             return (
               <button
                 key={v.id}
+                aria-pressed={isSelected}
                 onClick={() => onVersionChange(v.slug)}
                 className={cn(
                   "flex flex-col items-center gap-0.5 rounded-xl border-2 px-4 py-2.5 text-sm transition-all",
@@ -46,7 +47,7 @@ export function ProductVariantSelector({
               >
                 <span>{v.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  ${(price.salePrice / 1000).toFixed(0)}K
+                  {formatPriceShort(price.salePrice)}
                 </span>
               </button>
             );

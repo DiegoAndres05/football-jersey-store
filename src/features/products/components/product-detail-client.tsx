@@ -13,13 +13,15 @@ import { ProductAvailability } from "./product-availability";
 import { AddToCartButton } from "./add-to-cart-button";
 import type { ProductDetailData, VariantWithStock } from "@/features/products/types/product-types";
 
+type CustomType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
+
 export function ProductDetailClient({ product }: { product: ProductDetailData }) {
   const [selectedVersion, setSelectedVersion] = useState(product.variants[0]?.version.slug ?? "");
   const [selectedSize, setSelectedSize] = useState(product.variants[0]?.size.code ?? "");
-  const [customType, setCustomType] = useState<"NONE" | "CUSTOM" | "OFFICIAL_PLAYER">("NONE");
+  const [customType, setCustomType] = useState<CustomType>("NONE");
   const [customName, setCustomName] = useState("");
   const [customNumber, setCustomNumber] = useState("");
-  const [customPlayer, setCustomPlayer] = useState("");
+  const [customPlayerId, setCustomPlayerId] = useState("");
 
   const variantMap = useMemo(() => {
     const map = new Map<string, VariantWithStock>();
@@ -69,11 +71,18 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
     }).map((v) => v.size);
   }, [product.variants]);
 
-  const playerNames = useMemo(() => {
-    return [{ name: "Vinicius Jr.", number: "7" }, { name: "Bellingham", number: "5" }, { name: "Modric", number: "10" }];
-  }, []);
+  const selectedPlayer = useMemo(
+    () => product.players.find((p) => p.id === customPlayerId) ?? null,
+    [product.players, customPlayerId],
+  );
 
   const isDisabled = currentVariant?.availability === "OUT_OF_STOCK";
+
+  const surcharge = customType !== "NONE" ? product.customizationSurcharge : 0;
+  const customizationName =
+    customType === "CUSTOM" ? customName : customType === "OFFICIAL_PLAYER" ? selectedPlayer?.name ?? "" : "";
+  const customizationNumber =
+    customType === "CUSTOM" ? customNumber : customType === "OFFICIAL_PLAYER" ? selectedPlayer?.number ?? "" : "";
 
   return (
     <div className="container-page py-8">
@@ -93,7 +102,7 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
         {/* Right: Product info */}
         <div className="space-y-6">
           <div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2 flex-wrap">
               <span>{product.team.name}</span>
               <span>·</span>
               <span>{product.brand}</span>
@@ -118,8 +127,10 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
           {/* Price */}
           {currentVariant && (
             <ProductPrice
-              salePrice={currentVariant.salePrice}
-              compareAtPrice={currentVariant.compareAtPrice}
+              salePrice={currentVariant.salePrice + surcharge}
+              compareAtPrice={currentVariant.compareAtPrice
+                ? currentVariant.compareAtPrice + surcharge
+                : null}
             />
           )}
 
@@ -144,14 +155,15 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
             enabled={product.customizationsEnabled}
             type={customType}
             hasPlayerPrint={product.hasPlayerPrint}
-            playerNames={playerNames}
+            players={product.players}
+            surcharge={product.customizationSurcharge}
             name={customName}
             number={customNumber}
-            playerName={customPlayer}
+            selectedPlayerId={customPlayerId}
             onTypeChange={setCustomType}
             onNameChange={setCustomName}
             onNumberChange={setCustomNumber}
-            onPlayerChange={setCustomPlayer}
+            onPlayerChange={setCustomPlayerId}
           />
 
           <Separator />
@@ -174,10 +186,10 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
               versionName={currentVariant.version.name}
               sizeName={currentVariant.size.name}
               imageUrl={product.images[0]?.url ?? ""}
-              unitPrice={currentVariant.salePrice}
+              unitPrice={currentVariant.salePrice + surcharge}
               customizationType={customType}
-              customizationName={customType === "CUSTOM" ? customName : customType === "OFFICIAL_PLAYER" ? customPlayer : ""}
-              customizationNumber={customType === "CUSTOM" ? customNumber : customType === "OFFICIAL_PLAYER" ? customPlayer.split(" - ")[1] ?? "" : ""}
+              customizationName={customizationName}
+              customizationNumber={customizationNumber}
               disabled={isDisabled}
             />
           )}

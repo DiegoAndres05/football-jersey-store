@@ -27,6 +27,7 @@ async function main() {
   await prisma.productImage.deleteMany();
   await prisma.productVariant.deleteMany();
   await prisma.product.deleteMany();
+  await prisma.player.deleteMany();
   await prisma.season.deleteMany();
   await prisma.team.deleteMany();
   await prisma.league.deleteMany();
@@ -83,6 +84,54 @@ async function main() {
     prisma.team.create({ data: { slug: "nacional", name: "Atlético Nacional", shortName: "NAL", country: "Colombia", leagueId: ligaCol.id } }),
     prisma.team.create({ data: { slug: "colombia", name: "Selección Colombia", shortName: "COL", country: "Colombia", leagueId: selecciones.id } }),
   ]);
+
+  // ── Players ──
+  const playersByTeam: { team: { id: string }; players: { name: string; number: string }[] }[] = [
+    { team: realMadrid, players: [
+      { name: "Vinícius Júnior", number: "7" }, { name: "Jude Bellingham", number: "5" }, { name: "Kylian Mbappé", number: "9" }, { name: "Fede Valverde", number: "8" },
+    ]},
+    { team: barcelona, players: [
+      { name: "Lamine Yamal", number: "19" }, { name: "Robert Lewandowski", number: "9" }, { name: "Pedri", number: "8" },
+    ]},
+    { team: atletico, players: [
+      { name: "Antoine Griezmann", number: "7" }, { name: "Julián Álvarez", number: "19" }, { name: "Koke", number: "6" },
+    ]},
+    { team: manCity, players: [
+      { name: "Erling Haaland", number: "9" }, { name: "Kevin De Bruyne", number: "17" }, { name: "Phil Foden", number: "47" },
+    ]},
+    { team: liverpool, players: [
+      { name: "Mohamed Salah", number: "11" }, { name: "Virgil van Dijk", number: "4" }, { name: "Luis Díaz", number: "7" },
+    ]},
+    { team: arsenal, players: [
+      { name: "Bukayo Saka", number: "7" }, { name: "Martin Ødegaard", number: "8" }, { name: "Declan Rice", number: "41" },
+    ]},
+    { team: inter, players: [
+      { name: "Lautaro Martínez", number: "10" }, { name: "Nicolò Barella", number: "23" }, { name: "Hakan Çalhanoğlu", number: "20" },
+    ]},
+    { team: acMilan, players: [
+      { name: "Rafael Leão", number: "10" }, { name: "Theo Hernández", number: "19" }, { name: "Christian Pulisic", number: "11" },
+    ]},
+    { team: bayern, players: [
+      { name: "Harry Kane", number: "9" }, { name: "Jamal Musiala", number: "42" }, { name: "Joshua Kimmich", number: "6" },
+    ]},
+    { team: psg, players: [
+      { name: "Ousmane Dembélé", number: "10" }, { name: "Achraf Hakimi", number: "2" }, { name: "Vitinha", number: "17" },
+    ]},
+    { team: millonarios, players: [
+      { name: "Radamel Falcao", number: "3" }, { name: "Daniel Cataño", number: "10" }, { name: "David Mackalister Silva", number: "14" },
+    ]},
+    { team: nacional, players: [
+      { name: "Jefferson Duque", number: "9" }, { name: "Dorlan Pabón", number: "10" }, { name: "Sebastián Gómez", number: "8" },
+    ]},
+    { team: colombiaSel, players: [
+      { name: "James Rodríguez", number: "10" }, { name: "Luis Díaz", number: "7" }, { name: "Davinson Sánchez", number: "23" },
+    ]},
+  ];
+  for (const { team, players } of playersByTeam) {
+    await prisma.player.createMany({
+      data: players.map((p) => ({ teamId: team.id, ...p })),
+    });
+  }
 
   // ── Seasons ──
   const [sCurrent, sPrev, sRetro98, sRetro06, sRetro10] = await Promise.all([

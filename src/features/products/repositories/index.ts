@@ -1,1 +1,1 @@
-export { getProducts, getProductBySlug, getFeaturedProducts, getLeagues, getTeamsByLeague, getSeasons, getVersions, getSizes, computeStock, computeAvailability } from "./product-repository";
+export { getProducts, getProductBySlug, getRelatedProducts, getFeaturedProducts, getLeagues, getTeamsByLeague, getSeasons, getVersions, getSizes, computeStock, computeAvailability } from "./product-repository";

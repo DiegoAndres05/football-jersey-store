@@ -48,6 +48,8 @@ export function ProductGallery({ images }: { images: ImageData[] }) {
           {images.map((img, i) => (
             <button
               key={img.id}
+              aria-pressed={i === selectedIndex}
+              aria-label={img.altText ?? `Imagen ${i + 1} del producto`}
               onClick={() => onThumbnailClick(i)}
               className={cn(
                 "relative w-16 h-20 shrink-0 rounded-lg overflow-hidden border-2 transition-all",

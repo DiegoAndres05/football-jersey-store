@@ -65,8 +65,15 @@ export type ProductDetailData = {
     league: Pick<League, "id" | "slug" | "name" | "country"> | null;
   };
   season: Pick<Season, "id" | "slug" | "name" | "isRetro">;
+  players: PlayerData[];
   images: (Pick<ProductImage, "id" | "url" | "altText" | "order" | "isPrimary">)[];
   variants: VariantWithStock[];
+};
+
+export type PlayerData = {
+  id: string;
+  name: string;
+  number: string;
 };
 
 export type VariantWithStock = VariantWithRelations & {

@@ -124,6 +124,11 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailData 
           shortName: true,
           crestUrl: true,
           league: { select: { id: true, slug: true, name: true, country: true } },
+          players: {
+            where: { isActive: true },
+            orderBy: { name: "asc" },
+            select: { id: true, name: true, number: true },
+          },
         },
       },
       season: { select: { id: true, slug: true, name: true, isRetro: true } },
@@ -146,7 +151,36 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailData 
     return { ...v, stock, availability: computeAvailability(stock) };
   });
 
-  return { ...product, variants: variantsWithStock };
+  const players = [...product.team.players].sort(
+    (a, b) => parseInt(a.number, 10) - parseInt(b.number, 10),
+  );
+
+  return { ...product, players, variants: variantsWithStock };
+}
+
+export async function getRelatedProducts(
+  product: Pick<ProductDetailData, "id" | "team">,
+  limit = 4,
+): Promise<ProductCardData[]> {
+  const or: Prisma.ProductWhereInput[] = [{ team: { id: product.team.id } }];
+  if (product.team.league) {
+    or.push({ team: { leagueId: product.team.league.id } });
+  }
+
+  const candidates = await prisma.product.findMany({
+    where: { isActive: true, id: { not: product.id }, OR: or },
+    select: productCardSelect,
+    take: limit * 3,
+    orderBy: { createdAt: "desc" },
+  });
+
+  const ordered = candidates.sort((a, b) => {
+    const aSameTeam = a.team.id === product.team.id ? 0 : 1;
+    const bSameTeam = b.team.id === product.team.id ? 0 : 1;
+    return aSameTeam - bSameTeam;
+  });
+  const mapped = await mapProductCards(ordered.slice(0, limit));
+  return mapped;
 }
 
 export async function getFeaturedProducts(limit = 8): Promise<ProductCardData[]> {
