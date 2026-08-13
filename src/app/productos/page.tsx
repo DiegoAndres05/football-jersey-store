@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getProducts, getLeagues, getSeasons, getVersions, getSizes } from "@/features/products/repositories/product-repository";
 import { ProductGrid } from "@/features/products/components/product-grid";
 import { ProductFilters } from "@/features/products/components/product-filters";
+import { parseProductFiltersParams } from "@/features/products/schemas/product-filters-schema";
 import type { ProductFilters as FilterParams } from "@/features/products/types/product-types";
 
 interface PageProps {
@@ -13,15 +14,17 @@ interface PageProps {
 
 export default async function ProductosPage({ searchParams }: PageProps) {
   const params = await searchParams;
+  const raw = parseProductFiltersParams(params);
 
   const filters: FilterParams = {
-    league: asString(params.liga),
-    season: asString(params.temporada),
-    version: asString(params.version),
-    size: asString(params.talla),
-    search: asString(params.q),
-    sort: asSortOption(asString(params.sort)),
-    page: parseInt(asString(params.page) || "1", 10) || 1,
+    league: raw.liga,
+    season: raw.temporada,
+    version: raw.version,
+    size: raw.talla,
+    availability: raw.disponibilidad,
+    search: raw.q,
+    sort: raw.sort,
+    page: raw.page ?? 1,
   };
 
   const [result, leagues, seasons, versions, sizes] = await Promise.all([
@@ -132,22 +135,13 @@ function CatalogSkeleton() {
   );
 }
 
-function asString(v: string | string[] | undefined): string | undefined {
-  if (Array.isArray(v)) return v[0];
-  return v;
-}
-
-function asSortOption(v: string | undefined): FilterParams["sort"] {
-  const valid = ["default", "price-asc", "price-desc", "name-asc", "name-desc", "newest"] as const;
-  return valid.includes(v as any) ? (v as FilterParams["sort"]) : "default";
-}
-
 function paramsToQuery(filters: FilterParams): string {
   const p = new URLSearchParams();
   if (filters.league) p.set("liga", filters.league);
   if (filters.season) p.set("temporada", filters.season);
   if (filters.version) p.set("version", filters.version);
   if (filters.size) p.set("talla", filters.size);
+  if (filters.availability) p.set("disponibilidad", filters.availability);
   if (filters.search) p.set("q", filters.search);
   if (filters.sort && filters.sort !== "default") p.set("sort", filters.sort);
   return p.toString() ? `&${p.toString()}` : "";

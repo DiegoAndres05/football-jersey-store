@@ -1,6 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import type { ProductCardData, ProductListResult, ProductFilters, ProductDetailData, VariantWithStock, LeagueData, TeamData } from "../types/product-types";
+import type {
+  ProductCardData,
+  ProductListResult,
+  ProductFilters,
+  ProductDetailData,
+  VariantWithStock,
+  LeagueData,
+  TeamData,
+  Availability,
+  SortOption,
+} from "../types/product-types";
 
 const productCardSelect = {
   id: true,
@@ -27,143 +37,77 @@ const productCardSelect = {
   },
 } satisfies Prisma.ProductSelect;
 
+const PAGE_SIZE = 24;
+
 export async function getProducts(filters: ProductFilters): Promise<ProductListResult> {
   const page = Math.max(1, filters.page ?? 1);
-  const pageSize = 24;
-  const skip = (page - 1) * pageSize;
+  const skip = (page - 1) * PAGE_SIZE;
 
-  const where: Prisma.ProductWhereInput = { isActive: true };
-  const teamFilter: Prisma.TeamWhereInput = {};
+  const where = buildProductWhere(filters);
+  const orderBy = buildProductOrderBy(filters.sort);
 
-  if (filters.search) {
-    where.OR = [
-      { name: { contains: filters.search } },
-      { description: { contains: filters.search } },
-      { team: { name: { contains: filters.search } } },
-    ];
-  }
-  if (filters.league) {
-    teamFilter.league = { slug: filters.league };
-  }
-  if (filters.team) {
-    teamFilter.slug = filters.team;
-  }
-  if (filters.season) {
-    where.season = { slug: filters.season };
-  }
-  if (Object.keys(teamFilter).length > 0) {
-    where.team = teamFilter;
-  }
-  if (filters.version || filters.size || filters.availability) {
-    where.variants = {};
-    const variantFilters: Prisma.ProductVariantWhereInput[] = [];
-    if (filters.version) {
-      variantFilters.push({ version: { slug: filters.version } });
-    }
-    if (filters.size) {
-      variantFilters.push({ size: { code: filters.size } });
-    }
-    if (variantFilters.length > 0) {
-      where.variants.some = { AND: variantFilters };
-    }
-    if (filters.availability) {
-      // Stock-based filtering is done post-query
-    }
-  }
+  const isPriceSort = filters.sort === "price-asc" || filters.sort === "price-desc";
+  const hasAvailabilityFilter =
+    filters.availability === "AVAILABLE" || filters.availability === "OUT_OF_STOCK";
 
-  let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: "desc" };
-  switch (filters.sort) {
-    case "price-asc": orderBy = { variants: { _count: "asc" } }; break;
-    case "price-desc": orderBy = { variants: { _count: "desc" } }; break;
-    case "name-asc": orderBy = { name: "asc" }; break;
-    case "name-desc": orderBy = { name: "desc" }; break;
-    case "newest": orderBy = { createdAt: "desc" }; break;
+  // El sort por precio y el filtro de disponibilidad requieren agregados
+  // (min/max precio real y stock real del ledger), así que se calculan por
+  // lote sobre los candidatos y la paginación se hace sobre los ids filtrados.
+  if (isPriceSort || hasAvailabilityFilter) {
+    const candidateIds = (
+      await prisma.product.findMany({ where, select: { id: true }, orderBy })
+    ).map((p) => p.id);
+
+    const rangesByProductId = await getPriceRangesByProductIds(candidateIds);
+    const stocksByProductId = hasAvailabilityFilter
+      ? await getStocksByProductIds(candidateIds)
+      : undefined;
+
+    let allowedIds = candidateIds;
+
+    if (hasAvailabilityFilter) {
+      allowedIds = candidateIds.filter((id) => {
+        const isAvailable = (stocksByProductId?.get(id) ?? []).some((stock) => stock > 0);
+        return filters.availability === "AVAILABLE" ? isAvailable : !isAvailable;
+      });
+    }
+
+    if (isPriceSort) {
+      const dir = filters.sort === "price-asc" ? 1 : -1;
+      allowedIds = [...allowedIds].sort((a, b) => {
+        const priceA = rangesByProductId.get(a)?.min ?? 0;
+        const priceB = rangesByProductId.get(b)?.min ?? 0;
+        return (priceA - priceB) * dir;
+      });
+    }
+
+    const total = allowedIds.length;
+    const pageIds = allowedIds.slice(skip, skip + PAGE_SIZE);
+    const products =
+      pageIds.length > 0
+        ? await prisma.product.findMany({
+            where: { id: { in: pageIds } },
+            select: productCardSelect,
+          })
+        : [];
+    const productsById = new Map(products.map((p) => [p.id, p]));
+    const ordered = pageIds
+      .map((id) => productsById.get(id))
+      .filter((p): p is NonNullable<typeof p> => p !== undefined);
+    const mapped = await mapProductCards(ordered, {
+      rangesByProductId,
+      stocksByProductId,
+    });
+    return { products: mapped, total, page, totalPages: Math.ceil(total / PAGE_SIZE) };
   }
 
   const [products, total] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      select: productCardSelect,
-      skip,
-      take: pageSize,
-      orderBy,
-    }),
+    prisma.product.findMany({ where, select: productCardSelect, skip, take: PAGE_SIZE, orderBy }),
     prisma.product.count({ where }),
   ]);
 
-  const totalPages = Math.ceil(total / pageSize);
-
-  const mapped = await Promise.all(
-    products.map(async (p) => {
-      const prices = await getProductPriceRange(p.id);
-      const availability = await getWorstAvailability(p.id);
-      return {
-        id: p.id,
-        slug: p.slug,
-        name: p.name,
-        shortName: p.shortName,
-        kitType: p.kitType,
-        brand: p.brand,
-        isFeatured: p.isFeatured,
-        team: p.team,
-        season: p.season,
-        primaryImage: p.images[0] ?? null,
-        minPrice: prices.min,
-        maxPrice: prices.max,
-        availability,
-      } satisfies ProductCardData;
-    }),
-  );
-
-  return { products: mapped, total, page, totalPages };
-}
-
-async function getProductPriceRange(productId: string): Promise<{ min: number; max: number }> {
-  const result = await prisma.productVariant.aggregate({
-    where: { productId },
-    _min: { salePrice: true },
-    _max: { salePrice: true },
-  });
-  return {
-    min: result._min.salePrice ?? 0,
-    max: result._max.salePrice ?? 0,
-  };
-}
-
-async function getWorstAvailability(productId: string): Promise<"AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK"> {
-  const variants = await prisma.productVariant.findMany({
-    where: { productId },
-    select: { id: true },
-  });
-  if (variants.length === 0) return "OUT_OF_STOCK";
-  let hasAvailable = false;
-  let hasOnDemand = false;
-  for (const v of variants) {
-    const stock = await computeStock(v.id);
-    if (stock !== null && stock > 0) {
-      hasAvailable = true;
-    } else if (stock === null) {
-      hasOnDemand = true;
-    }
-  }
-  if (hasAvailable) return "AVAILABLE";
-  if (hasOnDemand) return "ON_DEMAND";
-  return "OUT_OF_STOCK";
-}
-
-export async function computeStock(variantId: string): Promise<number | null> {
-  const result = await prisma.inventoryMovement.aggregate({
-    where: { variantId },
-    _sum: { quantity: true },
-  });
-  const total = result._sum.quantity ?? 0;
-  return total;
-}
-
-export function computeAvailability(stock: number | null): "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK" {
-  if (stock === null) return "ON_DEMAND";
-  if (stock > 0) return "AVAILABLE";
-  return "OUT_OF_STOCK";
+  const mapped = await mapProductCards(products);
+  return { products: mapped, total, page, totalPages: Math.ceil(total / PAGE_SIZE) };
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductDetailData | null> {
@@ -171,10 +115,20 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailData 
     where: { slug, isActive: true },
     include: {
       team: {
-        select: { id: true, slug: true, name: true, shortName: true, crestUrl: true, league: { select: { id: true, slug: true, name: true, country: true } } },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          shortName: true,
+          crestUrl: true,
+          league: { select: { id: true, slug: true, name: true, country: true } },
+        },
       },
       season: { select: { id: true, slug: true, name: true, isRetro: true } },
-      images: { orderBy: { order: "asc" }, select: { id: true, url: true, altText: true, order: true, isPrimary: true } },
+      images: {
+        orderBy: { order: "asc" },
+        select: { id: true, url: true, altText: true, order: true, isPrimary: true },
+      },
       variants: {
         include: { version: true, size: true },
         orderBy: [{ version: { priceAdjustment: "asc" } }, { size: { position: "asc" } }],
@@ -184,12 +138,11 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailData 
 
   if (!product) return null;
 
-  const variantsWithStock: VariantWithStock[] = await Promise.all(
-    product.variants.map(async (v) => {
-      const stock = await computeStock(v.id);
-      return { ...v, stock, availability: computeAvailability(stock) };
-    }),
-  );
+  const stockByVariantId = await getStockByVariantIds(product.variants.map((v) => v.id));
+  const variantsWithStock: VariantWithStock[] = product.variants.map((v) => {
+    const stock = stockByVariantId.get(v.id) ?? 0;
+    return { ...v, stock, availability: computeAvailability(stock) };
+  });
 
   return { ...product, variants: variantsWithStock };
 }
@@ -202,27 +155,23 @@ export async function getFeaturedProducts(limit = 8): Promise<ProductCardData[]>
     orderBy: { createdAt: "desc" },
   });
 
-  return Promise.all(
-    products.map(async (p) => {
-      const prices = await getProductPriceRange(p.id);
-      const availability = await getWorstAvailability(p.id);
-      return {
-        id: p.id,
-        slug: p.slug,
-        name: p.name,
-        shortName: p.shortName,
-        kitType: p.kitType,
-        brand: p.brand,
-        isFeatured: p.isFeatured,
-        team: p.team,
-        season: p.season,
-        primaryImage: p.images[0] ?? null,
-        minPrice: prices.min,
-        maxPrice: prices.max,
-        availability,
-      };
-    }),
-  );
+  return mapProductCards(products);
+}
+
+export async function computeStock(variantId: string): Promise<number> {
+  const result = await prisma.inventoryMovement.aggregate({
+    where: { variantId },
+    _sum: { quantity: true },
+  });
+  return result._sum.quantity ?? 0;
+}
+
+export function computeAvailability(
+  stock: number | null,
+): "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK" {
+  if (stock === null) return "ON_DEMAND";
+  if (stock > 0) return "AVAILABLE";
+  return "OUT_OF_STOCK";
 }
 
 export async function getLeagues(): Promise<LeagueData[]> {
@@ -279,4 +228,146 @@ export async function getVersions() {
 
 export async function getSizes() {
   return prisma.size.findMany({ orderBy: { position: "asc" } });
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function buildProductWhere(filters: ProductFilters): Prisma.ProductWhereInput {
+  const where: Prisma.ProductWhereInput = { isActive: true };
+  const teamFilter: Prisma.TeamWhereInput = {};
+
+  if (filters.search) {
+    where.OR = [
+      { name: { contains: filters.search } },
+      { description: { contains: filters.search } },
+      { team: { name: { contains: filters.search } } },
+    ];
+  }
+  if (filters.league) {
+    teamFilter.league = { slug: filters.league };
+  }
+  if (filters.team) {
+    teamFilter.slug = filters.team;
+  }
+  if (filters.season) {
+    where.season = { slug: filters.season };
+  }
+  if (Object.keys(teamFilter).length > 0) {
+    where.team = teamFilter;
+  }
+
+  if (filters.version || filters.size) {
+    const variantFilters: Prisma.ProductVariantWhereInput[] = [];
+    if (filters.version) {
+      variantFilters.push({ version: { slug: filters.version } });
+    }
+    if (filters.size) {
+      variantFilters.push({ size: { code: filters.size } });
+    }
+    where.variants = { some: { AND: variantFilters } };
+  }
+
+  return where;
+}
+
+function buildProductOrderBy(sort?: SortOption): Prisma.ProductOrderByWithRelationInput {
+  switch (sort) {
+    case "name-asc":
+      return { name: "asc" };
+    case "name-desc":
+      return { name: "desc" };
+    case "newest":
+      return { createdAt: "desc" };
+    default:
+      return { createdAt: "desc" };
+  }
+}
+
+async function mapProductCards(
+  products: Prisma.ProductGetPayload<{ select: typeof productCardSelect }>[],
+  known?: {
+    rangesByProductId?: Map<string, { min: number; max: number }>;
+    stocksByProductId?: Map<string, number[]>;
+  },
+): Promise<ProductCardData[]> {
+  const ids = products.map((p) => p.id);
+  const [rangesByProductId, stocksByProductId] = await Promise.all([
+    known?.rangesByProductId ??
+      (ids.length > 0
+        ? getPriceRangesByProductIds(ids)
+        : Promise.resolve(new Map<string, { min: number; max: number }>())),
+    known?.stocksByProductId ??
+      (ids.length > 0
+        ? getStocksByProductIds(ids)
+        : Promise.resolve(new Map<string, number[]>())),
+  ]);
+
+  return products.map((p) => {
+    const range = rangesByProductId.get(p.id) ?? { min: 0, max: 0 };
+    const stocks = stocksByProductId.get(p.id) ?? [];
+    return {
+      id: p.id,
+      slug: p.slug,
+      name: p.name,
+      shortName: p.shortName,
+      kitType: p.kitType,
+      brand: p.brand,
+      isFeatured: p.isFeatured,
+      team: p.team,
+      season: p.season,
+      primaryImage: p.images[0] ?? null,
+      minPrice: range.min,
+      maxPrice: range.max,
+      availability: availabilityFromStocks(stocks),
+    } satisfies ProductCardData;
+  });
+}
+
+function availabilityFromStocks(stocks: number[]): Availability {
+  if (stocks.some((stock) => stock > 0)) return "AVAILABLE";
+  return "OUT_OF_STOCK";
+}
+
+async function getPriceRangesByProductIds(
+  productIds: string[],
+): Promise<Map<string, { min: number; max: number }>> {
+  if (productIds.length === 0) return new Map();
+  const rows = await prisma.productVariant.groupBy({
+    by: ["productId"],
+    where: { productId: { in: productIds } },
+    _min: { salePrice: true },
+    _max: { salePrice: true },
+  });
+  return new Map(
+    rows.map((r) => [
+      r.productId,
+      { min: r._min.salePrice ?? 0, max: r._max.salePrice ?? 0 },
+    ]),
+  );
+}
+
+async function getStockByVariantIds(variantIds: string[]): Promise<Map<string, number>> {
+  if (variantIds.length === 0) return new Map();
+  const rows = await prisma.inventoryMovement.groupBy({
+    by: ["variantId"],
+    where: { variantId: { in: variantIds } },
+    _sum: { quantity: true },
+  });
+  return new Map(rows.map((r) => [r.variantId, r._sum.quantity ?? 0]));
+}
+
+async function getStocksByProductIds(productIds: string[]): Promise<Map<string, number[]>> {
+  if (productIds.length === 0) return new Map();
+  const variants = await prisma.productVariant.findMany({
+    where: { productId: { in: productIds } },
+    select: { id: true, productId: true },
+  });
+  const stockByVariantId = await getStockByVariantIds(variants.map((v) => v.id));
+  const byProduct = new Map<string, number[]>();
+  for (const v of variants) {
+    const stocks = byProduct.get(v.productId) ?? [];
+    stocks.push(stockByVariantId.get(v.id) ?? 0);
+    byProduct.set(v.productId, stocks);
+  }
+  return byProduct;
 }

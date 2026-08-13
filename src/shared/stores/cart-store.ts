@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+export type CustomizationType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
+
 export type CartItem = {
+  lineId: string;
   variantId: string;
   productSlug: string;
   productName: string;
@@ -11,16 +14,39 @@ export type CartItem = {
   imageUrl: string;
   unitPrice: number;
   quantity: number;
-  customizationType: "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
+  customizationType: CustomizationType;
   customizationName: string;
   customizationNumber: string;
 };
 
+export type CartDraft = Omit<CartItem, "quantity" | "lineId">;
+
+/**
+ * Una línea de carrito se identifica por variante + personalización:
+ * "Real Madrid / Fan / M" (sin personalizar) es distinto de
+ * "Real Madrid / Player / M", y dos personalizaciones distintas
+ * sobre la misma variante nunca se mezclan.
+ */
+export function buildLineId(
+  item: Pick<
+    CartItem,
+    "variantId" | "customizationType" | "customizationName" | "customizationNumber"
+  >,
+): string {
+  const customization =
+    item.customizationType === "NONE"
+      ? "none"
+      : `${item.customizationType}:${item.customizationName}:${item.customizationNumber}`;
+  return `${item.variantId}#${customization}`;
+}
+
+type LegacyCartItem = Omit<CartItem, "lineId">;
+
 interface CartState {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "quantity">) => void;
-  removeItem: (variantId: string) => void;
-  updateQuantity: (variantId: string, quantity: number) => void;
+  addItem: (draft: CartDraft) => void;
+  removeItem: (lineId: string) => void;
+  updateQuantity: (lineId: string, quantity: number) => void;
   clear: () => void;
   itemCount: () => number;
   subtotal: () => number;
@@ -30,34 +56,46 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
-      addItem: (item) => {
+      addItem: (draft) => {
+        const lineId = buildLineId(draft);
         set((s) => {
-          const existing = s.items.find((i) => i.variantId === item.variantId);
+          const existing = s.items.find((i) => i.lineId === lineId);
           if (existing) {
             return {
               items: s.items.map((i) =>
-                i.variantId === item.variantId ? { ...i, quantity: i.quantity + 1 } : i,
+                i.lineId === lineId ? { ...i, quantity: i.quantity + 1 } : i,
               ),
             };
           }
-          return { items: [...s.items, { ...item, quantity: 1 }] };
+          return { items: [...s.items, { ...draft, lineId, quantity: 1 }] };
         });
       },
-      removeItem: (variantId) => {
-        set((s) => ({ items: s.items.filter((i) => i.variantId !== variantId) }));
+      removeItem: (lineId) => {
+        set((s) => ({ items: s.items.filter((i) => i.lineId !== lineId) }));
       },
-      updateQuantity: (variantId, quantity) => {
+      updateQuantity: (lineId, quantity) => {
         if (quantity < 1) return;
         set((s) => ({
-          items: s.items.map((i) =>
-            i.variantId === variantId ? { ...i, quantity } : i,
-          ),
+          items: s.items.map((i) => (i.lineId === lineId ? { ...i, quantity } : i)),
         }));
       },
       clear: () => set({ items: [] }),
       itemCount: () => get().items.reduce((acc, i) => acc + i.quantity, 0),
       subtotal: () => get().items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0),
     }),
-    { name: "fjs-cart" },
+    {
+      name: "fjs-cart",
+      version: 2,
+      partialize: (state) => ({ items: state.items }),
+      migrate: (persisted) => {
+        const state = persisted as { items?: LegacyCartItem[] };
+        return {
+          items: (state.items ?? []).map((item) => ({
+            ...item,
+            lineId: buildLineId(item),
+          })),
+        };
+      },
+    },
   ),
 );
