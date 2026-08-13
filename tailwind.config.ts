@@ -12,6 +12,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-sans)"],
+        display: ["var(--font-display)", "Arial Narrow", "Impact", "sans-serif"],
         mono: ["var(--font-mono)"],
       },
       colors: {

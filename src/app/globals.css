@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    /* ── Colores (HSL) ── */
-    --background: 0 0% 100%;
-    --foreground: 220 14% 11%;
-    --foreground-secondary: 220 9% 46%;
+    /* ── Colores (HSL) — Identidad Flashsport: off-white / negro / grises ── */
+    --background: 40 33% 98%;
+    --foreground: 0 0% 8%;
+    --foreground-secondary: 0 0% 38%;
 
-    --primary: 145 63% 32%;
+    --primary: 0 0% 0%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 145 63% 27%;
-    --primary-active: 145 63% 22%;
+    --primary-hover: 0 0% 18%;
+    --primary-active: 0 0% 34%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 14% 11%;
-    --secondary-hover: 220 14% 90%;
+    --secondary: 40 20% 96%;
+    --secondary-foreground: 0 0% 8%;
+    --secondary-hover: 40 20% 92%;
 
-    --accent: 145 63% 95%;
-    --accent-foreground: 145 63% 22%;
+    --accent: 40 20% 95%;
+    --accent-foreground: 0 0% 8%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 40 20% 96%;
+    --muted-foreground: 0 0% 38%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -40,18 +40,18 @@
     --info-foreground: 0 0% 100%;
     --info-muted: 201 96% 95%;
 
-    --border: 220 13% 91%;
-    --border-light: 220 13% 95%;
-    --input: 220 13% 91%;
-    --input-focus: 145 63% 32%;
+    --border: 40 15% 90%;
+    --border-light: 40 15% 94%;
+    --input: 40 15% 90%;
+    --input-focus: 0 0% 0%;
     --input-error: 0 84% 60%;
-    --ring: 145 63% 32%;
+    --ring: 0 0% 0%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 14% 11%;
+    --card-foreground: 0 0% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 14% 11%;
+    --popover-foreground: 0 0% 8%;
 
     /* ── Tipografía ── */
     --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
@@ -100,14 +100,14 @@
     --space-20: 5rem;
     --space-24: 6rem;
 
-    /* ── Radios ── */
+    /* ── Radios (escala editorial: menos redondeo) ── */
     --radius-xs: 0.25rem;
     --radius-sm: 0.375rem;
     --radius-md: 0.5rem;
     --radius-lg: 0.625rem;
     --radius-xl: 0.75rem;
     --radius-2xl: 1rem;
-    --radius-3xl: 1.5rem;
+    --radius-3xl: 1.25rem;
     --radius-full: 9999px;
 
     /* ── Sombras ── */

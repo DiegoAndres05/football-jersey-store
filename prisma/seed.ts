@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { SITE } from "../src/shared/config/site";
 
 const prisma = new PrismaClient();
 
@@ -56,17 +57,18 @@ async function main() {
   const szS = sizes[0]!, szM = sizes[1]!, szL = sizes[2]!, szXL = sizes[3]!, szXXL = sizes[4]!;
 
   // ── Leagues ──
-  const [laLiga, premier, serieA, bundes, ligaCol, selecciones] = await Promise.all([
+  const [laLiga, premier, serieA, bundes, ligue1, ligaCol, selecciones] = await Promise.all([
     prisma.league.create({ data: { slug: "la-liga", name: "La Liga", country: "España" } }),
     prisma.league.create({ data: { slug: "premier-league", name: "Premier League", country: "Inglaterra" } }),
     prisma.league.create({ data: { slug: "serie-a", name: "Serie A", country: "Italia" } }),
     prisma.league.create({ data: { slug: "bundesliga", name: "Bundesliga", country: "Alemania" } }),
+    prisma.league.create({ data: { slug: "ligue-1", name: "Ligue 1", country: "Francia" } }),
     prisma.league.create({ data: { slug: "liga-betplay", name: "Liga BetPlay", country: "Colombia" } }),
     prisma.league.create({ data: { slug: "selecciones", name: "Selecciones" } }),
   ]);
 
   // ── Teams ──
-  const [realMadrid, barcelona, atletico, manCity, liverpool, arsenal, inter, acMilan, bayern, millonarios, nacional, colombiaSel] = await Promise.all([
+  const [realMadrid, barcelona, atletico, manCity, liverpool, arsenal, inter, acMilan, bayern, psg, millonarios, nacional, colombiaSel] = await Promise.all([
     prisma.team.create({ data: { slug: "real-madrid", name: "Real Madrid", shortName: "RMA", country: "España", leagueId: laLiga.id } }),
     prisma.team.create({ data: { slug: "barcelona", name: "FC Barcelona", shortName: "BAR", country: "España", leagueId: laLiga.id } }),
     prisma.team.create({ data: { slug: "atletico-madrid", name: "Atlético de Madrid", shortName: "ATM", country: "España", leagueId: laLiga.id } }),
@@ -76,6 +78,7 @@ async function main() {
     prisma.team.create({ data: { slug: "inter", name: "Inter de Milán", shortName: "INT", country: "Italia", leagueId: serieA.id } }),
     prisma.team.create({ data: { slug: "ac-milan", name: "AC Milan", shortName: "MIL", country: "Italia", leagueId: serieA.id } }),
     prisma.team.create({ data: { slug: "bayern", name: "Bayern Munich", shortName: "BAY", country: "Alemania", leagueId: bundes.id } }),
+    prisma.team.create({ data: { slug: "paris-saint-germain", name: "Paris Saint-Germain", shortName: "PSG", country: "Francia", leagueId: ligue1.id } }),
     prisma.team.create({ data: { slug: "millonarios", name: "Millonarios FC", shortName: "MIL", country: "Colombia", leagueId: ligaCol.id } }),
     prisma.team.create({ data: { slug: "nacional", name: "Atlético Nacional", shortName: "NAL", country: "Colombia", leagueId: ligaCol.id } }),
     prisma.team.create({ data: { slug: "colombia", name: "Selección Colombia", shortName: "COL", country: "Colombia", leagueId: selecciones.id } }),
@@ -305,9 +308,9 @@ async function main() {
   // ── Settings ──
   await prisma.setting.createMany({
     data: [
-      { key: "store_name", value: "Football Jersey Store" },
-      { key: "store_email", value: "hola@footballstore.co" },
-      { key: "store_phone", value: "+57 300 000 0000" },
+      { key: "store_name", value: SITE.name },
+      { key: "store_email", value: SITE.email },
+      { key: "store_phone", value: SITE.whatsappNumber },
       { key: "currency", value: "COP" },
       { key: "shipping_free_threshold", value: "200000" },
       { key: "shipping_base_fee", value: "12000" },

@@ -1,17 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Menu, X, Search, ShoppingBag } from "lucide-react";
+import { Menu, X, Search, ShoppingBag, User } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NavLinks } from "./nav-links";
 import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/shared/stores/cart-store";
+import { SITE } from "@/shared/config/site";
 
 export function Header() {
+  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 10);
@@ -25,8 +29,19 @@ export function Header() {
     } else {
       document.body.style.overflow = "";
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [isMobileOpen]);
+
+  const submitSearch = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const q = query.trim();
+    router.push(q ? `/productos?q=${encodeURIComponent(q)}` : "/productos");
+    setQuery("");
+    setIsSearchOpen(false);
+    setIsMobileOpen(false);
+  };
 
   return (
     <>
@@ -34,41 +49,54 @@ export function Header() {
         className={cn(
           "sticky top-0 z-[var(--z-navbar)] transition-all duration-200",
           isScrolled
-            ? "bg-background/80 backdrop-blur-xl border-b border-border shadow-sm"
-            : "bg-background",
+            ? "bg-background/85 backdrop-blur-xl border-b border-border shadow-sm"
+            : "bg-background border-b border-border",
         )}
       >
-        <div className="container-page flex items-center justify-between h-16">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2 font-semibold text-lg shrink-0">
-              <span className="text-primary">⚽</span>
-              <span className="hidden sm:inline">Football Jersey Store</span>
-              <span className="sm:hidden">FJS</span>
+        <div className="container-page flex items-center justify-between h-16 md:h-[4.5rem]">
+          <div className="flex items-center gap-8">
+            <Link
+              href="/"
+              className="font-display text-2xl font-bold uppercase tracking-[0.12em] shrink-0"
+            >
+              {SITE.brand}
             </Link>
 
-            <NavLinks className="hidden md:flex" />
+            <NavLinks className="hidden lg:flex" />
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className={cn("hidden sm:flex items-center", isSearchOpen ? "flex" : "hidden lg:flex")}>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <input
-                  type="search"
-                  placeholder="Buscar camisetas..."
-                  className="h-9 w-56 rounded-xl border border-input bg-background pl-9 pr-3 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
-                />
-              </div>
-            </div>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <form
+              role="search"
+              onSubmit={submitSearch}
+              className="hidden md:flex items-center relative"
+            >
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <input
+                type="search"
+                name="q"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar camisetas..."
+                aria-label="Buscar camisetas"
+                className="h-9 w-48 lg:w-56 rounded-md border border-input bg-background pl-9 pr-3 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
+              />
+            </form>
 
             <Button
               variant="ghost"
               size="icon"
-              className="sm:hidden"
+              className="md:hidden"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
               aria-label="Buscar"
             >
               <Search className="h-5 w-5" />
+            </Button>
+
+            <Button variant="ghost" size="icon" asChild aria-label="Cuenta">
+              <Link href="/cuenta">
+                <User className="h-5 w-5" />
+              </Link>
             </Button>
 
             <CartBadge />
@@ -76,7 +104,7 @@ export function Header() {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
+              className="lg:hidden"
               onClick={() => setIsMobileOpen(true)}
               aria-label="Menú"
             >
@@ -86,23 +114,27 @@ export function Header() {
         </div>
 
         {isSearchOpen && (
-          <div className="sm:hidden container-page pb-3">
-            <div className="relative">
+          <div className="md:hidden container-page pb-3">
+            <form role="search" onSubmit={submitSearch} className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <input
                 type="search"
+                name="q"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar camisetas..."
-                className="h-9 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
+                aria-label="Buscar camisetas"
+                className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
                 autoFocus
               />
-            </div>
+            </form>
           </div>
         )}
       </header>
 
       <div
         className={cn(
-          "fixed inset-0 z-[var(--z-drawer)] bg-black/40 md:hidden",
+          "fixed inset-0 z-[var(--z-drawer)] bg-black/40 lg:hidden",
           "transition-opacity duration-200",
           isMobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
         )}
@@ -112,13 +144,17 @@ export function Header() {
       <div
         className={cn(
           "fixed top-0 left-0 bottom-0 z-[var(--z-drawer)] w-72 bg-card border-r border-border",
-          "flex flex-col p-6 transition-transform duration-200 md:hidden",
+          "flex flex-col p-6 transition-transform duration-200 lg:hidden",
           isMobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="flex items-center justify-between mb-6">
-          <Link href="/" className="font-semibold text-lg" onClick={() => setIsMobileOpen(false)}>
-            ⚽ FJS
+          <Link
+            href="/"
+            className="font-display text-xl font-bold uppercase tracking-[0.12em]"
+            onClick={() => setIsMobileOpen(false)}
+          >
+            {SITE.brand}
           </Link>
           <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(false)} aria-label="Cerrar menú">
             <X className="h-5 w-5" />
