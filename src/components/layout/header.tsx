@@ -57,7 +57,7 @@ export function Header() {
           <div className="flex items-center gap-8">
             <Link
               href="/"
-              className="font-display text-2xl font-bold uppercase tracking-[0.12em] shrink-0"
+              className="font-display text-xl font-bold uppercase tracking-[0.12em] shrink-0"
             >
               {SITE.brand}
             </Link>
@@ -66,6 +66,8 @@ export function Header() {
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
+            <span aria-hidden className="hidden h-6 w-px bg-border md:ml-2 md:mr-3" />
+
             <form
               role="search"
               onSubmit={submitSearch}

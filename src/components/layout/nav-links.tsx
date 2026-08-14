@@ -24,7 +24,13 @@ export function NavLinks({
   const pathname = usePathname();
 
   return (
-    <nav className={cn("flex", mobile ? "flex-col" : "items-center", className)}>
+    <nav
+      className={cn(
+        "flex",
+        mobile ? "flex-col gap-1" : "items-center gap-8",
+        className,
+      )}
+    >
       {NAV_ITEMS.map((item) => {
         const isActive =
           pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
@@ -43,7 +49,7 @@ export function NavLinks({
                       : "border-transparent text-muted-foreground hover:text-foreground",
                   )
                 : cn(
-                    "items-center gap-5 border-b-2 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-colors",
+                    "border-b-2 py-2 text-[13px] font-semibold uppercase tracking-[0.14em] transition-colors",
                     isActive
                       ? "border-foreground text-foreground"
                       : "border-transparent text-muted-foreground hover:border-foreground/40 hover:text-foreground",
