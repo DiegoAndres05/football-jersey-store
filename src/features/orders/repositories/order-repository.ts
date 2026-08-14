@@ -164,7 +164,8 @@ export async function createOrder(input: CreateOrderInput): Promise<
         data: orderItems.map((item) => ({
           variantId: item.variantId!,
           type: "RESERVATION",
-          quantity: item.quantity,
+          // El ledger computa stock como SUM(quantity): reservar resta existencias.
+          quantity: -item.quantity,
           reference: code,
           reason: "Reserva por pedido (pago simulado - demo).",
           orderReference: code,
