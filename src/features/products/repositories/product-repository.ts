@@ -298,7 +298,7 @@ function buildProductWhere(filters: ProductFilters): Prisma.ProductWhereInput {
       variantFilters.push({ version: { slug: filters.version } });
     }
     if (filters.size) {
-      variantFilters.push({ size: { code: filters.size } });
+      variantFilters.push({ size: { code: { equals: filters.size, mode: "insensitive" } } });
     }
     where.variants = { some: { AND: variantFilters } };
   }
