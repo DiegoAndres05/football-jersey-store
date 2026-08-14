@@ -19,10 +19,34 @@ const barlowCondensed = Barlow_Condensed({
 
 export const metadata: Metadata = {
   title: {
-    default: "Flashsport",
+    default: "Flashsport — Camisetas de fútbol",
     template: "%s · Flashsport",
   },
-  description: "Camisetas de fútbol de calidad con envío a toda Colombia",
+  description:
+    "Camisetas de fútbol de calidad, réplicas de tus equipos favoritos, con personalización y envío a toda Colombia.",
+  keywords: [
+    "camisetas de fútbol",
+    "camisetas de equipos",
+    "réplicas de camisetas",
+    "personalización de camisetas",
+    "Flashsport",
+    "Colombia",
+  ],
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "es_CO",
+    siteName: "Flashsport",
+    title: "Flashsport — Camisetas de fútbol",
+    description:
+      "Camisetas de fútbol de calidad con personalización y envío a toda Colombia.",
+  },
+  twitter: {
+    card: "summary",
+    title: "Flashsport — Camisetas de fútbol",
+    description:
+      "Camisetas de fútbol de calidad con personalización y envío a toda Colombia.",
+  },
 };
 
 export const viewport: Viewport = {
