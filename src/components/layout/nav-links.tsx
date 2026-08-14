@@ -24,7 +24,7 @@ export function NavLinks({
   const pathname = usePathname();
 
   return (
-    <nav className={cn("flex", mobile ? "flex-col gap-1" : "items-center gap-1", className)}>
+    <nav className={cn("flex", mobile ? "flex-col" : "items-center", className)}>
       {NAV_ITEMS.map((item) => {
         const isActive =
           pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
@@ -33,11 +33,21 @@ export function NavLinks({
             key={item.href}
             href={item.href}
             onClick={onNavClick}
+            aria-current={isActive ? "page" : undefined}
             className={cn(
-              "rounded-sm px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition-colors",
-              isActive
-                ? "bg-foreground text-background"
-                : "text-muted-foreground hover:text-foreground",
+              mobile
+                ? cn(
+                    "border-l-2 py-2.5 pl-4 text-sm font-semibold uppercase tracking-[0.14em] transition-colors",
+                    isActive
+                      ? "border-foreground text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )
+                : cn(
+                    "items-center gap-5 border-b-2 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-colors",
+                    isActive
+                      ? "border-foreground text-foreground"
+                      : "border-transparent text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+                  ),
             )}
           >
             {item.label}

@@ -79,7 +79,7 @@ export function Header() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar camisetas..."
                 aria-label="Buscar camisetas"
-                className="h-9 w-48 lg:w-56 rounded-md border border-input bg-background pl-9 pr-3 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
+                className="h-9 w-48 lg:w-56 rounded-md border border-input bg-background pl-9 pr-3 text-sm transition-all hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
               />
             </form>
 

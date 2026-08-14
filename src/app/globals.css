@@ -225,3 +225,32 @@
     outline-offset: 2px;
   }
 }
+
+/* ── Utilities editoriales (FASE 1 · dirección visual) ── */
+@layer utilities {
+  .text-outline {
+    color: transparent;
+    -webkit-text-stroke: 1.5px hsl(var(--foreground));
+  }
+  .text-outline-invert {
+    color: transparent;
+    -webkit-text-stroke: 1.5px hsl(var(--background));
+  }
+  .text-outline-faint {
+    color: transparent;
+    -webkit-text-stroke: 1px hsl(var(--border));
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}

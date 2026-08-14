@@ -29,9 +29,12 @@ export function Footer() {
       <div className="container-page py-12">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
           <div className="col-span-2 lg:col-span-2">
-            <Link href="/" className="font-display text-2xl font-bold uppercase tracking-[0.12em]">
+            <Link href="/" className="font-display text-3xl font-bold uppercase tracking-[0.12em]">
               {SITE.brand}
             </Link>
+            <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground">
+              Camisetas de fútbol · Edición 25/26
+            </p>
             <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-sm">
               {SITE.tagline} Camisetas de calidad con envío a toda Colombia y
               personalización con nombre y número.
@@ -68,7 +71,7 @@ export function Footer() {
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4 transition-colors"
                     >
                       {link.label}
                     </Link>
