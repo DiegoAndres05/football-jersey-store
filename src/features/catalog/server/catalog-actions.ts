@@ -532,3 +532,174 @@ export async function removeSupplierProductAction(supplierProductId: string) {
   await prisma.supplierProduct.delete({ where: { id: supplierProductId } });
   redirect(`/admin/proveedores/${sp.supplier.slug}/productos`);
 }
+
+// ---------------- TEMPORADAS ----------------
+
+const seasonSchema = z.object({
+  name: z.string().min(1, "Escribe el nombre.").max(80),
+  year: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
+  isRetro: z.boolean(),
+});
+
+export async function createSeasonAction(formData: FormData) {
+  await requireAdmin();
+  const parsed = seasonSchema.safeParse({
+    name: formData.get("name"),
+    year: cleanNullable(formData.get("year")),
+    isRetro: checkbox(formData.get("isRetro")),
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const slug = slugify(parsed.data.name);
+  if (await prisma.season.findUnique({ where: { slug } })) {
+    throw new Error("Ya existe una temporada con ese nombre.");
+  }
+
+  await prisma.season.create({ data: { slug, ...parsed.data } });
+  redirect("/admin/temporadas");
+}
+
+export async function updateSeasonAction(seasonId: string, formData: FormData) {
+  await requireAdmin();
+  const parsed = seasonSchema.safeParse({
+    name: formData.get("name"),
+    year: cleanNullable(formData.get("year")),
+    isRetro: checkbox(formData.get("isRetro")),
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const slug = slugify(parsed.data.name);
+  if (await prisma.season.findFirst({ where: { slug, NOT: { id: seasonId } } })) {
+    throw new Error("Ya existe otra temporada con ese nombre.");
+  }
+
+  await prisma.season.update({ where: { id: seasonId }, data: { slug, ...parsed.data } });
+  redirect("/admin/temporadas");
+}
+
+export async function deleteSeasonAction(seasonId: string) {
+  await requireAdmin();
+  const season = await prisma.season.findUnique({
+    where: { id: seasonId },
+    include: { _count: { select: { products: true } } },
+  });
+  if (!season) throw new Error("La temporada no existe.");
+  if (season._count.products > 0) {
+    throw new Error(`No se puede eliminar: tiene ${season._count.products} producto(s). Mueve sus productos primero.`);
+  }
+  await prisma.season.delete({ where: { id: seasonId } });
+  redirect("/admin/temporadas");
+}
+
+// ---------------- TALLAS ----------------
+
+const sizeSchema = z.object({
+  code: z.string().min(1, "Escribe el código.").max(12),
+  name: z.string().min(1, "Escribe el nombre.").max(40),
+  position: z.coerce.number().int().min(0).max(100).default(0),
+});
+
+export async function createSizeAction(formData: FormData) {
+  await requireAdmin();
+  const parsed = sizeSchema.safeParse({
+    code: formData.get("code"),
+    name: formData.get("name"),
+    position: formData.get("position") ?? "0",
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const code = parsed.data.code.trim().toUpperCase();
+  if (await prisma.size.findUnique({ where: { code } })) {
+    throw new Error("Ya existe una talla con ese código.");
+  }
+
+  await prisma.size.create({ data: { code, name: parsed.data.name, position: parsed.data.position } });
+  redirect("/admin/tallas");
+}
+
+export async function updateSizeAction(sizeId: string, formData: FormData) {
+  await requireAdmin();
+  const parsed = sizeSchema.safeParse({
+    code: formData.get("code"),
+    name: formData.get("name"),
+    position: formData.get("position") ?? "0",
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const code = parsed.data.code.trim().toUpperCase();
+  if (await prisma.size.findFirst({ where: { code, NOT: { id: sizeId } } })) {
+    throw new Error("Ya existe otra talla con ese código.");
+  }
+
+  await prisma.size.update({ where: { id: sizeId }, data: { ...parsed.data, code } });
+  redirect("/admin/tallas");
+}
+
+export async function deleteSizeAction(sizeId: string) {
+  await requireAdmin();
+  const size = await prisma.size.findUnique({
+    where: { id: sizeId },
+    include: { _count: { select: { variants: true } } },
+  });
+  if (!size) throw new Error("La talla no existe.");
+  if (size._count.variants > 0) {
+    throw new Error(`No se puede eliminar: tiene ${size._count.variants} variante(s).`);
+  }
+  await prisma.size.delete({ where: { id: sizeId } });
+  redirect("/admin/tallas");
+}
+
+// ---------------- VERSIONES ----------------
+
+const versionSchema = z.object({
+  name: z.string().min(1, "Escribe el nombre.").max(80),
+  priceAdjustment: z.coerce.number().int().min(0).max(1000000).default(0),
+});
+
+export async function createVersionAction(formData: FormData) {
+  await requireAdmin();
+  const parsed = versionSchema.safeParse({
+    name: formData.get("name"),
+    priceAdjustment: formData.get("priceAdjustment") ?? "0",
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const slug = slugify(parsed.data.name);
+  if (await prisma.version.findUnique({ where: { slug } })) {
+    throw new Error("Ya existe una versión con ese nombre.");
+  }
+
+  await prisma.version.create({ data: { slug, ...parsed.data } });
+  redirect("/admin/versiones");
+}
+
+export async function updateVersionAction(versionId: string, formData: FormData) {
+  await requireAdmin();
+  const parsed = versionSchema.safeParse({
+    name: formData.get("name"),
+    priceAdjustment: formData.get("priceAdjustment") ?? "0",
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const slug = slugify(parsed.data.name);
+  if (await prisma.version.findFirst({ where: { slug, NOT: { id: versionId } } })) {
+    throw new Error("Ya existe otra versión con ese nombre.");
+  }
+
+  await prisma.version.update({ where: { id: versionId }, data: { slug, ...parsed.data } });
+  redirect("/admin/versiones");
+}
+
+export async function deleteVersionAction(versionId: string) {
+  await requireAdmin();
+  const version = await prisma.version.findUnique({
+    where: { id: versionId },
+    include: { _count: { select: { variants: true } } },
+  });
+  if (!version) throw new Error("La versión no existe.");
+  if (version._count.variants > 0) {
+    throw new Error(`No se puede eliminar: tiene ${version._count.variants} variante(s).`);
+  }
+  await prisma.version.delete({ where: { id: versionId } });
+  redirect("/admin/versiones");
+}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LayoutDashboard, Package, ImageIcon, Trophy, Shield, Truck, ExternalLink, LogOut } from "lucide-react";
+import { LayoutDashboard, Package, ImageIcon, Trophy, Shield, Truck, Calendar, Ruler, Layers, ExternalLink, LogOut } from "lucide-react";
 import { getSessionUser } from "@/features/auth/server/session";
 import { logoutAction } from "@/features/auth/server/actions";
 
@@ -21,6 +21,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/ligas", label: "Ligas", icon: Trophy },
     { href: "/admin/equipos", label: "Equipos", icon: Shield },
     { href: "/admin/proveedores", label: "Proveedores", icon: Truck },
+    { href: "/admin/temporadas", label: "Temporadas", icon: Calendar },
+    { href: "/admin/tallas", label: "Tallas", icon: Ruler },
+    { href: "/admin/versiones", label: "Versiones", icon: Layers },
   ];
 
   return (
