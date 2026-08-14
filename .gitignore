@@ -34,7 +34,9 @@ next-env.d.ts
 # prisma
 prisma/dev.db
 prisma/dev.db-journal
-prisma/migrations/
 
 # vercel
 .vercel
+
+# Archivo de migraciones SQLite (histórico, conservado como referencia)
+prisma/migrations-sqlite-archive/

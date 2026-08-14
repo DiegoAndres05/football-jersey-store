@@ -15,11 +15,13 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// SQLite para desarrollo local. Cambiar a postgresql para producción.
-// En producción: provider = "postgresql"
+// PostgreSQL (Supabase) para producción.
+// DATABASE_URL = conexión pooled (PgBouncer, puerto 6543) para la app.
+// DIRECT_URL   = conexión directa (puerto 5432) para Prisma Migrate.
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // =========================================================================
