@@ -172,6 +172,12 @@ export default async function AdminProductsPage() {
                       <ImageIcon className="mr-1 h-3 w-3" /> Imágenes
                       <ArrowRight className="ml-1 h-3 w-3" />
                     </Link>
+                    <Link
+                      href={`/admin/productos/${p.slug}/variantes`}
+                      className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs hover:border-muted-foreground/40 transition-colors"
+                    >
+                      Variantes
+                    </Link>
                     <form action={deleteProductAction.bind(null, p.id)}>
                       <button
                         type="submit"
