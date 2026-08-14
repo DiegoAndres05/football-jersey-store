@@ -12,6 +12,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "rm -f prisma/dev.db && prisma db push && tsx prisma/seed.ts",
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
+    "admin:password": "tsx scripts/admin-set-password.ts",
     "studio": "prisma studio"
   },
   "dependencies": {
