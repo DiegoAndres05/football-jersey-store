@@ -37,7 +37,6 @@ export default async function HomePage() {
   const [featured, leagues] = await Promise.all([getFeaturedProducts(8), getLeagues()]);
 
   const heroProduct = featured[0] ?? null;
-  const heroSecondary = featured.slice(1, 3);
 
   const leaguesBySlug = new Map(leagues.map((l) => [l.slug, l]));
   const bigLeagues = BIG_LEAGUES.map((slug) => leaguesBySlug.get(slug)).filter(
@@ -80,7 +79,7 @@ export default async function HomePage() {
 
           {/* Fotografía de producto */}
           <div className="lg:col-span-6">
-            <HeroProduct product={heroProduct} secondary={heroSecondary} />
+            <HeroProduct product={heroProduct} />
           </div>
         </div>
       </section>
