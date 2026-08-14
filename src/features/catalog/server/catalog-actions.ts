@@ -150,3 +150,102 @@ export async function deleteTeamAction(teamId: string) {
   await prisma.team.delete({ where: { id: teamId } });
   redirect("/admin/equipos");
 }
+
+// ---------------- PRODUCTOS ----------------
+
+import { KIT_TYPES } from "@/features/catalog/types/kit-types";
+
+const productSchema = z.object({
+  name: z.string().min(1, "Escribe el nombre.").max(120),
+  shortName: z.string().max(40).optional().nullable(),
+  description: z.string().max(2000).optional().nullable(),
+  kitType: z.enum(KIT_TYPES, "Tipo de camiseta inválido."),
+  brand: z.string().max(40).optional().nullable(),
+  teamId: z.string().min(1, "Selecciona el equipo."),
+  seasonId: z.string().min(1, "Selecciona la temporada."),
+  isFeatured: z.boolean(),
+  isActive: z.boolean(),
+  customizationsEnabled: z.boolean(),
+  hasPlayerPrint: z.boolean(),
+  customizationSurcharge: z.coerce.number().int().min(0, "La personalización no puede ser negativa.").max(100000),
+});
+
+const checkbox = (v: FormDataEntryValue | null) => v === "on" || v === "1";
+
+function parseProductForm(formData: FormData) {
+  return productSchema.safeParse({
+    name: formData.get("name"),
+    shortName: cleanNullable(formData.get("shortName")),
+    description: cleanNullable(formData.get("description")),
+    kitType: formData.get("kitType"),
+    brand: cleanNullable(formData.get("brand")),
+    teamId: formData.get("teamId"),
+    seasonId: formData.get("seasonId"),
+    isFeatured: checkbox(formData.get("isFeatured")),
+    isActive: checkbox(formData.get("isActive")),
+    customizationsEnabled: checkbox(formData.get("customizationsEnabled")),
+    hasPlayerPrint: checkbox(formData.get("hasPlayerPrint")),
+    customizationSurcharge: formData.get("customizationSurcharge") ?? "0",
+  });
+}
+
+async function assertProductRefs(input: { teamId: string; seasonId: string }) {
+  const [team, season] = await Promise.all([
+    prisma.team.findUnique({ where: { id: input.teamId } }),
+    prisma.season.findUnique({ where: { id: input.seasonId } }),
+  ]);
+  if (!team) throw new Error("El equipo seleccionado no existe.");
+  if (!season) throw new Error("La temporada seleccionada no existe.");
+}
+
+export async function createProductAction(formData: FormData) {
+  await requireAdmin();
+  const parsed = parseProductForm(formData);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+  await assertProductRefs(parsed.data);
+
+  const slug = slugify(parsed.data.name);
+  if (await prisma.product.findUnique({ where: { slug } })) {
+    throw new Error("Ya existe un producto con ese nombre.");
+  }
+
+  await prisma.product.create({ data: { slug, ...parsed.data } });
+  redirect("/admin/productos");
+}
+
+export async function updateProductAction(productId: string, formData: FormData) {
+  await requireAdmin();
+  const parsed = parseProductForm(formData);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+  await assertProductRefs(parsed.data);
+
+  const slug = slugify(parsed.data.name);
+  if (await prisma.product.findFirst({ where: { slug, NOT: { id: productId } } })) {
+    throw new Error("Ya existe otro producto con ese nombre.");
+  }
+
+  await prisma.product.update({ where: { id: productId }, data: { slug, ...parsed.data } });
+  redirect("/admin/productos");
+}
+
+export async function deleteProductAction(productId: string) {
+  await requireAdmin();
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    include: {
+      _count: { select: { variants: true, supplierProducts: true } },
+    },
+  });
+  if (!product) throw new Error("El producto no existe.");
+  const razones: string[] = [];
+  if (product._count.variants > 0) razones.push(`${product._count.variants} variante(s)`);
+  if (product._count.supplierProducts > 0) razones.push(`${product._count.supplierProducts} proveedor(es)`);
+  if (razones.length) {
+    throw new Error(`No se puede eliminar: tiene ${razones.join(" y ")}. Elimina primero sus variantes.`);
+  }
+  if ((await prisma.productImage.count({ where: { productId } })) > 0) {
+    throw new Error("No se puede eliminar: tiene imágenes. Elimínalas primero.");
+  }
+  await prisma.product.delete({ where: { id: productId } });
+  redirect("/admin/productos");
+}
