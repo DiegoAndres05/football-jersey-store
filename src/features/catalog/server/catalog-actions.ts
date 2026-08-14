@@ -395,3 +395,140 @@ export async function adjustStockAction(variantId: string, formData: FormData) {
   });
   redirect(`/admin/productos/${variant.product.slug}/variantes`);
 }
+
+// ---------------- PROVEEDORES ----------------
+
+const supplierSchema = z.object({
+  name: z.string().min(1, "Escribe el nombre.").max(120),
+  contactName: z.string().max(120).optional().nullable(),
+  email: z.string().email("Correo inválido.").optional().nullable().or(z.literal("")),
+  phone: z.string().max(40).optional().nullable(),
+  country: z.string().max(80).optional().nullable(),
+  leadTimeDays: z.coerce.number().int().min(0, "El lead time no puede ser negativo.").max(365).default(15),
+  priority: z.coerce.number().int().min(0).max(10).default(0),
+  isActive: z.boolean(),
+  purchaseNotes: z.string().max(500).optional().nullable(),
+});
+
+function parseSupplierForm(formData: FormData) {
+  return supplierSchema.safeParse({
+    name: formData.get("name"),
+    contactName: cleanNullable(formData.get("contactName")),
+    email: cleanNullable(formData.get("email")),
+    phone: cleanNullable(formData.get("phone")),
+    country: cleanNullable(formData.get("country")),
+    leadTimeDays: formData.get("leadTimeDays") ?? "15",
+    priority: formData.get("priority") ?? "0",
+    isActive: checkbox(formData.get("isActive")),
+    purchaseNotes: cleanNullable(formData.get("purchaseNotes")),
+  });
+}
+
+export async function createSupplierAction(formData: FormData) {
+  await requireAdmin();
+  const parsed = parseSupplierForm(formData);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const slug = slugify(parsed.data.name);
+  if (await prisma.supplier.findUnique({ where: { slug } })) {
+    throw new Error("Ya existe un proveedor con ese nombre.");
+  }
+
+  await prisma.supplier.create({ data: { slug, ...parsed.data } });
+  redirect("/admin/proveedores");
+}
+
+export async function updateSupplierAction(supplierId: string, formData: FormData) {
+  await requireAdmin();
+  const parsed = parseSupplierForm(formData);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const slug = slugify(parsed.data.name);
+  if (await prisma.supplier.findFirst({ where: { slug, NOT: { id: supplierId } } })) {
+    throw new Error("Ya existe otro proveedor con ese nombre.");
+  }
+
+  await prisma.supplier.update({ where: { id: supplierId }, data: { slug, ...parsed.data } });
+  redirect("/admin/proveedores");
+}
+
+export async function deleteSupplierAction(supplierId: string) {
+  await requireAdmin();
+  const supplier = await prisma.supplier.findUnique({
+    where: { id: supplierId },
+    include: { _count: { select: { products: true } } },
+  });
+  if (!supplier) throw new Error("El proveedor no existe.");
+  if (supplier._count.products > 0) {
+    throw new Error(`No se puede eliminar: tiene ${supplier._count.products} producto(s) asignado(s). Desasigna primero.`);
+  }
+  await prisma.supplier.delete({ where: { id: supplierId } });
+  redirect("/admin/proveedores");
+}
+
+export async function addSupplierProductAction(supplierId: string, formData: FormData) {
+  await requireAdmin();
+  const productId = formData.get("productId");
+  const costPrice = z.coerce
+    .number()
+    .int()
+    .min(0, "El costo no puede ser negativo.")
+    .max(100000000)
+    .safeParse(formData.get("costPrice") ?? "0");
+  if (!productId || typeof productId !== "string") throw new Error("Selecciona el producto.");
+  if (!costPrice.success) throw new Error(costPrice.error.issues[0].message);
+
+  const supplier = await prisma.supplier.findUnique({
+    where: { id: supplierId },
+    select: { slug: true },
+  });
+  if (!supplier) throw new Error("El proveedor no existe.");
+  if (!(await prisma.product.findUnique({ where: { id: productId } }))) {
+    throw new Error("El producto seleccionado no existe.");
+  }
+
+  const clash = await prisma.supplierProduct.findUnique({
+    where: { supplierId_productId: { supplierId, productId } },
+  });
+  if (clash) throw new Error("Ese producto ya está asignado a este proveedor.");
+
+  await prisma.supplierProduct.create({
+    data: { supplierId, productId, costPrice: costPrice.data, notes: null },
+  });
+  redirect(`/admin/proveedores/${supplier.slug}/productos`);
+}
+
+export async function updateSupplierProductAction(supplierProductId: string, formData: FormData) {
+  await requireAdmin();
+  const costPrice = z.coerce
+    .number()
+    .int()
+    .min(0, "El costo no puede ser negativo.")
+    .max(100000000)
+    .safeParse(formData.get("costPrice") ?? "0");
+  if (!costPrice.success) throw new Error(costPrice.error.issues[0].message);
+
+  const sp = await prisma.supplierProduct.findUnique({
+    where: { id: supplierProductId },
+    include: { supplier: { select: { slug: true } } },
+  });
+  if (!sp) throw new Error("La asignación no existe.");
+
+  await prisma.supplierProduct.update({
+    where: { id: supplierProductId },
+    data: { costPrice: costPrice.data, isAvailable: checkbox(formData.get("isAvailable")) },
+  });
+  redirect(`/admin/proveedores/${sp.supplier.slug}/productos`);
+}
+
+export async function removeSupplierProductAction(supplierProductId: string) {
+  await requireAdmin();
+  const sp = await prisma.supplierProduct.findUnique({
+    where: { id: supplierProductId },
+    include: { supplier: { select: { slug: true } } },
+  });
+  if (!sp) throw new Error("La asignación no existe.");
+
+  await prisma.supplierProduct.delete({ where: { id: supplierProductId } });
+  redirect(`/admin/proveedores/${sp.supplier.slug}/productos`);
+}
