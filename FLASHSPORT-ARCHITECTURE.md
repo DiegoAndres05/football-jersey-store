@@ -34,8 +34,8 @@ para las fases siguientes.
 | Pedidos | Implementados (creación, historial de estados, confirmación) |
 | Admin | Dashboard de pedidos + inventario + login con cookie firmada |
 | Importador de camisetas | **No existe** (pendiente Fase futura) |
-| Almacenamiento de imágenes | **Hotlinks a Unsplash** en seed — sin almacenamiento propio |
-| Base de datos | SQLite (dev) — objetivo: PostgreSQL/Supabase en producción |
+| Almacenamiento de imágenes | Supabase Storage (bucket `product-images`) — FASE 2; 15 imágenes originales siguen en Unsplash (`storagePath = null`) |
+| Base de datos | PostgreSQL en Supabase (FASE 1, validada 1:1 desde SQLite) |
 | Autenticación de clientes | No existe (compra guest) — solo auth de admin |
 | Tests automatizados | **No existen** |
 | Pasarela de pagos | **No conectada** |
@@ -57,7 +57,8 @@ para las fases siguientes.
 | Formularios | react-hook-form | 7.85 | + `@hookform/resolvers` |
 | Validación | zod | 4.4 | Schemas por feature |
 | ORM | Prisma | 5.22 | `prisma-client-js` |
-| BD | SQLite (dev) | — | `prisma/dev.db`; objetivo PostgreSQL |
+| BD | PostgreSQL (Supabase, FASE 1) | 16 | `DATABASE_URL` pooled + `DIRECT_URL`; migrada desde SQLite |
+| Storage imágenes | Supabase Storage (FASE 2) | — | bucket `product-images` público de lectura; escritura solo service role |
 | Auth admin | Propia (HMAC + cookie) | — | `fs_admin_session`; ver §5 y riesgos |
 | Pagos | Mock interno | — | `payments/services` |
 | Lint | ESLint (`next lint`) | 8.57 | Config por defecto de Next |
@@ -429,6 +430,26 @@ claramente marcado como simulación y nunca cobra.
 | 9 | SQLite en dev no refleja comportamiento PostgreSQL (enums, concurrencia) | Media | Migrar a Supabase (Fase 1) |
 | 10 | Datos seed demo (precios, productos) no son el catálogo real | Baja | Reemplazar por importación real |
 | 11 | `features/admin/*` mayormente vacías (páginas con prisma directo) | Baja | Refactor en Fase 3 |
+
+---
+
+## 15. Seguridad (auditoría FASE 3 — verificada)
+
+Estado verificado empíricamente (2026-08-14) sobre el proyecto Supabase `xmsreelwxwqjzgtkxcje`:
+
+| Área | Estado | Verificación |
+|---|---|---|
+| RLS en tablas `public` (21 tablas) | **ON, 0 políticas** | anon no puede leer (`200 []`), insertar (`401`) ni actualizar (`200 []` = 0 filas) vía PostgREST |
+| Bucket `product-images` | Lectura pública (diseño), escritura solo service role | anon: upload `403 AccessDenied`, delete denegado, list `[]` (no filtra nombres) |
+| Service role | Bypass de RLS | La app (server-only, `src/lib/supabase/server.ts`) sube/reemplaza/borra sin fricción |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | No está en el bundle cliente | `.next/static` sin referencias a la URL de Supabase |
+| Secretos en git | Ninguno | Solo `.env.example` versionado; `.gitignore` cubre `.env` y variantes |
+| Auth admin | Cookie `fs_admin_session` HMAC-SHA256 (`NEXTAUTH_SECRET`), verificada en `middleware.ts` + `getSessionUser` | Middleware redirige `/admin/*` sin token válido |
+
+Pendientes no bloqueantes:
+- Login admin **sin rate-limit** (recomendable limitar intentos o protección en deploy).
+- Cookie con `secure: true` en producción: requiere HTTPS (en `http://localhost` no se guarda).
+- Rol `anon` de Supabase habilitado aunque no se usa (se puede desactivar en el panel de Supabase).
 
 ---
 
