@@ -138,6 +138,12 @@ model ProductImage {
   altText   String?
   order     Int      @default(0)
   isPrimary Boolean  @default(false)
+
+  // Imágenes gestionadas en Supabase Storage (FASE 2):
+  // storagePath = ruta del archivo (products/{productId}/...). Cuando es
+  // null, la imagen es externa (url histórica) y sigue funcionando igual.
+  storagePath String?
+
   createdAt DateTime @default(now())
 
   @@index([productId])

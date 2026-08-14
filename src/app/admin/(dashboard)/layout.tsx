@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LayoutDashboard, Package, ExternalLink, LogOut } from "lucide-react";
+import { LayoutDashboard, Package, ImageIcon, ExternalLink, LogOut } from "lucide-react";
 import { getSessionUser } from "@/features/auth/server/session";
 import { logoutAction } from "@/features/auth/server/actions";
 
@@ -17,6 +17,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const navItems = [
     { href: "/admin", label: "Panel", icon: LayoutDashboard },
     { href: "/admin/inventario", label: "Inventario", icon: Package },
+    { href: "/admin/productos", label: "Productos", icon: ImageIcon },
   ];
 
   return (
