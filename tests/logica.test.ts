@@ -68,3 +68,34 @@ test("filters: sort desconocido se rechaza (no rompe)", () => {
   const r = parseProductFiltersParams({ sort: "no-existe" });
   assert.notEqual(r.sort, "no-existe");
 });
+
+test("filters: conjunto completo de parámetros", () => {
+  const r = parseProductFiltersParams({
+    liga: "premier-league",
+    equipo: "mancity",
+    temporada: "2025",
+    version: "home",
+    talla: "M",
+    disponibilidad: "AVAILABLE",
+    page: "2",
+  });
+  assert.equal(r.liga, "premier-league");
+  assert.equal(r.equipo, "mancity");
+  assert.equal(r.temporada, "2025");
+  assert.equal(r.version, "home");
+  assert.equal(r.talla, "M");
+  assert.equal(r.disponibilidad, "AVAILABLE");
+  assert.equal(r.page, 2);
+});
+
+test("filters: q demasiado largo se limita", () => {
+  const r = parseProductFiltersParams({ q: "x".repeat(200) });
+  assert.notEqual(r.q, "x".repeat(200));
+});
+
+test("filters: sin parámetros no rompe (defaults)", () => {
+  const r = parseProductFiltersParams({});
+  assert.equal(r.sort, undefined);
+  assert.equal(r.page, 1);
+  assert.equal(r.q, undefined);
+});
