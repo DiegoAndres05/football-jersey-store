@@ -26,18 +26,18 @@ para las fases siguientes.
 
 | Área | Estado |
 |---|---|
-| Catálogo (productos, ligas, equipos) | Implementado con datos reales en BD (SQLite + Prisma) |
+| Catálogo (productos, ligas, equipos) | Implementado con datos reales en BD (PostgreSQL/Supabase) |
 | Detalle de producto | Implementado (galería, variantes, tallas, personalización) |
 | Carrito | Implementado (zustand persistido) |
 | Checkout | Implementado (datos de envío, cliente guest) |
 | Pagos | **Simulados** (`processMockPayment`) — no hay pasarela real |
 | Pedidos | Implementados (creación, historial de estados, confirmación) |
-| Admin | Dashboard de pedidos + inventario + login con cookie firmada |
+| Admin | CRUD completo de catálogo, dashboard (ingresos/stock bajo), inventario, login con cookie firmada + rate-limit |
 | Importador de camisetas | **No existe** (pendiente Fase futura) |
 | Almacenamiento de imágenes | Supabase Storage (bucket `product-images`) — FASE 2; 15 imágenes originales siguen en Unsplash (`storagePath = null`) |
 | Base de datos | PostgreSQL en Supabase (FASE 1, validada 1:1 desde SQLite) |
 | Autenticación de clientes | No existe (compra guest) — solo auth de admin |
-| Tests automatizados | **No existen** |
+| Tests automatizados | **Unit tests** con `node:test` (20 tests) — sin E2E/CI aún |
 | Pasarela de pagos | **No conectada** |
 | WhatsApp | Link `wa.me` configurado en `site.ts` (número placeholder) |
 
@@ -378,20 +378,29 @@ claramente marcado como simulación y nunca cobra.
 
 ## 12. Fases futuras (orden propuesto)
 
+> Estado: Fases 0–4 y fixes de calidad ya ejecutados y commiteados en `main`
+> (ver §2 y §14). El listado siguiente es el roadmap restante como estaba
+> planificado, actualizado en su numeración de referencia histórica.
+
+0. **Fase 0 — Arquitectura**: `FLASHSPORT-ARCHITECTURE.md`, organigrama de
+   `src/features/*` (realizada).
 1. **Fase 1 — Infraestructura**: migración SQLite → PostgreSQL (Supabase),
    `DATABASE_URL` remoto, `next.config` para dominio de storage, fix de cookie
-   `Secure` del admin login.
+   `Secure` del admin login (realizada).
 2. **Fase 2 — Almacenamiento e imágenes**: bucket Supabase Storage, subida
-   desde Admin, `ProductImage.origin/sourceUrl`, fotografía real de producto.
-3. **Fase 3 — Admin completo**: CRUD de productos, ligas, equipos; dashboard
-   extendido; migración de páginas a `features/admin/actions`.
+   desde Admin, `ProductImage.storagePath`, fotografía real de producto
+   (realizada; faltan las fotos propias del catálogo).
+3. **Fase 3 — Admin completo**: CRUD de productos, ligas, equipos, variantes,
+   stock (ledger), proveedores, temporadas, tallas y versiones; dashboard con
+   ingresos y alertas de stock (realizada).
 4. **Fase 4 — Importador**: Source Adapter + Normalizer + ImportJob/ImportItem
    + preview + revisión Admin + publicación.
 5. **Fase 5 — Pagos reales**: pasarela (Wompi/PayU/etc. según mercado
    colombiano), `Payment`, webhooks, estados de pago reales.
 6. **Fase 6 — Auth de clientes**: Supabase Auth, `Customer` ↔ `User`,
    cuenta con historial de pedidos.
-7. **Fase 7 — Calidad**: tests (unit + e2e), CI, logs/observabilidad.
+7. **Fase 7 — Calidad**: tests (unit + e2e), CI, logs/observabilidad
+   (parcial: unit tests con `node:test`, ver §14.8).
 8. **Fase 8 — Escalamiento**: SSR/ISR por catálogo, caché, CDN de imágenes.
 
 ---
@@ -417,19 +426,24 @@ claramente marcado como simulación y nunca cobra.
 
 ## 14. Riesgos y puntos pendientes
 
-| # | Riesgo / pendiente | Severidad | Acción |
+> Estado al cierre de Fases 0–4 + fixes: los ítems marcados con ✔ están
+> resueltos; los demás siguen vigentes.
+
+| # | Riesgo / pendiente | Severidad | Estado / acción |
 |---|---|---|---|
-| 1 | Cookie `secure: true` en producción rompe login admin sobre `http://localhost` | Alta | Fijar `secure` según `NEXTAUTH_URL` (Fase 1) |
-| 2 | Imágenes de producto son hotlinks a Unsplash (no representan el producto real) | Alta | Fotografía propia + Supabase Storage (Fases 2–3) |
-| 3 | Sin pasarela de pagos (solo mock) | Alta | Fase 5 |
-| 4 | Licencias de imágenes externas: no asumir republicación comercial | Alta | `origin`/`sourceUrl` + revisión manual en importador |
-| 5 | `NEXTAUTH_SECRET` con fallback a secreto de desarrollo en `middleware.ts` | Media | Cargar siempre desde env en producción |
-| 6 | Admin sin CRUD de catálogo (solo lectura) | Media | Fase 3 |
-| 7 | Número de WhatsApp placeholder (+57 300 000 0000) | Media | Configurar el real en `site.ts` |
-| 8 | Sin tests automatizados | Media | Fase 7 |
-| 9 | SQLite en dev no refleja comportamiento PostgreSQL (enums, concurrencia) | Media | Migrar a Supabase (Fase 1) |
-| 10 | Datos seed demo (precios, productos) no son el catálogo real | Baja | Reemplazar por importación real |
-| 11 | `features/admin/*` mayormente vacías (páginas con prisma directo) | Baja | Refactor en Fase 3 |
+| 1 | Cookie `secure` rompía login admin sobre `http://localhost` | ~~Alta~~ | ✔ **Resuelto**: `secure` solo cuando `NEXTAUTH_URL` es https (`c11c760`) |
+| 2 | Imágenes de producto son hotlinks a Unsplash (no representan el producto real) | Alta | **Parcial**: Storage y subida desde Admin listos (`3d6b89a`); falta fotografía propia del catálogo |
+| 3 | Sin pasarela de pagos (solo mock) | Alta | Pendiente (Fase 5) |
+| 4 | Licencias de imágenes externas: no asumir republicación comercial | Alta | Pendiente; `storagePath` permite migrar sin romper URLs históricas |
+| 5 | `NEXTAUTH_SECRET` con fallback a secreto de desarrollo en `middleware.ts` | Media | Pendiente (revisar en despliegue; `.env` cargado siempre) |
+| 6 | Admin sin CRUD de catálogo (solo lectura) | ~~Media~~ | ✔ **Resuelto**: CRUD completo (ligas, equipos, productos, variantes, stock, proveedores, temporadas, tallas, versiones) |
+| 7 | Número de WhatsApp placeholder (+57 300 000 0000) | Media | Pendiente: configurar el real en `site.ts` |
+| 8 | Sin tests automatizados | ~~Media~~ | ✔ **Resuelto (unit)**: `node:test`, 20 tests (rate-limit, passwords, checkout, pagos mock, filtros, utilidades); E2E y CI pendientes (Fase 7) |
+| 9 | SQLite en dev no reflejaba comportamiento PostgreSQL | ~~Media~~ | ✔ **Resuelto**: todo contra Supabase PostgreSQL (Fase 1) |
+| 10 | Datos seed demo (precios, productos) no son el catálogo real | Baja | Pendiente: reemplazar por importación real |
+| 11 | `features/admin/*` mayormente vacías (páginas con prisma directo) | ~~Baja~~ | ✔ **Resuelto**: catálogo bajo `src/features/catalog/*` con actions y repositories |
+| 12 | Rate-limit del login | ~~Media~~ | ✔ **Resuelto**: 5 intentos/15 min en memoria (`5b1cb04`) |
+| 13 | Build dependía de Google Fonts (red) | ~~Media~~ | ✔ **Resuelto**: Inter self-hosted local; display condensado con fallback de sistema (`fd1e0c7`) |
 
 ---
 
