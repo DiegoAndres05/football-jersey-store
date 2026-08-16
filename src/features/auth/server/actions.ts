@@ -57,12 +57,16 @@ export async function loginAction(formData: FormData): Promise<{ error: string }
 
   const token = createSessionCookie(user);
   const cookieStore = await cookies();
+  // Secure solo cuando la app se sirve por HTTPS (producción real).
+  // En local/producción sobre http, dejar la cookie sin Secure para
+  // que el login funcione también en este entorno.
+  const deployedHttps = (process.env.NEXTAUTH_URL ?? "").startsWith("https://");
   cookieStore.set("fs_admin_session", token, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 12,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production" && deployedHttps,
   });
 
   redirect("/admin");
