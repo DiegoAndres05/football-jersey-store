@@ -96,6 +96,6 @@ test("filters: q demasiado largo se limita", () => {
 test("filters: sin parámetros no rompe (defaults)", () => {
   const r = parseProductFiltersParams({});
   assert.equal(r.sort, undefined);
-  assert.equal(r.page, 1);
+  assert.equal(r.page, undefined); // el default (1) lo aplica el consumidor (page.tsx: `raw.page ?? 1`)
   assert.equal(r.q, undefined);
 });
