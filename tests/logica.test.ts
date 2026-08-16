@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { shippingFee, SHIPPING } from "../src/shared/config/site.ts";
 import { checkoutFormSchema } from "../src/features/checkout/schemas/checkout-schema.ts";
 import { parseProductFiltersParams } from "../src/features/products/schemas/product-filters-schema.ts";
+import { buildProductWhere } from "../src/features/products/repositories/product-where.ts";
 
 const VALID_FORM = {
   fullName: "Juan Pérez",
@@ -98,4 +99,31 @@ test("filters: sin parámetros no rompe (defaults)", () => {
   assert.equal(r.sort, undefined);
   assert.equal(r.page, undefined); // el default (1) lo aplica el consumidor (page.tsx: `raw.page ?? 1`)
   assert.equal(r.q, undefined);
+});
+
+function assertSearchInsensitive(where: ReturnType<typeof buildProductWhere>, term: string) {
+  assert.ok(where.OR, "debe generar cláusulas OR");
+  const filters = where.OR!.map((clause) => {
+    const value = Object.values(clause)[0];
+    return "name" in (value as object)
+      ? ((value as { name: { contains: string; mode?: string } }).name)
+      : (value as { contains: string; mode?: string });
+  });
+  assert.equal(filters.length, 3);
+  for (const filter of filters) {
+    assert.equal(filter.contains, term);
+    assert.equal(filter.mode, "insensitive");
+  }
+}
+
+test("search: el where generado es insensible a mayúsculas (Barcelona)", () => {
+  assertSearchInsensitive(buildProductWhere({ search: "Barcelona" }), "Barcelona");
+});
+
+test("search: el where generado es insensible a mayúsculas (barcelona)", () => {
+  assertSearchInsensitive(buildProductWhere({ search: "barcelona" }), "barcelona");
+});
+
+test("search: el where generado es insensible a mayúsculas (BARCELONA)", () => {
+  assertSearchInsensitive(buildProductWhere({ search: "BARCELONA" }), "BARCELONA");
 });

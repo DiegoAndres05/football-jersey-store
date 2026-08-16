@@ -10,7 +10,7 @@ type SessionPayload = { email: string; role: string; issuedAt: number };
 
 function sign(payload: SessionPayload): string {
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const secret = process.env.NEXTAUTH_SECRET ?? "local-dev-secret-change-me-in-production-please";
+  const secret = process.env.NEXTAUTH_SECRET ?? "";
   const mac = createHmac("sha256", secret).update(body).digest("base64url");
   return `${body}.${mac}`;
 }
@@ -23,7 +23,10 @@ export function createSessionCookie(user: Pick<User, "email" | "role">): string 
 function verify(token: string): SessionPayload | null {
   const [body, mac] = token.split(".");
   if (!body || !mac) return null;
-  const secret = process.env.NEXTAUTH_SECRET ?? "local-dev-secret-change-me-in-production-please";
+  const secret = process.env.NEXTAUTH_SECRET ?? "";
+  // Fail-safe: sin NEXTAUTH_SECRET no se valida ninguna sesión
+  // (nunca se usa un secreto conocido/default).
+  if (!secret) return null;
   const expected = createHmac("sha256", secret).update(body).digest("base64url");
   const a = Buffer.from(mac);
   const b = Buffer.from(expected);

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { buildProductWhere } from "./product-where";
 import type {
   ProductCardData,
   ProductListResult,
@@ -267,44 +268,6 @@ export async function getSizes() {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-function buildProductWhere(filters: ProductFilters): Prisma.ProductWhereInput {
-  const where: Prisma.ProductWhereInput = { isActive: true };
-  const teamFilter: Prisma.TeamWhereInput = {};
-
-  if (filters.search) {
-    where.OR = [
-      { name: { contains: filters.search } },
-      { description: { contains: filters.search } },
-      { team: { name: { contains: filters.search } } },
-    ];
-  }
-  if (filters.league) {
-    teamFilter.league = { slug: filters.league };
-  }
-  if (filters.team) {
-    teamFilter.slug = filters.team;
-  }
-  if (filters.season) {
-    where.season = { slug: filters.season };
-  }
-  if (Object.keys(teamFilter).length > 0) {
-    where.team = teamFilter;
-  }
-
-  if (filters.version || filters.size) {
-    const variantFilters: Prisma.ProductVariantWhereInput[] = [];
-    if (filters.version) {
-      variantFilters.push({ version: { slug: filters.version } });
-    }
-    if (filters.size) {
-      variantFilters.push({ size: { code: { equals: filters.size, mode: "insensitive" } } });
-    }
-    where.variants = { some: { AND: variantFilters } };
-  }
-
-  return where;
-}
 
 function buildProductOrderBy(sort?: SortOption): Prisma.ProductOrderByWithRelationInput {
   switch (sort) {

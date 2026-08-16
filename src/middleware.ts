@@ -1,11 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 const COOKIE_NAME = "fs_admin_session";
-const SECRET =
-  process.env.NEXTAUTH_SECRET ?? "local-dev-secret-change-me-in-production-please";
+// Sin fallback: el secreto debe venir del entorno (NEXTAUTH_SECRET).
+// Si falta, la validación falla de forma segura (deniega acceso) en lugar
+// de usar un secreto conocido/default.
+const SECRET = process.env.NEXTAUTH_SECRET ?? "";
 
 async function isValidToken(token: string | undefined): Promise<boolean> {
-  if (!token) return false;
+  if (!token || !SECRET) return false;
   const [body, mac] = token.split(".");
   if (!body || !mac) return false;
 
