@@ -25,6 +25,27 @@ export type FkaPreviewResult =
   | { ok: true; items: ImportPreviewItem[] }
   | { ok: false; error: string };
 
+/**
+ * El CDN de FKA bloquea las imágenes cuando se solicitan con un Referer
+ * ajeno a FKA (hotlink protection de Cloudflare → 403), por lo que el
+ * navegador del admin no puede cargar la miniatura directamente.
+ * La descarga se hace con la misma sesión autenticada del importador y se
+ * devuelve como data URL en previewImage. imageUrl se conserva intacto
+ * (CDN original) para que el flujo de importación no cambie.
+ */
+async function withPreviewImage(
+  fetcher: FkaFetcher,
+  kit: Omit<FkaKit, "source">,
+): Promise<{ kit: Omit<FkaKit, "source">; previewImage: string | null }> {
+  if (!kit.imageUrl) return { kit, previewImage: null };
+  try {
+    const { buffer, contentType } = await fetcher.downloadImage(kit.imageUrl);
+    return { kit, previewImage: `data:${contentType};base64,${buffer.toString("base64")}` };
+  } catch {
+    return { kit, previewImage: null };
+  }
+}
+
 export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<FkaPreviewResult> {
   const admin = await getSessionUser();
   if (!admin) return { ok: false, error: "No autorizado." };
@@ -156,8 +177,8 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
       for (const link of kitLinks) {
         try {
           const detailPage = await fetcher.fetchPage(link.url);
-          const kit = parseKitDetail(detailPage);
-          if (!kit) {
+          const parsedKit = parseKitDetail(detailPage);
+          if (!parsedKit) {
             items.push({
               kit: {
                 source: "football-kit-archive",
@@ -176,9 +197,11 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
             continue;
           }
 
+          const { kit, previewImage } = await withPreviewImage(fetcher, parsedKit);
           const resolution = resolveImport(kit, teams, seasons, products);
           items.push({
             kit: { ...kit, source: "football-kit-archive" },
+            previewImage,
             status: resolution.status,
             teamMatch: {
               found: resolution.teamFound,

@@ -109,9 +109,9 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
                   aria-label={`Seleccionar ${item.kit.title}`}
                 />
                 <div className="flex h-16 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-secondary">
-                  {item.kit.imageUrl ? (
+                  {item.previewImage ?? item.kit.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.kit.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    <img src={item.previewImage ?? item.kit.imageUrl ?? ""} alt="" className="h-full w-full object-cover" loading="lazy" />
                   ) : (
                     <span className="text-[10px] text-muted-foreground">Sin imagen</span>
                   )}

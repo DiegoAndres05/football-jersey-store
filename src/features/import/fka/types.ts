@@ -19,6 +19,12 @@ export type ImportPreviewItem = {
   teamMatch: { found: boolean; name: string | null };
   seasonMatch: { found: boolean; name: string | null };
   message: string | null;
+  /**
+   * Miniatura para el preview: data URL descargada con la sesión autenticada
+   * (el CDN de FKA bloquea la carga directa por Referer). Opcional: si no se
+   * descargó, la UI cae al imageUrl original de FKA.
+   */
+  previewImage?: string | null;
 };
 
 export type FkaSearchInput = {
