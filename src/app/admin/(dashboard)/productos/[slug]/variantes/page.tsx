@@ -9,6 +9,7 @@ import {
   deleteVariantAction,
   adjustStockAction,
 } from "@/features/catalog/server/catalog-actions";
+import { getVersions, getSizes } from "@/features/catalog/server/reference-cache";
 
 export const metadata: Metadata = {
   title: "Variantes · Flashsport Admin",
@@ -29,10 +30,7 @@ export default async function AdminProductVariantsPage({
   });
   if (!product) notFound();
 
-  const [versions, sizes] = await Promise.all([
-    prisma.version.findMany({ orderBy: { name: "asc" } }),
-    prisma.size.findMany({ orderBy: { position: "asc" } }),
-  ]);
+  const [versions, sizes] = await Promise.all([getVersions(), getSizes()]);
 
   const movements = await prisma.inventoryMovement.groupBy({
     by: ["variantId"],

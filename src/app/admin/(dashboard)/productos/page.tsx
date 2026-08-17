@@ -8,6 +8,7 @@ import {
   deleteProductAction,
 } from "@/features/catalog/server/catalog-actions";
 import { KIT_TYPES } from "@/features/catalog/types/kit-types";
+import { getTeams, getSeasons } from "@/features/catalog/server/reference-cache";
 
 export const metadata: Metadata = {
   title: "Productos · Flashsport Admin",
@@ -23,8 +24,8 @@ export default async function AdminProductsPage() {
         _count: { select: { images: true, variants: true, supplierProducts: true } },
       },
     }),
-    prisma.team.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.season.findMany({ orderBy: { year: "desc" }, select: { id: true, name: true, year: true } }),
+    getTeams(),
+    getSeasons(),
   ]);
 
   const productInputs = (p: (typeof products)[number]) => (

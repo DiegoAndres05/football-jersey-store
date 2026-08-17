@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { ArrowRight, Truck } from "lucide-react";
 import {
   createSupplierAction,
   updateSupplierAction,
   deleteSupplierAction,
 } from "@/features/catalog/server/catalog-actions";
+import { getSuppliers } from "@/features/catalog/server/reference-cache";
 
 export const metadata: Metadata = {
   title: "Proveedores · Flashsport Admin",
@@ -14,10 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminSuppliersPage() {
-  const suppliers = await prisma.supplier.findMany({
-    orderBy: [{ priority: "desc" }, { name: "asc" }],
-    include: { _count: { select: { products: true } } },
-  });
+  const suppliers = await getSuppliers();
 
   return (
     <div className="space-y-6">
