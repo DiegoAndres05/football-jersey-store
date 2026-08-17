@@ -12,7 +12,8 @@ import {
   parseTeamIdFromUrl,
 } from "../fka/parser";
 import { resolveImport } from "../fka/resolver";
-import type { ImportPreviewItem, FkaSearchInput } from "../fka/types";
+import type { ImportPreviewItem, FkaSearchInput, FkaKit } from "../fka/types";
+import { importFkaKitsAsDraftsWithRealDeps, type FkaImportResult } from "./import-service";
 
 const searchSchema = z.object({
   teams: z.array(z.string().trim().min(1)).min(1, "Escribe al menos un equipo.").max(10),
@@ -213,6 +214,60 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
     }
 
     return { ok: true, items };
+  } finally {
+    await fetcher.close();
+  }
+}
+
+const importSchema = z.object({
+  kits: z
+    .array(
+      z.object({
+        source: z.literal("football-kit-archive"),
+        title: z.string().trim().min(1, "Falta el título.").max(200),
+        team: z.string().trim().min(1, "Falta el equipo.").max(100),
+        season: z.string().trim().regex(/^(\d{4}|\d{2})-\d{2}$/, "Temporada inválida."),
+        type: z.enum(["LOCAL", "VISITANTE", "TERCERA"]),
+        imageUrl: z.union([z.string().url("Imagen inválida."), z.null()]),
+        sourceUrl: z.string().url("URL de origen inválida."),
+      }),
+    )
+    .min(1, "Selecciona al menos una camiseta.")
+    .max(50, "Máximo 50 camisetas por importación."),
+});
+
+export type FkaImportActionResult =
+  | { ok: true; result: FkaImportResult }
+  | { ok: false; error: string };
+
+export async function importFkaKitsAction(kits: FkaKit[]): Promise<FkaImportActionResult> {
+  const admin = await getSessionUser();
+  if (!admin) return { ok: false, error: "No autorizado." };
+
+  const parsed = importSchema.safeParse({ kits });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+  }
+
+  const db = await prisma.$transaction(async (tx) => {
+    const [teams, seasons, products] = await Promise.all([
+      tx.team.findMany({ select: { id: true, name: true } }),
+      tx.season.findMany({ select: { id: true, name: true, slug: true, year: true } }),
+      tx.product.findMany({ select: { id: true, teamId: true, seasonId: true, kitType: true } }),
+    ]);
+    return { teams, seasons, products };
+  });
+
+  const fetcher = await FkaFetcher.connect();
+  try {
+    const result = await importFkaKitsAsDraftsWithRealDeps(
+      parsed.data.kits,
+      db.teams,
+      db.seasons,
+      db.products,
+      fetcher.downloadImage.bind(fetcher),
+    );
+    return { ok: true, result };
   } finally {
     await fetcher.close();
   }

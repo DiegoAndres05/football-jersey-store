@@ -2,6 +2,7 @@ import "server-only";
 
 import type { FetchedPage, TeamCandidate } from "./parser.ts";
 import { bestTeamMatch } from "./normalizer.ts";
+import { assertAllowedFkaImageUrl, fkaImageExtension, MAX_FKA_IMAGE_BYTES, FkaImageError } from "./fka-image.ts";
 
 export const FKA_CDP_ENDPOINT = process.env.FKA_CDP_ENDPOINT ?? "http://127.0.0.1:9222";
 export const FKA_BASE_URL = "https://www.footballkitarchive.com";
@@ -165,6 +166,72 @@ export class FkaFetcher {
       return this.searchTeamOnce(compact);
     }
     return null;
+  }
+
+  /**
+   * Descarga una imagen de FKA a través de la sesión autenticada del
+   * navegador (el CDN devuelve 403 a requests directos). La validación
+   * de host/MIME/tamaño se hace con las mismas reglas de fka-image.
+   */
+  async downloadImage(url: string): Promise<{ buffer: Buffer; contentType: string; extension: string }> {
+    if (!this.session) throw new Error("Fetcher no conectado.");
+    assertAllowedFkaImageUrl(url);
+
+    const result = await this.session.evaluate<{
+      ok: boolean;
+      status: number;
+      contentType: string;
+      size: number;
+      base64: string | null;
+      error?: string;
+    }>(
+      `(async () => {
+        try {
+          const res = await fetch(${JSON.stringify(url)}, { credentials: "include" });
+          const contentType = res.headers.get("content-type") || "";
+          const buf = await res.arrayBuffer();
+          const bytes = new Uint8Array(buf);
+          const CHUNK = 0x8000;
+          const parts = [];
+          for (let i = 0; i < bytes.length; i += CHUNK) {
+            parts.push(String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK)));
+          }
+          return {
+            ok: res.ok,
+            status: res.status,
+            contentType,
+            size: bytes.length,
+            base64: res.ok ? btoa(parts.join("")) : null,
+          };
+        } catch (e) {
+          return { ok: false, status: 0, contentType: "", size: 0, base64: null, error: String(e) };
+        }
+      })()`,
+      true,
+    );
+
+    if (!result.ok) {
+      throw new FkaImageError(
+        result.error
+          ? `No se pudo descargar la imagen desde el navegador: ${result.error}`
+          : `La imagen respondió con estado HTTP ${result.status}.`,
+      );
+    }
+    const extension = fkaImageExtension(result.contentType);
+    if (!extension) {
+      throw new FkaImageError("La imagen no es un formato válido (JPG, PNG o WebP).");
+    }
+    if (result.size === 0) {
+      throw new FkaImageError("La imagen descargada está vacía.");
+    }
+    if (result.size > MAX_FKA_IMAGE_BYTES) {
+      throw new FkaImageError("La imagen supera el tamaño máximo permitido (5 MB).");
+    }
+    return {
+      buffer: Buffer.from(result.base64 ?? "", "base64"),
+      contentType: result.contentType,
+      extension,
+    };
   }
 
   private async searchTeamOnce(query: string): Promise<TeamCandidate | null> {

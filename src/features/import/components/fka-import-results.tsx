@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Info } from "lucide-react";
+import { ExternalLink, Info, Loader2, Check, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { importFkaKitsAction, type FkaImportActionResult } from "../server/import-actions";
 import type { FkaPreviewResult } from "../server/import-actions";
 import type { ImportStatus } from "../fka/types";
 
@@ -15,8 +16,20 @@ const STATUS_BADGE: Record<ImportStatus, { label: string; tone: "success" | "war
   ERROR: { label: "Error", tone: "muted" },
 };
 
+type ImportItemStatus = "IMPORTADO" | "DUPLICADO" | "SIN_TEMPORADA" | "SIN_EQUIPO" | "ERROR";
+
+const IMPORT_BADGE: Record<ImportItemStatus, { label: string; tone: "success" | "warning" | "danger" | "muted" }> = {
+  IMPORTADO: { label: "Importado", tone: "success" },
+  DUPLICADO: { label: "Duplicado", tone: "warning" },
+  SIN_TEMPORADA: { label: "Sin temporada", tone: "warning" },
+  SIN_EQUIPO: { label: "Sin equipo", tone: "danger" },
+  ERROR: { label: "Error", tone: "danger" },
+};
+
 export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<FkaImportActionResult | null>(null);
 
   if (!result.ok) {
     return (
@@ -45,6 +58,21 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
     });
   }
 
+  async function onImport() {
+    if (importable.length === 0) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      setImportResult(
+        await importFkaKitsAction(
+          importable.map((item) => item.kit),
+        ),
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-border bg-card p-4">
@@ -53,29 +81,31 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
             {result.items.length} resultado(s) ·{" "}
             {result.items.filter((i) => i.status === "ENCONTRADO").length} listos para importar
           </p>
-          <div className="flex items-center gap-3">
-            <Button type="button" disabled={importable.length === 0}>
-              Importar seleccionadas ({importable.length})
-            </Button>
-            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Info className="h-3.5 w-3.5" /> La escritura de productos llegará en FASE 5.4.
-            </span>
-          </div>
+          <Button type="button" onClick={onImport} disabled={importing || importable.length === 0}>
+            {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
+            Importar seleccionadas ({importable.length})
+          </Button>
         </div>
       </div>
+
+      {importResult && (
+        <ImportSummary result={importResult} />
+      )}
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <ul className="divide-y divide-border">
           {result.items.map((item, index) => {
             const badge = STATUS_BADGE[item.status];
             const isSelected = selected.has(index);
+            const selectable = item.status === "ENCONTRADO";
             return (
               <li key={`${item.kit.sourceUrl}-${item.kit.type}`} className="flex items-start gap-3 p-4">
                 <input
                   type="checkbox"
                   checked={isSelected}
+                  disabled={!selectable}
                   onChange={() => toggle(index)}
-                  className="mt-1 accent-primary"
+                  className="mt-1 accent-primary disabled:cursor-not-allowed"
                   aria-label={`Seleccionar ${item.kit.title}`}
                 />
                 <div className="flex h-16 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-secondary">
@@ -124,6 +154,58 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
             );
           })}
         </ul>
+      </div>
+    </div>
+  );
+}
+
+function ImportSummary({ result }: { result: FkaImportActionResult }) {
+  if (!result.ok) {
+    return (
+      <div className="rounded-xl border border-destructive/30 bg-[hsl(0_84%_95%)] p-4 text-sm text-destructive">
+        {result.error}
+      </div>
+    );
+  }
+
+  const s = result.result.summary;
+  return (
+    <div className="rounded-xl border border-success/30 bg-[hsl(142_71%_96%)] p-4">
+      <p className="flex items-center gap-2 font-semibold text-success">
+        <Check className="h-4 w-4" /> IMPORTACIÓN COMPLETADA
+      </p>
+      <ul className="mt-2 space-y-1 text-sm">
+        <li>✓ {s.imported} producto(s) importado(s) como borrador</li>
+        {s.duplicated > 0 && <li>↪ {s.duplicated} duplicado(s) omitido(s)</li>}
+        {s.sinTemporada > 0 && <li>⚠ {s.sinTemporada} sin temporada (no importados)</li>}
+        {s.sinEquipo > 0 && <li>⚠ {s.sinEquipo} sin equipo (no importados)</li>}
+        {s.errors > 0 && <li>✕ {s.errors} error(es)</li>}
+      </ul>
+
+      {s.imported > 0 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Los productos importados quedaron como <strong>borradores</strong> (inactivos). Revísalos y publícalos
+          desde /admin/productos.
+        </p>
+      )}
+
+      <div className="mt-3 space-y-1.5 border-t border-border pt-3">
+        {result.result.items.map((item, i) => {
+          const badge = IMPORT_BADGE[item.status];
+          return (
+            <div key={i} className="flex items-center justify-between gap-3 text-sm">
+              <span className="min-w-0 flex-1 truncate">{item.title}</span>
+              {item.status === "IMPORTADO" && item.slug ? (
+                <span className="shrink-0 text-xs text-muted-foreground">/productos/{item.slug}</span>
+              ) : (
+                <span className="shrink-0 text-xs text-muted-foreground">{item.message}</span>
+              )}
+              <Badge tone={badge.tone} className="shrink-0">
+                {badge.label}
+              </Badge>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
