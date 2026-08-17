@@ -98,29 +98,80 @@ export async function uploadProductImage(input: ImageUploadInput) {
   }
 }
 
-export async function deleteProductImage(imageId: string) {
-  const image = await prisma.productImage.findUnique({ where: { id: imageId } });
+export type ImageStorageDeleteDeps = {
+  findImage(
+    imageId: string,
+  ): Promise<{ productId: string; isPrimary: boolean; storagePath: string | null } | null>;
+  removeFile(storagePath: string): Promise<{ error: unknown }>;
+  deleteRow(imageId: string, productId: string, wasPrimary: boolean): Promise<void>;
+};
+
+/**
+ * Distingue el error "el objeto ya no existe en Storage" (delete idempotente)
+ * de errores reales (permisos, bucket incorrecto, credenciales, etc.),
+ * que SIEMPRE deben propagarse.
+ */
+export function isMissingObjectError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { status?: number | string; statusCode?: string | number; code?: string; message?: string };
+  const message = String(e.message ?? "");
+  const code = String(e.code ?? "");
+
+  if (code === "NoSuchBucket" || /denied|forbidden|unauthorized|credential/i.test(message)) {
+    return false;
+  }
+  if (code === "NoSuchKey") return true;
+
+  const status = Number(e.status ?? e.statusCode ?? 0);
+  if (status === 404 && !/bucket/i.test(message)) return true;
+  return /not.?found|no.?such.?key/i.test(message) && !/bucket/i.test(message);
+}
+
+export async function deleteProductImage(imageId: string, deps?: Partial<ImageStorageDeleteDeps>) {
+  const findImage =
+    deps?.findImage ??
+    (async (id) =>
+      prisma.productImage.findUnique({
+        where: { id },
+        select: { productId: true, isPrimary: true, storagePath: true },
+      }));
+  const removeFile =
+    deps?.removeFile ??
+    (async (storagePath) => supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).remove([storagePath]));
+  const deleteRow =
+    deps?.deleteRow ??
+    (async (id, productId, wasPrimary) => {
+      await prisma.$transaction(async (tx) => {
+        await tx.productImage.delete({ where: { id } });
+        if (wasPrimary) {
+          const next = await tx.productImage.findFirst({
+            where: { productId },
+            orderBy: { order: "asc" },
+          });
+          if (next) await tx.productImage.update({ where: { id: next.id }, data: { isPrimary: true } });
+        }
+      });
+    });
+
+  const image = await findImage(imageId);
   if (!image) throw new ImageStorageError("La imagen no existe.");
 
-  const wasPrimary = image.isPrimary;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.productImage.delete({ where: { id: imageId } });
-    if (wasPrimary) {
-      const next = await tx.productImage.findFirst({
-        where: { productId: image.productId },
-        orderBy: { order: "asc" },
-      });
-      if (next) await tx.productImage.update({ where: { id: next.id }, data: { isPrimary: true } });
-    }
-  });
-
+  // Borrado idempotente: primero el archivo, después la fila.
+  // Si el objeto físico ya no existe, la eliminación se considera completada.
   if (image.storagePath) {
-    const { error } = await supabaseServer.storage
-      .from(PRODUCT_IMAGES_BUCKET)
-      .remove([image.storagePath]);
-    if (error) throw new ImageStorageError(`Error de Storage al eliminar: ${error.message}`);
+    const { error } = await removeFile(image.storagePath);
+    if (error && !isMissingObjectError(error)) {
+      const detail =
+        error instanceof Error
+          ? error.message
+          : error && typeof error === "object" && "message" in error
+            ? String((error as { message?: unknown }).message)
+            : String(error);
+      throw new ImageStorageError(`Error de Storage al eliminar: ${detail}`);
+    }
   }
+
+  await deleteRow(imageId, image.productId, image.isPrimary);
 }
 
 export async function replaceProductImage(imageId: string, file: File, altText?: string | null) {
