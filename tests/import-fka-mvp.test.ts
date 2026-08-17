@@ -8,6 +8,8 @@ import {
 } from "../src/features/import/fka/fka-image.ts";
 import {
   importFkaKitsAsDrafts,
+  missingSeasons,
+  seasonToCreateData,
   type ImportStore,
   type ImageGateway,
   type FkaImportResult,
@@ -369,4 +371,47 @@ test("importación: tipos de estado válidos", () => {
   assert.equal(statuses.has("IMPORTADO"), true);
   assert.equal(statuses.has("DUPLICADO"), true);
   assert.equal(statuses.has("ERROR"), true);
+});
+
+// ---------------- TEMPORADAS FALTANTES (MVP confirmación) ----------------
+
+test("seasonToCreateData: genera el formato Season a partir de FKA", () => {
+  assert.deepEqual(seasonToCreateData("2026-27"), { slug: "26-27", name: "Temporada 26/27", year: 2026 });
+  assert.deepEqual(seasonToCreateData("25-26"), { slug: "25-26", name: "Temporada 25/26", year: 2025 });
+  assert.equal(seasonToCreateData("no-es-temporada"), null);
+});
+
+test("missingSeasons: lista temporadas únicas faltantes solo con equipo encontrado", () => {
+  const kits = [
+    kit({ season: "2026-27" }), // RM + temporada faltante
+    kit({ season: "2026-27", type: "VISITANTE", title: "Visitante" }), // misma temporada, dedup
+    kit({ season: "2027-28", type: "TERCERA", title: "Tercera" }), // otra temporada faltante
+    kit({ team: "Girona FC" }), // equipo no encontrado → ignorado
+    kit({ team: "FC Barcelona" }), // temporada 2025-26 existe → no falta
+  ];
+  const missing = missingSeasons(kits, TEAMS, SEASONS);
+  assert.deepEqual(missing, ["2026-27", "2027-28"]);
+});
+
+test("missingSeasons: sin temporadas faltantes devuelve lista vacía", () => {
+  const missing = missingSeasons([kit(), kit({ team: "FC Barcelona" })], TEAMS, SEASONS);
+  assert.deepEqual(missing, []);
+});
+
+test("importación: crea la temporada antes de importar permite importar el kit", async () => {
+  const store = makeMemoryStore();
+  const gateway = makeImageGateway();
+  const newSeason = seasonToCreateData("2026-27")!;
+  const seasonsWithNew = [...SEASONS, { id: "s3", name: newSeason.name, slug: newSeason.slug, year: newSeason.year }];
+  const res = await importFkaKitsAsDrafts(
+    [kit({ season: "2026-27" })],
+    TEAMS,
+    seasonsWithNew,
+    [],
+    store,
+    gateway,
+  );
+  assert.equal(res.items[0].status, "IMPORTADO");
+  assert.equal(res.summary.imported, 1);
+  assert.equal(store.created[0].isActive, false);
 });

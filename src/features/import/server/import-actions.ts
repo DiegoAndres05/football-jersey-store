@@ -14,6 +14,7 @@ import {
 import { resolveImport } from "../fka/resolver";
 import type { ImportPreviewItem, FkaSearchInput, FkaKit } from "../fka/types";
 import { importFkaKitsAsDraftsWithRealDeps, type FkaImportResult } from "./import-service";
+import { missingSeasons, seasonToCreateData } from "./import-logic";
 
 const searchSchema = z.object({
   teams: z.array(z.string().trim().min(1)).min(1, "Escribe al menos un equipo.").max(10),
@@ -261,9 +262,38 @@ const importSchema = z.object({
 
 export type FkaImportActionResult =
   | { ok: true; result: FkaImportResult }
+  | { ok: true; needsSeasons: true; seasons: string[] }
   | { ok: false; error: string };
 
-export async function importFkaKitsAction(kits: FkaKit[]): Promise<FkaImportActionResult> {
+export type FkaImportActionOptions = { createSeasons?: boolean };
+
+async function loadImportContext() {
+  return prisma.$transaction(async (tx) => {
+    const [teams, seasons, products] = await Promise.all([
+      tx.team.findMany({ select: { id: true, name: true } }),
+      tx.season.findMany({ select: { id: true, name: true, slug: true, year: true } }),
+      tx.product.findMany({ select: { id: true, teamId: true, seasonId: true, kitType: true } }),
+    ]);
+    return { teams, seasons, products };
+  });
+}
+
+async function createMissingSeasons(seasons: string[]): Promise<void> {
+  const toCreate = seasons
+    .map(seasonToCreateData)
+    .filter((d): d is NonNullable<typeof d> => d !== null);
+  if (toCreate.length === 0) return;
+  await prisma.$transaction(
+    toCreate.map((data) =>
+      prisma.season.upsert({ where: { slug: data.slug }, update: {}, create: data }),
+    ),
+  );
+}
+
+export async function importFkaKitsAction(
+  kits: FkaKit[],
+  options: FkaImportActionOptions = {},
+): Promise<FkaImportActionResult> {
   const admin = await getSessionUser();
   if (!admin) return { ok: false, error: "No autorizado." };
 
@@ -272,14 +302,17 @@ export async function importFkaKitsAction(kits: FkaKit[]): Promise<FkaImportActi
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
 
-  const db = await prisma.$transaction(async (tx) => {
-    const [teams, seasons, products] = await Promise.all([
-      tx.team.findMany({ select: { id: true, name: true } }),
-      tx.season.findMany({ select: { id: true, name: true, slug: true, year: true } }),
-      tx.product.findMany({ select: { id: true, teamId: true, seasonId: true, kitType: true } }),
-    ]);
-    return { teams, seasons, products };
-  });
+  const db = await loadImportContext();
+
+  const missing = missingSeasons(parsed.data.kits, db.teams, db.seasons);
+  if (missing.length > 0 && !options.createSeasons) {
+    return { ok: true, needsSeasons: true, seasons: missing };
+  }
+  if (missing.length > 0 && options.createSeasons) {
+    await createMissingSeasons(missing);
+    const seasons = await prisma.season.findMany({ select: { id: true, name: true, slug: true, year: true } });
+    db.seasons = seasons;
+  }
 
   const fetcher = await FkaFetcher.connect();
   try {

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { FkaKit, FkaKitType } from "../fka/types.ts";
 import { resolveSeason, resolveTeam } from "../fka/resolver.ts";
 import type { DbProduct, DbSeason, DbTeam } from "../fka/resolver.ts";
+import { normalizeSeason } from "../fka/normalizer.ts";
 
 /**
  * Lógica pura de importación MVP de camisetas FKA como productos BORRADOR.
@@ -89,6 +90,41 @@ export function fkaImageStoragePath(productId: string, imageUrl: string, extensi
 
 export function extensionToMime(extension: string): string {
   return extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : "image/jpeg";
+}
+
+export type SeasonCreateData = { slug: string; name: string; year: number | null };
+
+/**
+ * Datos para crear una temporada a partir de la cadena FKA (ej. "2026-27"),
+ * con el mismo formato que usa el modelo Season en la BD
+ * (slug "26-27", name "Temporada 26/27", year 2026). null si no se puede derivar.
+ */
+export function seasonToCreateData(fkaSeason: string): SeasonCreateData | null {
+  const norm = normalizeSeason(fkaSeason);
+  if (!norm) return null;
+  const year = Number(norm.slice(0, 4));
+  const start = norm.slice(2, 4);
+  const end = norm.slice(5, 7);
+  return { slug: `${start}-${end}`, name: `Temporada ${start}/${end}`, year };
+}
+
+/**
+ * Temporadas (normalizadas, ej. "2026-27") que faltan en la BD para los kits
+ * cuyo equipo SÍ se encontró. Solo considera kits con equipo resuelto; si el
+ * equipo no existe no se sugiere crear temporada.
+ */
+export function missingSeasons(kits: FkaKit[], dbTeams: DbTeam[], dbSeasons: DbSeason[]): string[] {
+  const missing = new Set<string>();
+  for (const kit of kits) {
+    const team = resolveTeam(dbTeams, kit.team);
+    if (!team) continue;
+    const season = resolveSeason(dbSeasons, kit.season);
+    if (!season) {
+      const norm = normalizeSeason(kit.season);
+      if (norm) missing.add(norm);
+    }
+  }
+  return Array.from(missing);
 }
 
 export async function importFkaKitsAsDrafts(
