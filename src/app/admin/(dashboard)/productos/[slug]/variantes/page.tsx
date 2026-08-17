@@ -72,8 +72,9 @@ export default async function AdminProductVariantsPage({
               <option key={v.id} value={v.id}>{v.name}</option>
             ))}
           </select>
-          <select name="sizeId" required defaultValue="" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm lg:w-32">
+          <select name="sizeId" required defaultValue="" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm lg:w-40">
             <option value="" disabled>Talla…</option>
+            <option value="__ALL__">Todas las tallas</option>
             {sizes.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}

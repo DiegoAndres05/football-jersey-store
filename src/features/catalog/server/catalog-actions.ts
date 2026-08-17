@@ -4,24 +4,17 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/features/auth/server/session";
+import {
+  slugify,
+  buildUniqueSku,
+  createVariantsForAllSizes,
+} from "@/features/catalog/server/variant-service";
 
 /**
  * CRUD de catálogo (FASE 4). Solo admin (cookie firmada).
  * Los errores de negocio se propagan como Error con mensaje amigable
  * y se muestran en el error.tsx de cada ruta.
  */
-
-function slugify(input: string): string {
-  return (
-    input
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "sin-nombre"
-  );
-}
 
 async function requireAdmin() {
   const admin = await getSessionUser();
@@ -264,16 +257,6 @@ const variantSchema = z.object({
 
 const variantEditSchema = variantSchema.omit({ versionId: true, sizeId: true });
 
-async function variantSku(product: { slug: string }, version: { slug: string }, size: { code: string }) {
-  const base = slugify(`${product.slug}-${version.slug}-${size.code}`);
-  let sku = base;
-  let i = 2;
-  while (await prisma.productVariant.findUnique({ where: { sku } })) {
-    sku = `${base}-${i++}`;
-  }
-  return sku;
-}
-
 export async function createVariantAction(productId: string, formData: FormData) {
   await requireAdmin();
   const parsed = variantSchema.safeParse({
@@ -293,11 +276,35 @@ export async function createVariantAction(productId: string, formData: FormData)
   });
   if (!product) throw new Error("El producto no existe.");
 
-  const [version, size] = await Promise.all([
-    prisma.version.findUnique({ where: { id: parsed.data.versionId } }),
-    prisma.size.findUnique({ where: { id: parsed.data.sizeId } }),
-  ]);
+  const version = await prisma.version.findUnique({ where: { id: parsed.data.versionId } });
   if (!version) throw new Error("La versión seleccionada no existe.");
+
+  // "Todas las tallas": crea una variante por cada talla que aún no exista
+  // para esta versión. Las combinaciones ya existentes se omiten.
+  if (parsed.data.sizeId === "__ALL__") {
+    const sizes = await prisma.size.findMany({
+      orderBy: { position: "asc" },
+      select: { id: true, code: true },
+    });
+    if (sizes.length === 0) throw new Error("No hay tallas configuradas.");
+
+    await createVariantsForAllSizes(
+      product,
+      version,
+      sizes,
+      {
+        costPrice: parsed.data.costPrice,
+        salePrice: parsed.data.salePrice,
+        compareAtPrice: parsed.data.compareAtPrice ?? null,
+        lowStockAt: parsed.data.lowStockAt ?? null,
+        weight: parsed.data.weight,
+      },
+    );
+
+    redirect(`/admin/productos/${product.slug}/variantes`);
+  }
+
+  const size = await prisma.size.findUnique({ where: { id: parsed.data.sizeId } });
   if (!size) throw new Error("La talla seleccionada no existe.");
 
   const clash = await prisma.productVariant.findUnique({
@@ -310,7 +317,7 @@ export async function createVariantAction(productId: string, formData: FormData)
       productId,
       versionId: parsed.data.versionId,
       sizeId: parsed.data.sizeId,
-      sku: await variantSku(product, version, size),
+      sku: await buildUniqueSku(prisma, product, version, size),
       costPrice: parsed.data.costPrice,
       salePrice: parsed.data.salePrice,
       compareAtPrice: parsed.data.compareAtPrice,

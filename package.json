@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --import tsx --env-file=.env --test tests/rate-limit.test.ts tests/password.test.ts tests/logica.test.ts tests/helpers.test.ts tests/import-fka.test.ts tests/import-fka-mvp.test.ts tests/products-image-storage.test.ts",
+    "test": "node --import tsx --env-file=.env --test tests/rate-limit.test.ts tests/password.test.ts tests/logica.test.ts tests/helpers.test.ts tests/import-fka.test.ts tests/import-fka-mvp.test.ts tests/products-image-storage.test.ts tests/variant-service.test.ts",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
