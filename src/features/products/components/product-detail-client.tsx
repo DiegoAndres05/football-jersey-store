@@ -2,9 +2,11 @@
 
 import { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { ChevronRight, Truck, Shield, RefreshCw } from "lucide-react";
+import { ChevronRight, MessageCircle, RefreshCw, Shield, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { whatsappLink } from "@/shared/config/site";
 import { ProductGallery } from "./product-gallery";
 import { ProductVariantSelector } from "./product-variant-selector";
 import { ProductCustomization } from "./product-customization";
@@ -148,9 +150,8 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
             getVariantPrice={getVariantPrice}
           />
 
-          <Separator />
-
           {/* Customization */}
+          {product.customizationsEnabled && <Separator />}
           <ProductCustomization
             enabled={product.customizationsEnabled}
             type={customType}
@@ -165,8 +166,7 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
             onNumberChange={setCustomNumber}
             onPlayerChange={setCustomPlayerId}
           />
-
-          <Separator />
+          {product.customizationsEnabled && <Separator />}
 
           {/* Availability */}
           {currentVariant && (
@@ -177,22 +177,36 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
           )}
 
           {/* Add to cart */}
-          {currentVariant && (
-            <AddToCartButton
-              variantId={currentVariant.id}
-              productSlug={product.slug}
-              productName={product.name}
-              teamName={product.team.name}
-              versionName={currentVariant.version.name}
-              sizeName={currentVariant.size.name}
-              imageUrl={product.images[0]?.url ?? ""}
-              unitPrice={currentVariant.salePrice + surcharge}
-              customizationType={customType}
-              customizationName={customizationName}
-              customizationNumber={customizationNumber}
-              disabled={isDisabled}
-            />
-          )}
+          {currentVariant &&
+            (isDisabled ? (
+              <Button size="xl" variant="outline" className="w-full" asChild>
+                <a
+                  href={whatsappLink(
+                    `Hola Flashsport, me interesa la camiseta ${product.name} (${product.team.name}, ${currentVariant.version.name}, talla ${currentVariant.size.name}). Está agotada. ¿Cómo puedo conseguirla?`,
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  Consultar por WhatsApp
+                </a>
+              </Button>
+            ) : (
+              <AddToCartButton
+                variantId={currentVariant.id}
+                productSlug={product.slug}
+                productName={product.name}
+                teamName={product.team.name}
+                versionName={currentVariant.version.name}
+                sizeName={currentVariant.size.name}
+                imageUrl={product.images[0]?.url ?? ""}
+                unitPrice={currentVariant.salePrice + surcharge}
+                customizationType={customType}
+                customizationName={customizationName}
+                customizationNumber={customizationNumber}
+                disabled={isDisabled}
+              />
+            ))}
 
           {/* Trust badges */}
           {product.description && (

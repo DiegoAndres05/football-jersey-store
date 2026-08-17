@@ -45,7 +45,12 @@ export default async function ProductosPage({ searchParams }: PageProps) {
     getSizes(),
   ]);
 
-  const activeFilters = buildActiveFilters(raw);
+  const activeFilters = buildActiveFilters(raw, {
+    league: new Map(leagues.map((l) => [l.slug, l.name])),
+    team: new Map(teams.map((t) => [t.slug, t.name])),
+    season: new Map(seasons.map((s) => [s.slug, s.name])),
+    version: new Map(versions.map((v) => [v.slug, v.name])),
+  });
   const hasActiveFilters = activeFilters.length > 0;
 
   return (
@@ -146,25 +151,60 @@ export default async function ProductosPage({ searchParams }: PageProps) {
 
           {/* Pagination */}
           {result.totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-10">
-              {Array.from({ length: result.totalPages }, (_, i) => i + 1).map((p) => {
-                const isCurrent = p === result.page;
-                return (
+            <nav aria-label="Paginación" className="flex flex-wrap items-center justify-center gap-2 mt-10">
+              {result.page > 1 ? (
+                <Link
+                  href={`/productos?page=${result.page - 1}${paramsToQuery(filters)}`}
+                  aria-label="Página anterior"
+                  className="flex h-10 items-center gap-1 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                >
+                  ← Anterior
+                </Link>
+              ) : (
+                <span className="flex h-10 cursor-not-allowed items-center gap-1 rounded-md border border-border px-3 text-sm font-medium text-muted-foreground/50 opacity-50">
+                  ← Anterior
+                </span>
+              )}
+
+              {getPaginationItems(result.page, result.totalPages).map((item, i) =>
+                item === "ellipsis" ? (
+                  <span
+                    key={`ellipsis-${i}`}
+                    aria-hidden
+                    className="flex h-10 items-center px-1 text-sm text-muted-foreground"
+                  >
+                    …
+                  </span>
+                ) : (
                   <Link
-                    key={p}
-                    href={`/productos?page=${p}${paramsToQuery(filters)}`}
-                    aria-current={isCurrent ? "page" : undefined}
+                    key={item}
+                    href={`/productos?page=${item}${paramsToQuery(filters)}`}
+                    aria-current={item === result.page ? "page" : undefined}
                     className={`flex h-10 w-10 items-center justify-center rounded-md text-sm font-medium transition-colors ${
-                      isCurrent
+                      item === result.page
                         ? "bg-foreground text-background"
                         : "bg-card border border-border hover:bg-accent text-foreground"
                     }`}
                   >
-                    {p}
+                    {item}
                   </Link>
-                );
-              })}
-            </div>
+                ),
+              )}
+
+              {result.page < result.totalPages ? (
+                <Link
+                  href={`/productos?page=${result.page + 1}${paramsToQuery(filters)}`}
+                  aria-label="Página siguiente"
+                  className="flex h-10 items-center gap-1 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                >
+                  Siguiente →
+                </Link>
+              ) : (
+                <span className="flex h-10 cursor-not-allowed items-center gap-1 rounded-md border border-border px-3 text-sm font-medium text-muted-foreground/50 opacity-50">
+                  Siguiente →
+                </span>
+              )}
+            </nav>
           )}
         </div>
       </div>
@@ -172,31 +212,59 @@ export default async function ProductosPage({ searchParams }: PageProps) {
   );
 }
 
-function buildActiveFilters(raw: ReturnType<typeof parseProductFiltersParams>): {
+const SORT_LABELS: Record<string, string> = {
+  newest: "Novedades",
+  "price-asc": "Menor precio",
+  "price-desc": "Mayor precio",
+  "name-asc": "A-Z",
+  "name-desc": "Z-A",
+};
+
+type FilterLookups = {
+  league: Map<string, string>;
+  team: Map<string, string>;
+  season: Map<string, string>;
+  version: Map<string, string>;
+};
+
+function buildActiveFilters(
+  raw: ReturnType<typeof parseProductFiltersParams>,
+  lookups: FilterLookups,
+): {
   param: string;
   label: string;
   removeHref: string;
 }[] {
-  const labels: { key: keyof typeof raw; param: string; label: string }[] = [
-    { key: "liga", param: "liga", label: "Liga" },
-    { key: "equipo", param: "equipo", label: "Equipo" },
-    { key: "temporada", param: "temporada", label: "Temporada" },
-    { key: "version", param: "version", label: "Versión" },
-    { key: "talla", param: "talla", label: "Talla" },
-    { key: "disponibilidad", param: "disponibilidad", label: "Disponibilidad" },
-    { key: "q", param: "q", label: "Búsqueda" },
-    { key: "sort", param: "sort", label: "Orden" },
+  const labels: {
+    key: keyof typeof raw;
+    param: string;
+    label: string;
+    format: (value: string) => string;
+  }[] = [
+    { key: "liga", param: "liga", label: "Liga", format: (v) => lookups.league.get(v) ?? v },
+    { key: "equipo", param: "equipo", label: "Equipo", format: (v) => lookups.team.get(v) ?? v },
+    { key: "temporada", param: "temporada", label: "Temporada", format: (v) => lookups.season.get(v) ?? v },
+    { key: "version", param: "version", label: "Versión", format: (v) => lookups.version.get(v) ?? v },
+    { key: "talla", param: "talla", label: "Talla", format: (v) => v },
+    {
+      key: "disponibilidad",
+      param: "disponibilidad",
+      label: "Disponibilidad",
+      format: (v) => (v === "AVAILABLE" ? "Disponible" : "Agotado"),
+    },
+    { key: "q", param: "q", label: "Búsqueda", format: (v) => v },
+    { key: "sort", param: "sort", label: "Orden", format: (v) => SORT_LABELS[v] ?? v },
   ];
 
-  return labels.flatMap(({ key, param, label }) => {
+  return labels.flatMap(({ key, param, label, format }) => {
     const value = raw[key];
-    if (!value || (key === "sort" && value === "default")) return [];
+    if (typeof value !== "string" || !value || (key === "sort" && value === "default")) return [];
     const url = new URLSearchParams();
     for (const [k, v] of Object.entries(raw)) {
       if (k === param || typeof v !== "string" || !v || (k === "sort" && v === "default")) continue;
       url.set(k, v);
     }
-    return [{ param, label: `${label}: ${value}`, removeHref: `/productos?${url.toString()}` }];
+    return [{ param, label: `${label}: ${format(value)}`, removeHref: `/productos?${url.toString()}` }];
   });
 }
 
@@ -215,6 +283,20 @@ function CatalogSkeleton() {
       ))}
     </div>
   );
+}
+
+function getPaginationItems(current: number, total: number): (number | "ellipsis")[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const items: (number | "ellipsis")[] = [1];
+  if (current > 3) items.push("ellipsis");
+  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p++) {
+    items.push(p);
+  }
+  if (current < total - 2) items.push("ellipsis");
+  items.push(total);
+  return items;
 }
 
 function paramsToQuery(filters: FilterParams): string {
