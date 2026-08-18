@@ -166,6 +166,12 @@ model ProductVariant {
   lowStockAt      Int?
   weight          Int              @default(400)
 
+  // Modalidad de entrega (MVP):
+  // INMEDIATA se deriva del stock del ledger (stock > 0).
+  // allowsBackorder=true permite vender la variante como BAJO_PEDIDO
+  // aunque no haya stock físico inmediato.
+  allowsBackorder Boolean          @default(true)
+
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -394,6 +400,8 @@ model OrderItem {
   customizationName  String?
   customizationNumber String?
   officialPlayer     String?
+
+  deliveryMode     String  @default("INMEDIATA")  // INMEDIATA | BAJO_PEDIDO (snapshot del pedido)
 
   sourceType      String  @default("LOCAL")  // LOCAL | SUPPLIER
   supplierId      String?

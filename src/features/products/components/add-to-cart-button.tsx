@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ShoppingBag, Check } from "lucide-react";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { toast } from "@/components/ui/toast";
+import type { DeliveryMode } from "@/features/products/types/delivery-mode";
 
 export function AddToCartButton({
   variantId,
@@ -19,6 +20,7 @@ export function AddToCartButton({
   customizationType,
   customizationName,
   customizationNumber,
+  deliveryMode,
   disabled,
 }: {
   variantId: string;
@@ -32,6 +34,7 @@ export function AddToCartButton({
   customizationType: "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
   customizationName: string;
   customizationNumber: string;
+  deliveryMode: DeliveryMode;
   disabled?: boolean;
 }) {
   const [added, setAdded] = useState(false);
@@ -52,13 +55,14 @@ export function AddToCartButton({
       customizationType,
       customizationName,
       customizationNumber,
+      deliveryMode,
     });
 
     setAdded(true);
     toast({ title: "Agregado al carrito", variant: "success" });
 
     setTimeout(() => setAdded(false), 2000);
-  }, [variantId, productSlug, productName, teamName, versionName, sizeName, imageUrl, unitPrice, customizationType, customizationName, customizationNumber, disabled, addItem]);
+  }, [variantId, productSlug, productName, teamName, versionName, sizeName, imageUrl, unitPrice, customizationType, customizationName, customizationNumber, deliveryMode, disabled, addItem]);
 
   return (
     <Button

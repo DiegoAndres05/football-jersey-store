@@ -128,6 +128,13 @@ export default async function AdminProductVariantsPage({
                           <input name="compareAtPrice" type="number" min={0} defaultValue={v.compareAtPrice ?? ""} placeholder="Tachado" className="h-7 w-20 rounded-md border border-input bg-background px-2 text-xs" />
                           <input name="lowStockAt" type="number" min={0} defaultValue={v.lowStockAt ?? ""} placeholder="Alert.≤" className="h-7 w-16 rounded-md border border-input bg-background px-2 text-xs" />
                           <input name="weight" type="number" min={1} defaultValue={v.weight} className="h-7 w-14 rounded-md border border-input bg-background px-2 text-xs" title="Peso (g)" />
+                          <label
+                            title="Permite vender esta talla sin stock físico (bajo pedido)"
+                            className="flex items-center gap-1.5 text-xs cursor-pointer select-none px-1"
+                          >
+                            <input name="allowsBackorder" type="checkbox" defaultChecked={v.allowsBackorder} className="h-3.5 w-3.5 accent-primary" />
+                            Bajo pedido
+                          </label>
                           <button type="submit" className="rounded-md border border-border px-2.5 py-1 text-xs hover:border-muted-foreground/40 transition-colors">
                             Guardar
                           </button>

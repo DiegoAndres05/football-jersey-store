@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { DeliveryMode } from "@/features/products/types/delivery-mode";
 
 export type CustomizationType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
 
@@ -17,30 +18,30 @@ export type CartItem = {
   customizationType: CustomizationType;
   customizationName: string;
   customizationNumber: string;
+  deliveryMode: DeliveryMode;
 };
 
 export type CartDraft = Omit<CartItem, "quantity" | "lineId">;
 
 /**
- * Una línea de carrito se identifica por variante + personalización:
- * "Real Madrid / Fan / M" (sin personalizar) es distinto de
- * "Real Madrid / Player / M", y dos personalizaciones distintas
- * sobre la misma variante nunca se mezclan.
+ * Una línea de carrito se identifica por variante + personalización + modalidad
+ * de entrega: la misma variante en "inmediata" y en "bajo pedido" son líneas
+ * distintas porque difieren en stock, tiempo de despacho y validación.
  */
 export function buildLineId(
   item: Pick<
     CartItem,
-    "variantId" | "customizationType" | "customizationName" | "customizationNumber"
+    "variantId" | "customizationType" | "customizationName" | "customizationNumber" | "deliveryMode"
   >,
 ): string {
   const customization =
     item.customizationType === "NONE"
       ? "none"
       : `${item.customizationType}:${item.customizationName}:${item.customizationNumber}`;
-  return `${item.variantId}#${customization}`;
+  return `${item.variantId}#${customization}#${item.deliveryMode}`;
 }
 
-type LegacyCartItem = Omit<CartItem, "lineId">;
+type LegacyCartItem = Omit<CartItem, "lineId" | "deliveryMode">;
 
 interface CartState {
   items: CartItem[];
@@ -85,15 +86,15 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: "fjs-cart",
-      version: 2,
+      version: 3,
       partialize: (state) => ({ items: state.items }),
       migrate: (persisted) => {
         const state = persisted as { items?: LegacyCartItem[] };
         return {
-          items: (state.items ?? []).map((item) => ({
-            ...item,
-            lineId: buildLineId(item),
-          })),
+          items: (state.items ?? []).map((item) => {
+            const normalized = { ...item, deliveryMode: "INMEDIATA" as const };
+            return { ...normalized, lineId: buildLineId(normalized) };
+          }),
         };
       },
     },

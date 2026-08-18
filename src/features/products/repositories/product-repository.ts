@@ -331,6 +331,7 @@ async function mapProductCards(
       availability: availabilityFromStocks(stocks),
       availableSizes,
       versionNames,
+      canBackorder: infos.some((info) => info.allowsBackorder),
     } satisfies ProductCardData;
   });
 }
@@ -374,6 +375,7 @@ type VariantInfo = {
   sizePosition: number;
   versionName: string;
   versionAdjustment: number;
+  allowsBackorder: boolean;
 };
 
 async function getVariantInfosByProductIds(productIds: string[]): Promise<Map<string, VariantInfo[]>> {
@@ -383,6 +385,7 @@ async function getVariantInfosByProductIds(productIds: string[]): Promise<Map<st
     select: {
       id: true,
       productId: true,
+      allowsBackorder: true,
       size: { select: { code: true, position: true } },
       version: { select: { name: true, priceAdjustment: true } },
     },
@@ -396,6 +399,7 @@ async function getVariantInfosByProductIds(productIds: string[]): Promise<Map<st
       sizePosition: v.size.position,
       versionName: v.version.name,
       versionAdjustment: v.version.priceAdjustment,
+      allowsBackorder: v.allowsBackorder,
     };
     const list = byProduct.get(v.productId) ?? [];
     list.push(info);

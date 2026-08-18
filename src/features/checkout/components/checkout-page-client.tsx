@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { SHIPPING, shippingFee, SITE } from "@/shared/config/site";
+import { DELIVERY_MODE_INFO } from "@/features/products/types/delivery-mode";
 import { formatPrice } from "@/lib/utils";
 import { processMockPayment } from "@/features/payments/services/mock-payment";
 import { submitOrder } from "@/features/orders/server/order-actions";
@@ -110,6 +111,7 @@ export function CheckoutPageClient() {
         customizationType: i.customizationType,
         customizationName: i.customizationName,
         customizationNumber: i.customizationNumber,
+        deliveryMode: i.deliveryMode,
       })),
       paymentMethod,
       paymentReference: payment.reference,
@@ -316,6 +318,10 @@ export function CheckoutPageClient() {
                       {item.customizationNumber ? ` · ${item.customizationNumber}` : ""})
                     </p>
                   )}
+                  <p className="text-xs text-muted-foreground">
+                    {DELIVERY_MODE_INFO[item.deliveryMode].label} ·{" "}
+                    {DELIVERY_MODE_INFO[item.deliveryMode].eta}
+                  </p>
                 </div>
                 <p className="text-sm font-medium tabular-nums">{formatPrice(item.unitPrice * item.quantity)}</p>
               </div>

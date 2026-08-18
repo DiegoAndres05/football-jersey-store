@@ -6,6 +6,8 @@ import {
   checkoutFormSchema,
   type PaymentMethod,
 } from "@/features/checkout/schemas/checkout-schema";
+import type { DeliveryMode } from "@/features/products/types/delivery-mode";
+import { planInventoryMovements } from "./inventory-plan";
 
 export type OrderLineInput = {
   variantId: string;
@@ -13,6 +15,7 @@ export type OrderLineInput = {
   customizationType: "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
   customizationName: string;
   customizationNumber: string;
+  deliveryMode: DeliveryMode;
 };
 
 export type CreateOrderInput = {
@@ -67,6 +70,9 @@ export async function createOrder(input: CreateOrderInput): Promise<
     if (!variant || line.quantity < 1) {
       return { ok: false, error: "Un artículo del carrito ya no está disponible." };
     }
+    if (line.deliveryMode !== "INMEDIATA" && line.deliveryMode !== "BAJO_PEDIDO") {
+      return { ok: false, error: "Modalidad de entrega inválida." };
+    }
     const surcharge =
       line.customizationType !== "NONE" && variant.product.customizationsEnabled
         ? variant.product.customizationSurcharge
@@ -90,6 +96,7 @@ export async function createOrder(input: CreateOrderInput): Promise<
       customizationNumber: line.customizationNumber || null,
       officialPlayer:
         line.customizationType === "OFFICIAL_PLAYER" ? line.customizationName || null : null,
+      deliveryMode: line.deliveryMode,
     });
   }
 
@@ -100,6 +107,26 @@ export async function createOrder(input: CreateOrderInput): Promise<
 
   try {
     const order = await prisma.$transaction(async (tx) => {
+      // Bloquea las variantes involucradas para serializar pedidos
+      // concurrentes y evitar sobreventa en líneas de entrega inmediata.
+      if (variantIds.length > 0) {
+        await tx.$queryRaw`
+          SELECT "id" FROM "ProductVariant"
+          WHERE "id" IN (${Prisma.join(variantIds)})
+          FOR UPDATE
+        `;
+      }
+
+      const stockRows = await tx.inventoryMovement.groupBy({
+        by: ["variantId"],
+        where: { variantId: { in: variantIds } },
+        _sum: { quantity: true },
+      });
+      const stockById = new Map(stockRows.map((r) => [r.variantId, r._sum.quantity ?? 0]));
+
+      const plan = planInventoryMovements(input.lines, stockById);
+      if (!plan.ok) throw new Error(`NO_STOCK:${plan.error}`);
+
       const existingCustomer = await tx.customer.findFirst({ where: { email: f.email } });
       const customer = existingCustomer
         ? await tx.customer.update({
@@ -161,11 +188,12 @@ export async function createOrder(input: CreateOrderInput): Promise<
       });
 
       await tx.inventoryMovement.createMany({
-        data: orderItems.map((item) => ({
-          variantId: item.variantId!,
+        data: plan.movements.map((m) => ({
+          variantId: m.variantId,
           type: "RESERVATION",
           // El ledger computa stock como SUM(quantity): reservar resta existencias.
-          quantity: -item.quantity,
+          // Solo las líneas INMEDIATA reservan; las de bajo pedido no tienen stock físico.
+          quantity: m.quantity,
           reference: code,
           reason: "Reserva por pedido (pago simulado - demo).",
           orderReference: code,
@@ -178,8 +206,14 @@ export async function createOrder(input: CreateOrderInput): Promise<
 
     return { ok: true, code: order.code };
   } catch (err) {
-    console.error("createOrder failed:", err);
-    return { ok: false, error: "No pudimos crear tu pedido. Intenta de nuevo." };
+    const noStock = err instanceof Error && err.message.startsWith("NO_STOCK:");
+    if (!noStock) console.error("createOrder failed:", err);
+    return {
+      ok: false,
+      error: noStock && err instanceof Error
+        ? err.message.slice("NO_STOCK:".length)
+        : "No pudimos crear tu pedido. Intenta de nuevo.",
+    };
   }
 }
 

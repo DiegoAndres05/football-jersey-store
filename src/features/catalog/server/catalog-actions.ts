@@ -253,6 +253,7 @@ const variantSchema = z.object({
   compareAtPrice: z.coerce.number().int().min(0).max(100000000).optional().nullable(),
   lowStockAt: z.coerce.number().int().min(0).max(100000).optional().nullable(),
   weight: z.coerce.number().int().min(1).max(100000).default(400),
+  allowsBackorder: z.coerce.boolean().optional(),
 });
 
 const variantEditSchema = variantSchema.omit({ versionId: true, sizeId: true });
@@ -336,6 +337,7 @@ export async function updateVariantAction(variantId: string, formData: FormData)
     compareAtPrice: cleanNullable(formData.get("compareAtPrice")),
     lowStockAt: cleanNullable(formData.get("lowStockAt")),
     weight: formData.get("weight") ?? "400",
+    allowsBackorder: formData.get("allowsBackorder"),
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 

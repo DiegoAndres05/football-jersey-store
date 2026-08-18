@@ -62,9 +62,15 @@ export function ProductCard({ product, priority }: { product: ProductCardData; p
 
         <div className="mt-auto pt-2">
           {product.availability === "OUT_OF_STOCK" ? (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-destructive">
-              Agotada
-            </p>
+            product.canBackorder ? (
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-warning">
+                Bajo pedido · 15–20 días
+              </p>
+            ) : (
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-destructive">
+                Agotada
+              </p>
+            )
           ) : product.availableSizes.length > 0 ? (
             <p className="text-[11px] tracking-wider text-muted-foreground">
               Tallas: <span className="text-foreground">{product.availableSizes.join(" · ")}</span>

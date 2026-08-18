@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { ChevronRight, MessageCircle, RefreshCw, Shield, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { whatsappLink } from "@/shared/config/site";
+import { getAvailableDeliveryModes, type DeliveryMode } from "@/features/products/types/delivery-mode";
 import { ProductGallery } from "./product-gallery";
 import { ProductVariantSelector } from "./product-variant-selector";
 import { ProductCustomization } from "./product-customization";
 import { ProductPrice } from "./product-price";
-import { ProductAvailability } from "./product-availability";
+import { ProductDeliveryMode } from "./product-delivery-mode";
 import { AddToCartButton } from "./add-to-cart-button";
 import type { ProductDetailData, VariantWithStock } from "@/features/products/types/product-types";
 
@@ -24,6 +25,7 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
   const [customName, setCustomName] = useState("");
   const [customNumber, setCustomNumber] = useState("");
   const [customPlayerId, setCustomPlayerId] = useState("");
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("INMEDIATA");
 
   const variantMap = useMemo(() => {
     const map = new Map<string, VariantWithStock>();
@@ -78,13 +80,21 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
     [product.players, customPlayerId],
   );
 
-  const isDisabled = currentVariant?.availability === "OUT_OF_STOCK";
-
   const surcharge = customType !== "NONE" ? product.customizationSurcharge : 0;
   const customizationName =
     customType === "CUSTOM" ? customName : customType === "OFFICIAL_PLAYER" ? selectedPlayer?.name ?? "" : "";
   const customizationNumber =
     customType === "CUSTOM" ? customNumber : customType === "OFFICIAL_PLAYER" ? selectedPlayer?.number ?? "" : "";
+
+  const availableModes = currentVariant
+    ? getAvailableDeliveryModes(currentVariant.stock, currentVariant.allowsBackorder)
+    : [];
+
+  useEffect(() => {
+    if (!currentVariant) return;
+    const [first] = getAvailableDeliveryModes(currentVariant.stock, currentVariant.allowsBackorder);
+    if (first) setDeliveryMode(first);
+  }, [currentVariant]);
 
   return (
     <div className="container-page py-8">
@@ -168,44 +178,50 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
           />
           {product.customizationsEnabled && <Separator />}
 
-          {/* Availability */}
-          {currentVariant && (
-            <ProductAvailability
-              availability={currentVariant.availability}
-              stock={currentVariant.stock}
-            />
-          )}
-
-          {/* Add to cart */}
+          {/* Delivery mode + Add to cart */}
           {currentVariant &&
-            (isDisabled ? (
-              <Button size="xl" variant="outline" className="w-full" asChild>
-                <a
-                  href={whatsappLink(
-                    `Hola Flashsport, me interesa la camiseta ${product.name} (${product.team.name}, ${currentVariant.version.name}, talla ${currentVariant.size.name}). Está agotada. ¿Cómo puedo conseguirla?`,
-                  )}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <MessageCircle className="h-5 w-5" />
-                  Consultar por WhatsApp
-                </a>
-              </Button>
+            (availableModes.length > 0 ? (
+              <>
+                <ProductDeliveryMode
+                  stock={currentVariant.stock}
+                  allowsBackorder={currentVariant.allowsBackorder}
+                  selected={deliveryMode}
+                  onSelect={setDeliveryMode}
+                />
+
+                <AddToCartButton
+                  variantId={currentVariant.id}
+                  productSlug={product.slug}
+                  productName={product.name}
+                  teamName={product.team.name}
+                  versionName={currentVariant.version.name}
+                  sizeName={currentVariant.size.name}
+                  imageUrl={product.images[0]?.url ?? ""}
+                  unitPrice={currentVariant.salePrice + surcharge}
+                  customizationType={customType}
+                  customizationName={customizationName}
+                  customizationNumber={customizationNumber}
+                  deliveryMode={deliveryMode}
+                />
+              </>
             ) : (
-              <AddToCartButton
-                variantId={currentVariant.id}
-                productSlug={product.slug}
-                productName={product.name}
-                teamName={product.team.name}
-                versionName={currentVariant.version.name}
-                sizeName={currentVariant.size.name}
-                imageUrl={product.images[0]?.url ?? ""}
-                unitPrice={currentVariant.salePrice + surcharge}
-                customizationType={customType}
-                customizationName={customizationName}
-                customizationNumber={customizationNumber}
-                disabled={isDisabled}
-              />
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Esta talla está agotada y no se puede pedir bajo encargo.
+                </p>
+                <Button size="xl" variant="outline" className="w-full" asChild>
+                  <a
+                    href={whatsappLink(
+                      `Hola Flashsport, me interesa la camiseta ${product.name} (${product.team.name}, ${currentVariant.version.name}, talla ${currentVariant.size.name}). Está agotada. ¿Cómo puedo conseguirla?`,
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    Consultar por WhatsApp
+                  </a>
+                </Button>
+              </div>
             ))}
 
           {/* Trust badges */}

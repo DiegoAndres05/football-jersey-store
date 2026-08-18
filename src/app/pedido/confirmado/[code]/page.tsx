@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getOrderByCode } from "@/features/orders/repositories/order-repository";
+import { DELIVERY_MODE_INFO, type DeliveryMode } from "@/features/products/types/delivery-mode";
 import { formatPrice } from "@/lib/utils";
 
 interface PageProps {
@@ -59,17 +60,24 @@ export default async function OrderConfirmationPage({ params }: PageProps) {
         </dl>
 
         <div className="mt-6 space-y-2 text-left">
-          {order.items.map((item) => (
-            <div key={item.id} className="flex justify-between gap-3 rounded-lg border border-border px-4 py-3 text-sm">
-              <div className="min-w-0">
-                <p className="font-medium truncate">{item.productName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {item.teamName} · {item.versionName} · Talla {item.sizeName} · x{item.quantity}
-                </p>
+          {order.items.map((item) => {
+            const deliveryMode = item.deliveryMode as DeliveryMode;
+            return (
+              <div key={item.id} className="flex justify-between gap-3 rounded-lg border border-border px-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{item.productName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {item.teamName} · {item.versionName} · Talla {item.sizeName} · x{item.quantity}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {deliveryMode === "BAJO_PEDIDO" ? "Bajo pedido" : "Entrega inmediata"} ·{" "}
+                    {DELIVERY_MODE_INFO[deliveryMode].eta}
+                  </p>
+                </div>
+                <p className="font-medium tabular-nums shrink-0">{formatPrice(item.subtotal)}</p>
               </div>
-              <p className="font-medium tabular-nums shrink-0">{formatPrice(item.subtotal)}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <Button className="mt-8" asChild>

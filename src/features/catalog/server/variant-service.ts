@@ -44,6 +44,8 @@ export type VariantPriceData = {
   compareAtPrice: number | null;
   lowStockAt: number | null;
   weight: number;
+  /** Si se omite, la BD aplica el default (true): la variante se puede vender bajo pedido. */
+  allowsBackorder?: boolean;
 };
 
 export type VariantDbClient = {

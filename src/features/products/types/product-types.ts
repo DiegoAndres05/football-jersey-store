@@ -1,4 +1,7 @@
 import type { Product, ProductImage, ProductVariant, Team, Season, Version, Size, League } from "@prisma/client";
+import type { DeliveryMode } from "./delivery-mode";
+
+export type { DeliveryMode } from "./delivery-mode";
 
 export type ProductCardData = {
   id: string;
@@ -18,6 +21,7 @@ export type ProductCardData = {
   availability: Availability;
   availableSizes: string[];
   versionNames: string[];
+  canBackorder: boolean;
 };
 
 export type Availability = "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK";
@@ -79,6 +83,7 @@ export type PlayerData = {
 export type VariantWithStock = VariantWithRelations & {
   stock: number | null;
   availability: Availability;
+  allowsBackorder: boolean;
 };
 
 export type LeagueData = Pick<League, "id" | "slug" | "name" | "country"> & {

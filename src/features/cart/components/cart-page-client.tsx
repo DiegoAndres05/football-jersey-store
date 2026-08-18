@@ -6,7 +6,9 @@ import Link from "next/link";
 import { Minus, Plus, Trash2, ArrowRight, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { useCartStore } from "@/shared/stores/cart-store";
+import { DELIVERY_MODE_INFO } from "@/features/products/types/delivery-mode";
 import { formatPrice } from "@/lib/utils";
 
 export function CartPageClient() {
@@ -102,6 +104,15 @@ export function CartPageClient() {
                           : `${item.customizationName} · ${item.customizationNumber}`}
                       </p>
                     )}
+                    <div className="mt-1">
+                      <Badge
+                        tone={item.deliveryMode === "BAJO_PEDIDO" ? "warning" : "default"}
+                        className="text-[11px]"
+                      >
+                        {DELIVERY_MODE_INFO[item.deliveryMode].label} ·{" "}
+                        {DELIVERY_MODE_INFO[item.deliveryMode].eta}
+                      </Badge>
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
