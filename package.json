@@ -14,7 +14,8 @@
     "db:reset": "rm -f prisma/dev.db && prisma db push && tsx prisma/seed.ts",
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
     "admin:password": "tsx scripts/admin-set-password.ts",
-    "studio": "prisma studio"
+    "studio": "prisma studio",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.8.0",
