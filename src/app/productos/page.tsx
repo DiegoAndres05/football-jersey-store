@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +16,24 @@ import { ProductFilters } from "@/features/products/components/product-filters";
 import { EmptyState } from "@/features/products/components/empty-state";
 import { parseProductFiltersParams } from "@/features/products/schemas/product-filters-schema";
 import type { ProductFilters as FilterParams } from "@/features/products/types/product-types";
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+
+export const metadata: Metadata = {
+  title: "Catálogo de camisetas de fútbol",
+  description:
+    "Explora nuestro catálogo de camisetas de fútbol: ligas, equipos, temporadas y tallas. Envío a toda Colombia.",
+  alternates: { canonical: `${siteUrl}/productos` },
+  openGraph: {
+    title: "Catálogo de camisetas de fútbol | Flashsport",
+    description:
+      "Explora nuestro catálogo de camisetas de fútbol: ligas, equipos, temporadas y tallas.",
+    url: `${siteUrl}/productos`,
+    siteName: "Flashsport",
+    type: "website",
+    locale: "es_CO",
+  },
+};
 
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Tooltip } from "@/components/ui/tooltip";
+import { SITE } from "@/shared/config/site";
 import "./globals.css";
 
 // Fuentes locales (self-hosted) para builds reproducibles sin red.
@@ -53,8 +54,29 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE.name,
+    url: siteUrl,
+    description: SITE.tagline,
+    contactPoint: {
+      "@type": "ContactPoint",
+      contactType: "customer service",
+      email: SITE.email,
+      availableLanguage: "Spanish",
+    },
+  };
+
   return (
     <html lang="es" className={`${inter.variable}`}>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+      </head>
       <body className="min-h-screen flex flex-col bg-background text-foreground antialiased">
         <Tooltip.Provider delayDuration={300}>
           <AppLayout>{children}</AppLayout>
