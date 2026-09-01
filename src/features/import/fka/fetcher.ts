@@ -98,9 +98,10 @@ export class FkaFetcher {
   }
 
   async fetchPage(url: string): Promise<FetchedPage> {
-    const html = await fkaFetch(url);
+    const resolved = resolveUrl(url, FKA_BASE_URL);
+    const html = await fkaFetch(resolved);
     if (isCloudflareChallenge(html)) throw new FkaBlockedError();
-    return parseHtml(html, url);
+    return parseHtml(html, resolved);
   }
 
   async searchTeam(query: string): Promise<TeamCandidate | null> {
