@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { supabaseServer, PRODUCT_IMAGES_BUCKET } from "@/lib/supabase/server";
 import { getSessionUser } from "@/features/auth/server/session";
 import {
   slugify,
@@ -236,9 +237,20 @@ export async function deleteProductAction(productId: string) {
   if (razones.length) {
     throw new Error(`No se puede eliminar: tiene ${razones.join(" y ")}. Elimina primero sus variantes.`);
   }
-  if ((await prisma.productImage.count({ where: { productId } })) > 0) {
-    throw new Error("No se puede eliminar: tiene imágenes. Elimínalas primero.");
+  const images = await prisma.productImage.findMany({
+    where: { productId },
+    select: { id: true, storagePath: true },
+  });
+  for (const img of images) {
+    if (img.storagePath) {
+      try {
+        await supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).remove([img.storagePath]);
+      } catch {
+        /* ignore: idempotent */
+      }
+    }
   }
+  await prisma.productImage.deleteMany({ where: { productId } });
   await prisma.product.delete({ where: { id: productId } });
   redirect("/admin/productos");
 }
