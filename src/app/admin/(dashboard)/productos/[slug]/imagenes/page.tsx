@@ -20,10 +20,11 @@ export const metadata: Metadata = {
 export default async function AdminProductImagesPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
+  const { slug } = await params;
   const product = await prisma.product.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
     include: { images: { orderBy: { order: "asc" } }, team: { select: { name: true } } },
   });
   if (!product) notFound();

@@ -19,10 +19,11 @@ export const metadata: Metadata = {
 export default async function AdminProductVariantsPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
+  const { slug } = await params;
   const product = await prisma.product.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
     include: {
       team: { select: { name: true } },
       variants: { include: { version: true, size: true }, orderBy: [{ size: { position: "asc" } }, { version: { name: "asc" } }] },

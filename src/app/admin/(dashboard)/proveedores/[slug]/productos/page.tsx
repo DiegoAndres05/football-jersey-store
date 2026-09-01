@@ -17,10 +17,11 @@ export const metadata: Metadata = {
 export default async function AdminSupplierProductsPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
+  const { slug } = await params;
   const supplier = await prisma.supplier.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
     include: {
       products: {
         include: { product: { select: { name: true, team: { select: { name: true } } } } },
