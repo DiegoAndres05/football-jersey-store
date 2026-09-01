@@ -12,6 +12,7 @@ import "server-only";
  */
 
 const ALLOWED_HOSTS = new Set(["www.footballkitarchive.com", "cdn.footballkitarchive.com"]);
+const FKA_ORIGIN = "https://www.footballkitarchive.com";
 
 export const MAX_FKA_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -58,7 +59,13 @@ export async function downloadFkaImage(url: string, timeoutMs = 15000): Promise<
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
-    res = await fetch(url, { signal: controller.signal, redirect: "follow" });
+    res = await fetch(url, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: {
+        Referer: `${FKA_ORIGIN}/`,
+      },
+    });
   } catch (err) {
     if (controller.signal.aborted) throw new FkaImageError("Tiempo de espera agotado al descargar la imagen.");
     throw new FkaImageError(`No se pudo descargar la imagen: ${err instanceof Error ? err.message : "error de red"}`);

@@ -27,12 +27,11 @@ export type FkaPreviewResult =
   | { ok: false; error: string };
 
 /**
- * El CDN de FKA bloquea las imágenes cuando se solicitan con un Referer
- * ajeno a FKA (hotlink protection de Cloudflare → 403), por lo que el
- * navegador del admin no puede cargar la miniatura directamente.
- * La descarga se hace con la misma sesión autenticada del importador y se
- * devuelve como data URL en previewImage. imageUrl se conserva intacto
- * (CDN original) para que el flujo de importación no cambie.
+ * El CDN de FKA bloquea las imágenes cuando se solicitan sin el Referer
+ * correcto (hotlink protection de Cloudflare → 403). La descarga se hace
+ * con Referer de FKA vía downloadFkaImage y se devuelve como data URL
+ * en previewImage. imageUrl se conserva intacto para el flujo de
+ * importación.
  */
 async function withPreviewImage(
   fetcher: FkaFetcher,

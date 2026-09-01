@@ -106,7 +106,7 @@ export function FkaImportForm() {
           </Button>
           {pending && (
             <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Download className="h-4 w-4" /> Usando la sesión persistente del navegador
+              <Download className="h-4 w-4" /> Descargando datos de FKA
             </span>
           )}
         </div>
