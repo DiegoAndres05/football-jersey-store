@@ -127,6 +127,32 @@ export function missingSeasons(kits: FkaKit[], dbTeams: DbTeam[], dbSeasons: DbS
   return Array.from(missing);
 }
 
+export type TeamCreateData = { name: string; slug: string; leagueId: string };
+
+/**
+ * Datos para crear un equipo a partir del nombre FKA.
+ * El slug se deriva del nombre normalizado. leagueId se inyecta desde la acción.
+ */
+export function teamToCreateData(fkaTeamName: string, leagueId: string): TeamCreateData | null {
+  const slug = slugifyImport(fkaTeamName);
+  if (!slug || slug === "sin-nombre") return null;
+  return { name: fkaTeamName, slug, leagueId };
+}
+
+/**
+ * Nombres de equipo (de FKA) que faltan en la BD.
+ */
+export function missingTeams(kits: FkaKit[], dbTeams: DbTeam[]): string[] {
+  const missing = new Set<string>();
+  for (const kit of kits) {
+    const team = resolveTeam(dbTeams, kit.team);
+    if (!team) {
+      missing.add(kit.team);
+    }
+  }
+  return Array.from(missing);
+}
+
 export async function importFkaKitsAsDrafts(
   kits: FkaKit[],
   dbTeams: DbTeam[],

@@ -30,7 +30,7 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<FkaImportActionResult | null>(null);
-  const [confirm, setConfirm] = useState<{ kits: FkaKit[]; seasons: string[] } | null>(null);
+  const [confirm, setConfirm] = useState<{ kits: FkaKit[]; seasons?: string[]; teams?: string[] } | null>(null);
 
   if (!result.ok) {
     return (
@@ -49,7 +49,9 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
   }
 
   const isSelectable = (item: ImportPreviewItem) =>
-    item.status === "ENCONTRADO" || (item.status === "SIN_TEMPORADA" && item.teamMatch.found);
+    item.status === "ENCONTRADO" ||
+    item.status === "SIN_EQUIPO" ||
+    (item.status === "SIN_TEMPORADA" && item.teamMatch.found);
 
   const importable = result.items.filter((_, i) => selected.has(i));
   const readyCount = result.items.filter(isSelectable).length;
@@ -70,6 +72,10 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
     setConfirm(null);
     try {
       const res = await importFkaKitsAction(importable.map((item) => item.kit));
+      if (res.ok && "needsTeams" in res) {
+        setConfirm({ kits: importable.map((item) => item.kit), teams: res.teams });
+        return;
+      }
       if (res.ok && "needsSeasons" in res) {
         setConfirm({ kits: importable.map((item) => item.kit), seasons: res.seasons });
         return;
@@ -85,7 +91,7 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
     setImporting(true);
     setImportResult(null);
     try {
-      setImportResult(await importFkaKitsAction(confirm.kits, { createSeasons: true }));
+      setImportResult(await importFkaKitsAction(confirm.kits, { createSeasons: true, createTeams: true }));
     } finally {
       setImporting(false);
       setConfirm(null);
@@ -114,18 +120,35 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
       {confirm && !importing && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
           <p className="font-semibold text-amber-900">
-            Falta(n) temporada(s) para importar
+            Faltan recursos para importar
           </p>
-          <ul className="mt-2 list-inside list-disc space-y-0.5 text-sm text-amber-900">
-            {confirm.seasons.map((season) => (
-              <li key={season}>
-                La temporada {season} no existe en Flashsport.
-              </li>
-            ))}
-          </ul>
+          {confirm.teams && confirm.teams.length > 0 && (
+            <>
+              <ul className="mt-2 list-inside list-disc space-y-0.5 text-sm text-amber-900">
+                {confirm.teams.map((team) => (
+                  <li key={team}>
+                    El equipo <strong>{team}</strong> no existe en Flashsport.
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-amber-800">
+                Se crearán automáticamente en la liga &ldquo;Otros&rdquo;.
+              </p>
+            </>
+          )}
+          {confirm.seasons && confirm.seasons.length > 0 && (
+            <>
+              <ul className="mt-2 list-inside list-disc space-y-0.5 text-sm text-amber-900">
+                {confirm.seasons.map((season) => (
+                  <li key={season}>
+                    La temporada <strong>{season}</strong> no existe en Flashsport.
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <p className="mt-2 text-sm text-amber-900">
-            ¿Quieres crear{" "}
-            {confirm.seasons.length === 1 ? "esta temporada" : "estas temporadas"} e importar las camisetas
+            ¿Quieres crear los recursos faltantes e importar las camisetas
             seleccionadas? Los productos se crearán como borradores (inactivos).
           </p>
           <div className="mt-3 flex gap-2">
@@ -134,7 +157,7 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
             </Button>
             <Button type="button" onClick={onConfirmImport} disabled={importing}>
               {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-              Crear temporada e importar
+              Crear e importar
             </Button>
           </div>
         </div>
@@ -215,7 +238,7 @@ function ImportSummary({ result }: { result: FkaImportActionResult }) {
       </div>
     );
   }
-  if ("needsSeasons" in result) return null;
+  if ("needsSeasons" in result || "needsTeams" in result) return null;
 
   const s = result.result.summary;
   return (

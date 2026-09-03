@@ -14,7 +14,7 @@ import {
 import { resolveImport } from "../fka/resolver";
 import type { ImportPreviewItem, FkaSearchInput, FkaKit } from "../fka/types";
 import { importFkaKitsAsDraftsWithRealDeps, type FkaImportResult } from "./import-service";
-import { missingSeasons, seasonToCreateData } from "./import-logic";
+import { missingSeasons, seasonToCreateData, missingTeams, teamToCreateData } from "./import-logic";
 
 const searchSchema = z.object({
   teams: z.array(z.string().trim().min(1)).min(1, "Escribe al menos un equipo.").max(10),
@@ -261,10 +261,11 @@ const importSchema = z.object({
 
 export type FkaImportActionResult =
   | { ok: true; result: FkaImportResult }
-  | { ok: true; needsSeasons: true; seasons: string[] }
+  | { ok: true; needsSeasons: true; seasons: string[]; teams?: string[] }
+  | { ok: true; needsTeams: true; teams: string[]; seasons?: string[] }
   | { ok: false; error: string };
 
-export type FkaImportActionOptions = { createSeasons?: boolean };
+export type FkaImportActionOptions = { createSeasons?: boolean; createTeams?: boolean };
 
 async function loadImportContext() {
   return prisma.$transaction(async (tx) => {
@@ -289,6 +290,20 @@ async function createMissingSeasons(seasons: string[]): Promise<void> {
   );
 }
 
+async function createMissingTeams(teamNames: string[]): Promise<void> {
+  const otrosLeague = await prisma.league.findUnique({ where: { slug: "otros" } });
+  if (!otrosLeague) throw new Error("Falta la liga 'Otros' para crear equipos automáticamente.");
+  const toCreate = teamNames
+    .map((name) => teamToCreateData(name, otrosLeague.id))
+    .filter((d): d is NonNullable<typeof d> => d !== null);
+  if (toCreate.length === 0) return;
+  await prisma.$transaction(
+    toCreate.map((data) =>
+      prisma.team.upsert({ where: { slug: data.slug }, update: {}, create: data }),
+    ),
+  );
+}
+
 export async function importFkaKitsAction(
   kits: FkaKit[],
   options: FkaImportActionOptions = {},
@@ -302,6 +317,16 @@ export async function importFkaKitsAction(
   }
 
   const db = await loadImportContext();
+
+  const missingT = missingTeams(parsed.data.kits, db.teams);
+  if (missingT.length > 0 && !options.createTeams) {
+    return { ok: true, needsTeams: true, teams: missingT };
+  }
+  if (missingT.length > 0 && options.createTeams) {
+    await createMissingTeams(missingT);
+    const teams = await prisma.team.findMany({ select: { id: true, name: true } });
+    db.teams = teams;
+  }
 
   const missing = missingSeasons(parsed.data.kits, db.teams, db.seasons);
   if (missing.length > 0 && !options.createSeasons) {
