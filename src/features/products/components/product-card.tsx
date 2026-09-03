@@ -1,11 +1,16 @@
+"use client";
 import Link from "next/link";
 import Image from "next/image";
+import { Heart } from "lucide-react";
 import type { ProductCardData } from "@/features/products/types/product-types";
 import { Badge } from "@/components/ui/badge";
 import { formatPriceShort } from "@/lib/utils";
+import { useFavoritesStore } from "@/shared/stores/favorites-store";
 
 export function ProductCard({ product, priority }: { product: ProductCardData; priority?: boolean }) {
   const isOutlet = product.season.isRetro;
+  const favorite = useFavoritesStore((state) => state.isFavorite(product.id));
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
 
   return (
     <Link
@@ -33,6 +38,7 @@ export function ProductCard({ product, priority }: { product: ProductCardData; p
             <Badge tone="warning" size="sm">Retro</Badge>
           )}
         </div>
+        <button type="button" aria-label={favorite ? `Quitar ${product.name} de favoritos` : `Guardar ${product.name} en favoritos`} aria-pressed={favorite} onClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleFavorite({ productId: product.id, slug: product.slug }); }} className="absolute right-2 top-2 rounded-full bg-background/90 p-2 shadow-sm hover:bg-background"><Heart className={`h-4 w-4 ${favorite ? "fill-current text-red-600" : ""}`} /></button>
       </div>
 
       <div className="flex-1 flex flex-col p-3.5 gap-1.5">

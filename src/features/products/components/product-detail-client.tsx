@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { ChevronRight, MessageCircle, RefreshCw, Shield, Truck } from "lucide-react";
+import { ChevronRight, Heart, MessageCircle, RefreshCw, Shield, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -15,6 +15,10 @@ import { ProductPrice } from "./product-price";
 import { ProductDeliveryMode } from "./product-delivery-mode";
 import { AddToCartButton } from "./add-to-cart-button";
 import type { ProductDetailData, VariantWithStock } from "@/features/products/types/product-types";
+import { SizeGuideDialog } from "./size-guide-dialog";
+import { useFavoritesStore } from "@/shared/stores/favorites-store";
+import { useRecentlyViewedStore } from "@/shared/stores/recently-viewed-store";
+import { toast } from "@/components/ui/toast";
 
 type CustomType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
 
@@ -26,6 +30,13 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
   const [customNumber, setCustomNumber] = useState("");
   const [customPlayerId, setCustomPlayerId] = useState("");
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("INMEDIATA");
+  const favorite = useFavoritesStore((state) => state.isFavorite(product.id));
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+  const recordViewed = useRecentlyViewedStore((state) => state.recordViewed);
+  const hydrateFavorites = useFavoritesStore((state) => state.hydrate);
+  const hydrateViewed = useRecentlyViewedStore((state) => state.hydrate);
+
+  useEffect(() => { hydrateFavorites(); hydrateViewed(); if (product.isActive) recordViewed({ productId: product.id, slug: product.slug }); }, [hydrateFavorites, hydrateViewed, product.id, product.isActive, product.slug, recordViewed]);
 
   const variantMap = useMemo(() => {
     const map = new Map<string, VariantWithStock>();
@@ -128,6 +139,7 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
               <span>{product.season.name}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold">{product.name}</h1>
+            <button type="button" aria-label={favorite ? "Quitar de favoritos" : "Guardar en favoritos"} aria-pressed={favorite} onClick={() => { toggleFavorite({ productId: product.id, slug: product.slug }); toast({ title: favorite ? "Quitado de favoritos" : "Guardado en favoritos", variant: "success" }); }} className="mt-3 inline-flex items-center gap-2 text-sm underline underline-offset-4"><Heart className={`h-4 w-4 ${favorite ? "fill-current text-red-600" : ""}`} /> {favorite ? "Guardado en favoritos" : "Guardar en favoritos"}</button>
             {product.shortName && (
               <p className="text-sm text-muted-foreground mt-1">{product.shortName}</p>
             )}
@@ -159,6 +171,7 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
             getVariantAvailability={getVariantAvailability}
             getVariantPrice={getVariantPrice}
           />
+          <SizeGuideDialog kind={selectedVersion.toLowerCase().includes("player") ? "PLAYER" : "FAN"} variants={product.variants.filter((variant) => variant.version.slug === selectedVersion).map((variant) => ({ sizeCode: variant.size.code, availability: variant.availability }))} onApply={setSelectedSize} />
 
           {/* Customization */}
           {product.customizationsEnabled && <Separator />}

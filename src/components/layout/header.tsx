@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Menu, X, Search, ShoppingBag, User } from "lucide-react";
+import { Menu, X, Search, ShoppingBag, User, Heart, History } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import { NavLinks } from "./nav-links";
 import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { SITE } from "@/shared/config/site";
+import { useFavoritesStore } from "@/shared/stores/favorites-store";
 
 export function Header() {
   const router = useRouter();
@@ -101,6 +102,10 @@ export function Header() {
               </Link>
             </Button>
 
+            <FavoritesBadge />
+
+            <Button variant="ghost" size="icon" asChild aria-label="Vistos recientemente"><Link href="/productos#vistos-recientemente"><History className="h-5 w-5" /></Link></Button>
+
             <CartBadge />
 
             <Button
@@ -183,4 +188,11 @@ function CartBadge() {
       </Button>
     </Link>
   );
+}
+
+function FavoritesBadge() {
+  const favorites = useFavoritesStore((state) => state.favorites);
+  const hydrate = useFavoritesStore((state) => state.hydrate);
+  useEffect(() => { hydrate(); }, [hydrate]);
+  return <Link href="/favoritos" className="relative"><Button variant="ghost" size="icon" aria-label={`Favoritos${favorites.length ? `, ${favorites.length} guardados` : ""}`}><Heart className="h-5 w-5" />{favorites.length > 0 && <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{favorites.length > 99 ? "99+" : favorites.length}</span>}</Button></Link>;
 }

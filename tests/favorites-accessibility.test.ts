@@ -1,0 +1,2 @@
+import assert from "node:assert/strict"; import test from "node:test"; import { readFileSync } from "node:fs";
+test("favorite controls expose names and pressed state", () => { const source = readFileSync("src/features/products/components/product-card.tsx", "utf8"); assert.match(source, /aria-label/); assert.match(source, /aria-pressed/); });

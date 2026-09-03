@@ -1,0 +1,2 @@
+import assert from "node:assert/strict"; import test from "node:test"; import { readFileSync } from "node:fs";
+test("size guide exposes dialog semantics and live result", () => { const source = readFileSync("src/features/products/components/size-guide-dialog.tsx", "utf8"); assert.match(source, /aria-live/); assert.match(source, /aria-invalid/); assert.match(source, /DialogTitle/); });

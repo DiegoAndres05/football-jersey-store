@@ -1,0 +1,2 @@
+import assert from "node:assert/strict"; import test from "node:test"; import { readFileSync } from "node:fs";
+test("recently viewed controls are keyboard buttons with names", () => { const source = readFileSync("src/features/products/components/recently-viewed.tsx", "utf8"); assert.match(source, /type=\"button\"/); assert.match(source, /aria-label/); });

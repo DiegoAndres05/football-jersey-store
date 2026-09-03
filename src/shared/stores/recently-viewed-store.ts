@@ -1,0 +1,8 @@
+"use client";
+import { create } from "zustand";
+import { readSafe, writeSafe } from "./safe-storage";
+import type { RecentlyViewedReference } from "@/features/products/types/local-product-reference-types";
+const STORAGE_KEY = "flashsport:recently-viewed:v1";
+const valid = (value: unknown): RecentlyViewedReference[] => Array.isArray(value) ? value.filter((item): item is RecentlyViewedReference => Boolean(item && typeof item === "object" && typeof (item as RecentlyViewedReference).productId === "string" && typeof (item as RecentlyViewedReference).slug === "string" && Number.isFinite((item as RecentlyViewedReference).lastViewedAt))).sort((a, b) => b.lastViewedAt - a.lastViewedAt).slice(0, 12) : [];
+type RecentlyViewedState = { viewed: RecentlyViewedReference[]; hydrated: boolean; recordViewed: (reference: Omit<RecentlyViewedReference, "lastViewedAt"> & { lastViewedAt?: number }) => void; removeViewed: (productId: string) => void; clearViewed: () => void; hydrate: () => void };
+export const useRecentlyViewedStore = create<RecentlyViewedState>((set, get) => ({ viewed: [], hydrated: false, recordViewed: (reference) => set((state) => { const viewed = [{ ...reference, lastViewedAt: reference.lastViewedAt ?? Date.now() }, ...state.viewed.filter((item) => item.productId !== reference.productId)].slice(0, 12); writeSafe(STORAGE_KEY, viewed); return { viewed }; }), removeViewed: (productId) => set((state) => { const viewed = state.viewed.filter((item) => item.productId !== productId); writeSafe(STORAGE_KEY, viewed); return { viewed }; }), clearViewed: () => { writeSafe(STORAGE_KEY, []); set({ viewed: [] }); }, hydrate: () => { if (get().hydrated) return; set({ viewed: readSafe(STORAGE_KEY, [], valid), hydrated: true }); } }));

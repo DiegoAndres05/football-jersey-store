@@ -16,6 +16,7 @@ import { ProductFilters } from "@/features/products/components/product-filters";
 import { EmptyState } from "@/features/products/components/empty-state";
 import { parseProductFiltersParams } from "@/features/products/schemas/product-filters-schema";
 import type { ProductFilters as FilterParams } from "@/features/products/types/product-types";
+import { RecentlyViewed } from "@/features/products/components/recently-viewed";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 
@@ -225,6 +226,7 @@ export default async function ProductosPage({ searchParams }: PageProps) {
               )}
             </nav>
           )}
+          <div id="vistos-recientemente"><RecentlyViewed products={result.products} /></div>
         </div>
       </div>
     </div>
