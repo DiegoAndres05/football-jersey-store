@@ -6,9 +6,31 @@ import {
   createOrder,
   type CreateOrderInput,
 } from "@/features/orders/repositories/order-repository";
+import { notifyOrderPaid } from "@/features/notifications/services/notification-service";
 
 export async function submitOrder(input: CreateOrderInput) {
-  return createOrder(input);
+  const result = await createOrder(input);
+  if (result.ok) {
+    const order = await prisma.order.findUnique({ where: { code: result.code }, select: { id: true } });
+    if (order) {
+      await prisma.$transaction(async (tx) => {
+        const current = await tx.order.findUnique({ where: { id: order.id } });
+        if (!current || current.status !== "PENDING_PAYMENT") return;
+        await tx.order.update({ where: { id: order.id }, data: { status: "PAID", paidAt: new Date() } });
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: order.id,
+            fromStatus: current.status,
+            toStatus: "PAID",
+            createdBy: input.paymentReference,
+            note: "Pago simulado confirmado.",
+          },
+        });
+      });
+      void notifyOrderPaid(order.id).catch(() => undefined);
+    }
+  }
+  return result;
 }
 
 const MANAGED_STATUSES = [

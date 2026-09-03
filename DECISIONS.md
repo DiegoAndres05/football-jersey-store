@@ -323,6 +323,24 @@
 
 ---
 
+### D25: Telegram como efecto secundario durable e idempotente
+
+| Campo | Valor |
+|---|---|
+| **Decisión** | ✅ Adoptado |
+| **Contexto** | Un pedido pagado debe avisar a operación sin depender de la disponibilidad de Telegram. |
+| **Motivo** | `NotificationAttempt` registra estado, contador, timestamps, referencia y error resumido. La clave única por pedido/canal/evento permite reintentos sin duplicar un éxito. |
+| **Impacto** | Telegram vive detrás de un puerto mockeable y nunca bloquea checkout. Solo una sesión admin activa puede solicitar retry; `SENT` es terminal. |
+
+### D26: Conservar snapshots históricos de modalidad
+
+| Campo | Valor |
+|---|---|
+| **Decisión** | ✅ Adoptado |
+| **Contexto** | Catálogo e inventario pueden cambiar después de crear un pedido. |
+| **Motivo** | Administración proyecta `OrderItem.deliveryMode` sin consultar stock ni catálogo; un valor ausente se muestra como `NO_DISPONIBLE`. |
+| **Impacto** | Los filtros son inclusivos para pedidos mixtos y no reinterpretan datos históricos. |
+
 ## Resumen por tipo de decisión
 
 | Tipo | Cantidad |

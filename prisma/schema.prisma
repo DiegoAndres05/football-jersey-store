@@ -371,6 +371,7 @@ model Order {
 
   items           OrderItem[]
   history         OrderStatusHistory[]
+  notificationAttempts NotificationAttempt[]
 
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
@@ -378,6 +379,25 @@ model Order {
   @@index([status])
   @@index([customerEmail])
   @@index([customerId])
+}
+
+model NotificationAttempt {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  channel        String
+  eventKey       String
+  idempotencyKey String   @unique
+  status         String
+  attemptCount   Int      @default(0)
+  providerRef    String?
+  errorSummary   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastAttemptAt  DateTime?
+  sentAt         DateTime?
+
+  @@index([orderId, channel, eventKey])
 }
 
 model OrderItem {

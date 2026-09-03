@@ -345,3 +345,11 @@ Los tres valores están en centavos COP (Int). No hay moneda por variante — la
 ---
 
 > **Documento generado: Julio 2026**
+
+## 9. Notificaciones de pedidos
+
+`src/features/notifications` es un bounded context server-only. El servicio construye el evento desde los snapshots de `Order` y `OrderItem`, lo formatea y lo entrega mediante el puerto `NotificationTransport`; Telegram es el adaptador actual y recibe sus credenciales únicamente desde variables de entorno.
+
+`NotificationAttempt` pertenece al agregado operativo de notificaciones y se relaciona con `Order` con `Restrict`. Su `idempotencyKey` única se deriva de `orderId`, `TELEGRAM` y `ORDER_CREATED_PAID`. El claim condicional evita reclamar dos veces un intento y los estados `FAILED`/`NOT_CONFIGURED` son reintentables; `SENT` es terminal.
+
+El aviso se dispara después de confirmar el pago y crear el pedido. Es un efecto secundario no bloqueante: una indisponibilidad de Telegram nunca revierte ni modifica el pedido, sus importes, sus líneas, sus snapshots de modalidad o el inventario. La proyección administrativa normaliza snapshots ausentes como `NO_DISPONIBLE` y filtra modalidades de forma inclusiva.
