@@ -1,19 +1,16 @@
-import { cookies } from "next/headers";
 import { CurrencySelector } from "@/features/system/components/currency-selector";
+import { getCurrencyContext } from "@/shared/money/server-helpers";
 import { getPublicUsdRate } from "@/features/system/repositories/usd-rate-repository";
-import { getSaleCurrencyFromCookies } from "@/shared/currency/sale-currency";
 
 /**
- * Server wrapper que lee la cookie y la tasa, y renderiza el selector de moneda.
+ * Server wrapper: el `current` es la moneda visible (USD solo con tasa vigente).
  */
 export async function CurrencySelectorServer() {
-  const cookieStore = await cookies();
-  const currency = getSaleCurrencyFromCookies(cookieStore);
-  const rate = await getPublicUsdRate();
+  const [ctx, rate] = await Promise.all([getCurrencyContext(), getPublicUsdRate()]);
 
   return (
     <CurrencySelector
-      current={currency}
+      current={ctx.currency}
       rateInfo={rate.available ? rate : null}
     />
   );

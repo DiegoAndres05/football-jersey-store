@@ -18,7 +18,11 @@ import type { ProductDetailData, VariantWithStock } from "@/features/products/ty
 import { SizeGuideDialog } from "./size-guide-dialog";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
 import { useRecentlyViewedStore } from "@/shared/stores/recently-viewed-store";
+import { useCartStore } from "@/shared/stores/cart-store";
+import { remainingImmediate } from "@/features/cart/domain/immediate-quantity";
 import { toast } from "@/components/ui/toast";
+import { SHIPPING } from "@/shared/config/site";
+import { formatMoney } from "@/shared/money/format";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
 
 type CustomType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
@@ -36,6 +40,7 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
   const recordViewed = useRecentlyViewedStore((state) => state.recordViewed);
   const hydrateFavorites = useFavoritesStore((state) => state.hydrate);
   const hydrateViewed = useRecentlyViewedStore((state) => state.hydrate);
+  const cartItems = useCartStore((state) => state.items);
 
   useEffect(() => { hydrateFavorites(); hydrateViewed(); if (product.isActive) recordViewed({ productId: product.id, slug: product.slug }); }, [hydrateFavorites, hydrateViewed, product.id, product.isActive, product.slug, recordViewed]);
 
@@ -101,6 +106,10 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
   const availableModes = currentVariant
     ? getAvailableDeliveryModes(currentVariant.stock, currentVariant.allowsBackorder)
     : [];
+
+  const immediateRemaining = currentVariant
+    ? remainingImmediate(cartItems, currentVariant.id, currentVariant.stock ?? 0)
+    : 0;
 
   useEffect(() => {
     if (!currentVariant) return;
@@ -191,6 +200,7 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
             onNameChange={setCustomName}
             onNumberChange={setCustomNumber}
             onPlayerChange={setCustomPlayerId}
+            currencyContext={currencyContext}
           />
           {product.customizationsEnabled && <Separator />}
 
@@ -218,6 +228,8 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
                   customizationName={customizationName}
                   customizationNumber={customizationNumber}
                   deliveryMode={deliveryMode}
+                  immediateStock={currentVariant.stock ?? 0}
+                  remainingImmediate={immediateRemaining}
                 />
               </>
             ) : (
@@ -247,7 +259,7 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
 
           <div className="grid grid-cols-3 gap-3 pt-2">
             {[
-              { icon: Truck, label: "Envío gratis", sub: "desde $200.000" },
+              { icon: Truck, label: "Envío gratis", sub: `desde ${formatMoney({ amountCop: SHIPPING.freeThreshold, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}` },
               { icon: Shield, label: "Pago seguro", sub: "Tarjeta, PSE, Nequi" },
               { icon: RefreshCw, label: "Cambios", sub: "hasta 30 días" },
             ].map((item) => {

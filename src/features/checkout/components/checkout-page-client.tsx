@@ -18,6 +18,9 @@ import { formatMoney } from "@/shared/money/format";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
 import { processMockPayment } from "@/features/payments/services/mock-payment";
 import { submitOrder } from "@/features/orders/server/order-actions";
+import { getImmediateStockByVariantIds } from "@/features/cart/server/cart-stock-actions";
+import { formatReconcileMessage } from "@/features/cart/domain/immediate-quantity";
+import { toast } from "@/components/ui/toast";
 import {
   checkoutFormSchema,
   type CheckoutFormValues,
@@ -39,6 +42,24 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
   const formRef = useRef<CheckoutFormValues | null>(null);
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!mounted || items.length === 0) return;
+    const ids = [...new Set(useCartStore.getState().items.map((item) => item.variantId))];
+    if (ids.length === 0) return;
+    let cancelled = false;
+    getImmediateStockByVariantIds(ids).then((rows) => {
+      if (cancelled) return;
+      const map = new Map(rows.map((row) => [row.variantId, row.stock]));
+      const adjustments = useCartStore.getState().reconcileWithStock(map);
+      if (adjustments.length > 0) {
+        toast({ title: formatReconcileMessage(adjustments), variant: "warning" });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted, items.length]);
 
   const { register, handleSubmit, formState: { errors, isValid } } = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema),
@@ -96,7 +117,27 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
     if (paymentStatus !== "idle" || !formRef.current) return;
     setPaymentStatus("processing");
     setPayError("");
-    const payment = await processMockPayment({ method: paymentMethod, amount: total });
+
+    const current = useCartStore.getState();
+    const ids = [...new Set(current.items.map((item) => item.variantId))];
+    const rows = await getImmediateStockByVariantIds(ids);
+    const stockMap = new Map(rows.map((row) => [row.variantId, row.stock]));
+    const adjustments = current.reconcileWithStock(stockMap);
+    if (adjustments.length > 0) {
+      toast({ title: formatReconcileMessage(adjustments), variant: "warning" });
+      setPaymentStatus("idle");
+      return;
+    }
+
+    const lines = useCartStore.getState().items;
+    if (lines.length === 0) {
+      setPaymentStatus("idle");
+      return;
+    }
+
+    const payableSubtotal = lines.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
+    const payableTotal = payableSubtotal + shippingFee(payableSubtotal);
+    const payment = await processMockPayment({ method: paymentMethod, amount: payableTotal });
 
     if (!payment.ok) {
       setPayError(payment.reason);
@@ -106,7 +147,7 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
 
     const result = await submitOrder({
       form: formRef.current,
-      lines: items.map((i) => ({
+      lines: lines.map((i) => ({
         variantId: i.variantId,
         quantity: i.quantity,
         customizationType: i.customizationType,

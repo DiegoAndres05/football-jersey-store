@@ -369,6 +369,15 @@ async function getStockByVariantIds(variantIds: string[]): Promise<Map<string, n
   return new Map(rows.map((r) => [r.variantId, r._sum.quantity ?? 0]));
 }
 
+/** Stock físico (suma del ledger) por variante. Ids ausentes → 0. */
+export async function getImmediateStockByVariantIds(
+  variantIds: string[],
+): Promise<{ variantId: string; stock: number }[]> {
+  const unique = [...new Set(variantIds)];
+  const stockById = await getStockByVariantIds(unique);
+  return unique.map((variantId) => ({ variantId, stock: stockById.get(variantId) ?? 0 }));
+}
+
 type VariantInfo = {
   stock: number;
   sizeCode: string;

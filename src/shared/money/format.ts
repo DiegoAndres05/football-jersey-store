@@ -23,11 +23,10 @@ export function formatMoney(input: MoneyInput): string {
     return formatCop(amountCop);
   }
 
-  // USD
   const { copPerUsd } = input;
   if (!copPerUsd || copPerUsd <= 0) {
-    // Sin tasa válida, mostrar COP como fallback
-    return formatCop(amountCop);
+    // No disfrazar USD como COP ($89.900). El contexto visible debe coercer a COP antes.
+    return "USD —";
   }
 
   const usdCents = toUsdCents(amountCop, copPerUsd);

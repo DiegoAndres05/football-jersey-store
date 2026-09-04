@@ -5,7 +5,6 @@ import { Heart } from "lucide-react";
 import type { ProductCardData } from "@/features/products/types/product-types";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
 import { Badge } from "@/components/ui/badge";
-import { formatPriceShort } from "@/lib/utils";
 import { formatMoney } from "@/shared/money/format";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
 
@@ -14,16 +13,12 @@ export function ProductCard({ product, priority, currencyContext }: { product: P
   const favorite = useFavoritesStore((state) => state.isFavorite(product.id));
   const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
 
-  const formatPrice = (amountCop: number) => {
-    if (currencyContext) {
-      return formatMoney({
-        amountCop,
-        currency: currencyContext.currency,
-        copPerUsd: currencyContext.copPerUsd ?? undefined,
-      });
-    }
-    return formatPriceShort(amountCop);
-  };
+  const formatPrice = (amountCop: number) =>
+    formatMoney({
+      amountCop,
+      currency: currencyContext?.currency ?? "COP",
+      copPerUsd: currencyContext?.copPerUsd ?? undefined,
+    });
 
   return (
     <Link

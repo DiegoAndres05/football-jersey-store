@@ -28,3 +28,21 @@ export function getSaleCurrencyFromCookies(
 ): SaleCurrency {
   return parseSaleCurrency(cookieStore.get(SALE_CURRENCY_COOKIE)?.value);
 }
+
+export type PublicUsdRate =
+  | { available: false }
+  | { available: true; copPerUsd: number };
+
+/**
+ * USD visible solo si la cookie es USD y hay tasa vigente.
+ * Si no, COP: el selector y los precios no pueden divergir.
+ */
+export function resolveVisibleCurrency(
+  cookie: SaleCurrency,
+  rate: PublicUsdRate,
+): { currency: SaleCurrency; copPerUsd: number | null } {
+  if (cookie === "USD" && rate.available && rate.copPerUsd >= 1) {
+    return { currency: "USD", copPerUsd: rate.copPerUsd };
+  }
+  return { currency: "COP", copPerUsd: rate.available ? rate.copPerUsd : null };
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus, Trash2, ArrowRight, ShoppingBag } from "lucide-react";
@@ -11,6 +11,12 @@ import { useCartStore } from "@/shared/stores/cart-store";
 import { DELIVERY_MODE_INFO } from "@/features/products/types/delivery-mode";
 import { formatMoney } from "@/shared/money/format";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
+import { getImmediateStockByVariantIds } from "@/features/cart/server/cart-stock-actions";
+import {
+  formatReconcileMessage,
+  remainingImmediate,
+} from "@/features/cart/domain/immediate-quantity";
+import { toast } from "@/components/ui/toast";
 
 export function CartPageClient({ currencyContext }: { currencyContext?: CurrencyContext }) {
   const items = useCartStore((s) => s.items);
@@ -18,9 +24,37 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
   const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
+  const reconcileWithStock = useCartStore((s) => s.reconcileWithStock);
 
   const [mounted, setMounted] = useState(false);
+  const [stockByVariant, setStockByVariant] = useState<Map<string, number> | null>(null);
+  const variantKey = useMemo(
+    () => [...new Set(items.map((item) => item.variantId))].sort().join(","),
+    [items],
+  );
+
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!mounted || variantKey.length === 0) {
+      setStockByVariant(new Map());
+      return;
+    }
+    const ids = variantKey.split(",");
+    let cancelled = false;
+    getImmediateStockByVariantIds(ids).then((rows) => {
+      if (cancelled) return;
+      const map = new Map(rows.map((row) => [row.variantId, row.stock]));
+      setStockByVariant(map);
+      const adjustments = reconcileWithStock(map);
+      if (adjustments.length > 0) {
+        toast({ title: formatReconcileMessage(adjustments), variant: "warning" });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted, variantKey, reconcileWithStock]);
 
   const isEmpty = !mounted || items.length === 0;
 
@@ -144,7 +178,19 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
                       variant="outline"
                       size="icon"
                       className="h-8 w-8"
-                      onClick={() => updateQuantity(item.lineId, item.quantity + 1)}
+                      onClick={() =>
+                        updateQuantity(
+                          item.lineId,
+                          item.quantity + 1,
+                          item.deliveryMode === "INMEDIATA"
+                            ? (stockByVariant?.get(item.variantId) ?? 0)
+                            : undefined,
+                        )
+                      }
+                      disabled={
+                        item.deliveryMode === "INMEDIATA" &&
+                        remainingImmediate(items, item.variantId, stockByVariant?.get(item.variantId) ?? 0) <= 0
+                      }
                       aria-label="Aumentar cantidad"
                     >
                       <Plus className="h-3.5 w-3.5" />

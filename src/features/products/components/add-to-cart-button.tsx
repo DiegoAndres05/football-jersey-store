@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ShoppingBag, Check } from "lucide-react";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { toast } from "@/components/ui/toast";
 import type { DeliveryMode } from "@/features/products/types/delivery-mode";
+import { IMMEDIATE_AT_CAP_MESSAGE } from "@/features/cart/domain/immediate-quantity";
 
 export function AddToCartButton({
   variantId,
@@ -21,6 +21,8 @@ export function AddToCartButton({
   customizationName,
   customizationNumber,
   deliveryMode,
+  immediateStock,
+  remainingImmediate: remainingImmediateUnits,
   disabled,
 }: {
   variantId: string;
@@ -35,6 +37,8 @@ export function AddToCartButton({
   customizationName: string;
   customizationNumber: string;
   deliveryMode: DeliveryMode;
+  immediateStock?: number;
+  remainingImmediate?: number;
   disabled?: boolean;
 }) {
   const [added, setAdded] = useState(false);
@@ -43,26 +47,39 @@ export function AddToCartButton({
   const handleClick = useCallback(() => {
     if (disabled) return;
 
-    addItem({
-      variantId,
-      productSlug,
-      productName,
-      teamName,
-      versionName,
-      sizeName,
-      imageUrl,
-      unitPrice,
-      customizationType,
-      customizationName,
-      customizationNumber,
-      deliveryMode,
-    });
+    if (deliveryMode === "INMEDIATA" && (remainingImmediateUnits ?? 0) <= 0) {
+      toast({ title: IMMEDIATE_AT_CAP_MESSAGE, variant: "warning" });
+      return;
+    }
+
+    const result = addItem(
+      {
+        variantId,
+        productSlug,
+        productName,
+        teamName,
+        versionName,
+        sizeName,
+        imageUrl,
+        unitPrice,
+        customizationType,
+        customizationName,
+        customizationNumber,
+        deliveryMode,
+      },
+      deliveryMode === "INMEDIATA" ? immediateStock : undefined,
+    );
+
+    if (!result.ok) {
+      toast({ title: IMMEDIATE_AT_CAP_MESSAGE, variant: "warning" });
+      return;
+    }
 
     setAdded(true);
     toast({ title: "Agregado al carrito", variant: "success" });
 
     setTimeout(() => setAdded(false), 2000);
-  }, [variantId, productSlug, productName, teamName, versionName, sizeName, imageUrl, unitPrice, customizationType, customizationName, customizationNumber, deliveryMode, disabled, addItem]);
+  }, [variantId, productSlug, productName, teamName, versionName, sizeName, imageUrl, unitPrice, customizationType, customizationName, customizationNumber, deliveryMode, immediateStock, remainingImmediateUnits, disabled, addItem]);
 
   return (
     <Button

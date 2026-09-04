@@ -115,7 +115,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
               Ver todo <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <ProductGrid products={related} />
+          <ProductGrid products={related} currencyContext={currencyCtx} />
         </section>
       )}
     </>

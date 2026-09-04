@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
 import { getPublicUsdRate } from "@/features/system/repositories/usd-rate-repository";
-import { getSaleCurrencyFromCookies, type SaleCurrency } from "@/shared/currency/sale-currency";
+import {
+  getSaleCurrencyFromCookies,
+  resolveVisibleCurrency,
+  type SaleCurrency,
+} from "@/shared/currency/sale-currency";
 import { formatMoney, formatMoneyTotal } from "@/shared/money/format";
 
 export interface CurrencyContext {
@@ -14,13 +18,9 @@ export interface CurrencyContext {
  */
 export async function getCurrencyContext(): Promise<CurrencyContext> {
   const cookieStore = await cookies();
-  const currency = getSaleCurrencyFromCookies(cookieStore);
+  const cookie = getSaleCurrencyFromCookies(cookieStore);
   const rate = await getPublicUsdRate();
-
-  return {
-    currency,
-    copPerUsd: rate.available ? rate.copPerUsd : null,
-  };
+  return resolveVisibleCurrency(cookie, rate);
 }
 
 /**

@@ -17,6 +17,7 @@ import { EmptyState } from "@/features/products/components/empty-state";
 import { parseProductFiltersParams } from "@/features/products/schemas/product-filters-schema";
 import type { ProductFilters as FilterParams } from "@/features/products/types/product-types";
 import { RecentlyViewed } from "@/features/products/components/recently-viewed";
+import { getCurrencyContext } from "@/shared/money/server-helpers";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 
@@ -56,13 +57,14 @@ export default async function ProductosPage({ searchParams }: PageProps) {
     page: raw.page ?? 1,
   };
 
-  const [result, leagues, teams, seasons, versions, sizes] = await Promise.all([
+  const [result, leagues, teams, seasons, versions, sizes, currencyCtx] = await Promise.all([
     getProducts(filters),
     getLeagues(),
     filters.league ? getTeamsByLeague(filters.league) : Promise.resolve([]),
     getSeasons(),
     getVersions(),
     getSizes(),
+    getCurrencyContext(),
   ]);
 
   const activeFilters = buildActiveFilters(raw, {
@@ -165,7 +167,7 @@ export default async function ProductosPage({ searchParams }: PageProps) {
             {result.products.length === 0 ? (
               <EmptyState variant={hasActiveFilters ? "results" : "catalog"} />
             ) : (
-              <ProductGrid products={result.products} priority />
+              <ProductGrid products={result.products} priority currencyContext={currencyCtx} />
             )}
           </Suspense>
 

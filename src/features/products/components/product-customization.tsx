@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PlayerData } from "@/features/products/types/product-types";
+import type { CurrencyContext } from "@/shared/money/server-helpers";
+import { formatMoney } from "@/shared/money/format";
 
 type CustomType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
 
@@ -20,6 +22,7 @@ export function ProductCustomization({
   onNameChange,
   onNumberChange,
   onPlayerChange,
+  currencyContext,
 }: {
   enabled: boolean;
   type: CustomType;
@@ -33,6 +36,7 @@ export function ProductCustomization({
   onNameChange: (v: string) => void;
   onNumberChange: (v: string) => void;
   onPlayerChange: (v: string) => void;
+  currencyContext?: CurrencyContext;
 }) {
   if (!enabled) return null;
 
@@ -48,7 +52,12 @@ export function ProductCustomization({
         <label className="text-sm font-medium block">Personalización</label>
         {surcharge > 0 && (
           <span className="text-xs text-muted-foreground">
-            Adicional: ${surcharge.toLocaleString("es-CO")}
+            Adicional:{" "}
+            {formatMoney({
+              amountCop: surcharge,
+              currency: currencyContext?.currency ?? "COP",
+              copPerUsd: currencyContext?.copPerUsd ?? undefined,
+            })}
           </span>
         )}
       </div>
