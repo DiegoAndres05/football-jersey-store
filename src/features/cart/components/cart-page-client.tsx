@@ -9,9 +9,10 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { DELIVERY_MODE_INFO } from "@/features/products/types/delivery-mode";
-import { formatPrice } from "@/lib/utils";
+import { formatMoney } from "@/shared/money/format";
+import type { CurrencyContext } from "@/shared/money/server-helpers";
 
-export function CartPageClient() {
+export function CartPageClient({ currencyContext }: { currencyContext?: CurrencyContext }) {
   const items = useCartStore((s) => s.items);
   const itemCount = useCartStore((s) => s.items.reduce((acc, i) => acc + i.quantity, 0));
   const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
@@ -151,11 +152,11 @@ export function CartPageClient() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold tabular-nums">
-                      {formatPrice(item.unitPrice * item.quantity)}
+                      {formatMoney({ amountCop: item.unitPrice * item.quantity, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}
                     </p>
                     {item.quantity > 1 && (
                       <p className="text-xs text-muted-foreground tabular-nums">
-                        {formatPrice(item.unitPrice)} c/u
+                        {formatMoney({ amountCop: item.unitPrice, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })} c/u
                       </p>
                     )}
                   </div>
@@ -181,7 +182,7 @@ export function CartPageClient() {
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Subtotal</dt>
-              <dd className="font-medium tabular-nums">{formatPrice(subtotal)}</dd>
+              <dd className="font-medium tabular-nums">{formatMoney({ amountCop: subtotal, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Envío</dt>
@@ -193,8 +194,8 @@ export function CartPageClient() {
 
           {remaining > 0 ? (
             <p className="mt-3 rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
-              Te faltan {formatPrice(remaining)} para envío gratis desde{" "}
-              {formatPrice(freeShippingThreshold)}.
+              Te faltan {formatMoney({ amountCop: remaining, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })} para envío gratis desde{" "}
+              {formatMoney({ amountCop: freeShippingThreshold, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}.
             </p>
           ) : (
             <p className="mt-3 rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
@@ -206,7 +207,7 @@ export function CartPageClient() {
 
           <div className="flex justify-between items-baseline">
             <span className="text-sm font-medium">Total</span>
-            <span className="text-2xl font-bold tabular-nums">{formatPrice(subtotal)}</span>
+            <span className="text-2xl font-bold tabular-nums">{formatMoney({ amountCop: subtotal, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span>
           </div>
 
           <Button className="w-full mt-4" asChild>

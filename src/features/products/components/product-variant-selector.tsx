@@ -1,7 +1,9 @@
 "use client";
 
-import { cn, formatPriceShort } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { formatMoney } from "@/shared/money/format";
+import type { CurrencyContext } from "@/shared/money/server-helpers";
 
 type Version = { id: string; slug: string; name: string; priceAdjustment: number };
 type Size = { id: string; code: string; name: string; position: number };
@@ -15,6 +17,7 @@ export function ProductVariantSelector({
   onSizeChange,
   getVariantAvailability,
   getVariantPrice,
+  currencyContext,
 }: {
   versions: Version[];
   sizes: Size[];
@@ -24,6 +27,7 @@ export function ProductVariantSelector({
   onSizeChange: (code: string) => void;
   getVariantAvailability: (versionSlug: string, sizeCode: string) => "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK";
   getVariantPrice: (versionSlug: string) => { salePrice: number; compareAtPrice: number | null };
+  currencyContext?: CurrencyContext;
 }) {
   return (
     <div className="space-y-5">
@@ -47,7 +51,7 @@ export function ProductVariantSelector({
               >
                 <span>{v.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {formatPriceShort(price.salePrice)}
+                  {formatMoney({ amountCop: price.salePrice, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}
                 </span>
               </button>
             );

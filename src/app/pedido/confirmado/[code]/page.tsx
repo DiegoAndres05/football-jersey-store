@@ -5,7 +5,8 @@ import { CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getOrderByCode } from "@/features/orders/repositories/order-repository";
 import { DELIVERY_MODE_INFO, type DeliveryMode } from "@/features/products/types/delivery-mode";
-import { formatPrice } from "@/lib/utils";
+import { formatMoney } from "@/shared/money/format";
+import type { SaleCurrency } from "@/shared/currency/sale-currency";
 
 interface PageProps {
   params: Promise<{ code: string }>;
@@ -20,6 +21,9 @@ export default async function OrderConfirmationPage({ params }: PageProps) {
   const order = await getOrderByCode(code);
 
   if (!order) notFound();
+
+  const orderCurrency = (order.saleCurrency ?? "COP") as SaleCurrency;
+  const orderRate = order.exchangeRateCopPerUsd ?? undefined;
 
   return (
     <div className="container-page py-16 max-w-2xl">
@@ -48,8 +52,16 @@ export default async function OrderConfirmationPage({ params }: PageProps) {
           </div>
           <div className="rounded-xl border border-border p-4">
             <dt className="text-xs text-muted-foreground uppercase tracking-wide">Total</dt>
-            <dd className="mt-1 font-semibold tabular-nums">{formatPrice(order.total)}</dd>
+            <dd className="mt-1 font-semibold tabular-nums">
+              {formatMoney({ amountCop: order.total, currency: orderCurrency, copPerUsd: orderRate })}
+            </dd>
           </div>
+          {orderCurrency === "USD" && orderRate && (
+            <div className="rounded-xl border border-border p-4 col-span-2">
+              <dt className="text-xs text-muted-foreground uppercase tracking-wide">Tipo de cambio</dt>
+              <dd className="mt-1 font-medium">1 USD = {orderRate.toLocaleString("es-CO")} COP (congelado al confirmar)</dd>
+            </div>
+          )}
           <div className="rounded-xl border border-border p-4 col-span-2">
             <dt className="text-xs text-muted-foreground uppercase tracking-wide">Envío a</dt>
             <dd className="mt-1">
@@ -74,7 +86,9 @@ export default async function OrderConfirmationPage({ params }: PageProps) {
                     {DELIVERY_MODE_INFO[deliveryMode].eta}
                   </p>
                 </div>
-                <p className="font-medium tabular-nums shrink-0">{formatPrice(item.subtotal)}</p>
+                <p className="font-medium tabular-nums shrink-0">
+                  {formatMoney({ amountCop: item.subtotal, currency: orderCurrency, copPerUsd: orderRate })}
+                </p>
               </div>
             );
           })}

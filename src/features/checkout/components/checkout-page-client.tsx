@@ -14,7 +14,8 @@ import { Separator } from "@/components/ui/separator";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { SHIPPING, shippingFee, SITE } from "@/shared/config/site";
 import { DELIVERY_MODE_INFO } from "@/features/products/types/delivery-mode";
-import { formatPrice } from "@/lib/utils";
+import { formatMoney } from "@/shared/money/format";
+import type { CurrencyContext } from "@/shared/money/server-helpers";
 import { processMockPayment } from "@/features/payments/services/mock-payment";
 import { submitOrder } from "@/features/orders/server/order-actions";
 import {
@@ -23,7 +24,7 @@ import {
   type PaymentMethod,
 } from "@/features/checkout/schemas/checkout-schema";
 
-export function CheckoutPageClient() {
+export function CheckoutPageClient({ currencyContext }: { currencyContext?: CurrencyContext }) {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
   const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
@@ -170,7 +171,7 @@ export function CheckoutPageClient() {
                 <h2 className="font-display text-lg font-bold uppercase tracking-tight mb-1">Envío</h2>
                 <p className="text-xs text-muted-foreground mb-4">
                   {SITE.country} · {SHIPPING.methodName} ·{" "}
-                  {fee === 0 ? "Gratis en este pedido" : formatPrice(SHIPPING.flatFee)}
+                  {fee === 0 ? "Gratis en este pedido" : formatMoney({ amountCop: SHIPPING.flatFee, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}
                 </p>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
@@ -269,7 +270,7 @@ export function CheckoutPageClient() {
                     Pago aprobado
                   </h3>
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                    Simulación aprobada por {formatPrice(total)} con{" "}
+                    Simulación aprobada por {formatMoney({ amountCop: total, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })} con{" "}
                     {paymentMethod === "CARD" ? "tarjeta" : paymentMethod === "PSE" ? "PSE" : "Nequi"}.
                     Referencia {payReference}. Creando tu pedido…
                   </p>
@@ -287,7 +288,7 @@ export function CheckoutPageClient() {
 
               {paymentStatus === "idle" && (
                 <Button onClick={payNow} className="w-full sm:w-auto">
-                  Pagar {formatPrice(total)} <ShieldCheck className="h-4 w-4" />
+                  Pagar {formatMoney({ amountCop: total, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })} <ShieldCheck className="h-4 w-4" />
                 </Button>
               )}
             </div>
@@ -323,7 +324,7 @@ export function CheckoutPageClient() {
                     {DELIVERY_MODE_INFO[item.deliveryMode].eta}
                   </p>
                 </div>
-                <p className="text-sm font-medium tabular-nums">{formatPrice(item.unitPrice * item.quantity)}</p>
+                <p className="text-sm font-medium tabular-nums">{formatMoney({ amountCop: item.unitPrice * item.quantity, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</p>
               </div>
             ))}
           </div>
@@ -333,15 +334,15 @@ export function CheckoutPageClient() {
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Subtotal</dt>
-              <dd className="font-medium tabular-nums">{formatPrice(subtotal)}</dd>
+              <dd className="font-medium tabular-nums">{formatMoney({ amountCop: subtotal, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Envío ({SHIPPING.methodName})</dt>
-              <dd className="font-medium tabular-nums">{fee === 0 ? "Gratis" : formatPrice(fee)}</dd>
+              <dd className="font-medium tabular-nums">{fee === 0 ? "Gratis" : formatMoney({ amountCop: fee, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</dd>
             </div>
             {remaining > 0 && (
               <p className="rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
-                Te faltan {formatPrice(remaining)} para envío gratis.
+                Te faltan {formatMoney({ amountCop: remaining, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })} para envío gratis.
               </p>
             )}
           </dl>
@@ -350,7 +351,7 @@ export function CheckoutPageClient() {
 
           <div className="flex justify-between items-baseline">
             <span className="text-sm font-medium">Total</span>
-            <span className="text-2xl font-bold tabular-nums">{formatPrice(total)}</span>
+            <span className="text-2xl font-bold tabular-nums">{formatMoney({ amountCop: total, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span>
           </div>
         </aside>
       </div>

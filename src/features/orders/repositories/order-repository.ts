@@ -8,6 +8,7 @@ import {
 } from "@/features/checkout/schemas/checkout-schema";
 import type { DeliveryMode } from "@/features/products/types/delivery-mode";
 import { planInventoryMovements } from "./inventory-plan";
+import { getCurrencyContext } from "@/shared/money/server-helpers";
 
 export type OrderLineInput = {
   variantId: string;
@@ -105,6 +106,10 @@ export async function createOrder(input: CreateOrderInput): Promise<
   const f = parsed.data;
   const code = orderCode();
 
+  const currencyCtx = await getCurrencyContext();
+  const saleCurrency = currencyCtx.currency;
+  const exchangeRateCopPerUsd = currencyCtx.currency === "USD" && currencyCtx.copPerUsd ? currencyCtx.copPerUsd : null;
+
   try {
     const order = await prisma.$transaction(async (tx) => {
       // Bloquea las variantes involucradas para serializar pedidos
@@ -176,6 +181,8 @@ export async function createOrder(input: CreateOrderInput): Promise<
           notes: f.notes || null,
           paymentMethod: input.paymentMethod,
           paymentRef: input.paymentReference,
+          saleCurrency,
+          exchangeRateCopPerUsd,
           items: { create: orderItems },
           history: {
             create: {

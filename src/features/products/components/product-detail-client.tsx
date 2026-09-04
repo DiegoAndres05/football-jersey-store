@@ -19,10 +19,11 @@ import { SizeGuideDialog } from "./size-guide-dialog";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
 import { useRecentlyViewedStore } from "@/shared/stores/recently-viewed-store";
 import { toast } from "@/components/ui/toast";
+import type { CurrencyContext } from "@/shared/money/server-helpers";
 
 type CustomType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
 
-export function ProductDetailClient({ product }: { product: ProductDetailData }) {
+export function ProductDetailClient({ product, currencyContext }: { product: ProductDetailData; currencyContext?: CurrencyContext }) {
   const [selectedVersion, setSelectedVersion] = useState(product.variants[0]?.version.slug ?? "");
   const [selectedSize, setSelectedSize] = useState(product.variants[0]?.size.code ?? "");
   const [customType, setCustomType] = useState<CustomType>("NONE");
@@ -155,6 +156,7 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
               compareAtPrice={currentVariant.compareAtPrice
                 ? currentVariant.compareAtPrice + surcharge
                 : null}
+              currencyContext={currencyContext}
             />
           )}
 
@@ -170,6 +172,7 @@ export function ProductDetailClient({ product }: { product: ProductDetailData })
             onSizeChange={setSelectedSize}
             getVariantAvailability={getVariantAvailability}
             getVariantPrice={getVariantPrice}
+            currencyContext={currencyContext}
           />
           <SizeGuideDialog kind={selectedVersion.toLowerCase().includes("player") ? "PLAYER" : "FAN"} variants={product.variants.filter((variant) => variant.version.slug === selectedVersion).map((variant) => ({ sizeCode: variant.size.code, availability: variant.availability }))} onApply={setSelectedSize} />
 

@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { getProductBySlug, getRelatedProducts } from "@/features/products/repositories/product-repository";
 import { ProductDetailClient } from "@/features/products/components/product-detail-client";
 import { ProductGrid } from "@/features/products/components/product-grid";
+import { getCurrencyContext } from "@/shared/money/server-helpers";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -47,7 +48,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
+  const [product, currencyCtx] = await Promise.all([
+    getProductBySlug(slug),
+    getCurrencyContext(),
+  ]);
 
   if (!product) {
     notFound();
@@ -92,7 +96,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <ProductDetailClient product={product} />
+      <ProductDetailClient product={product} currencyContext={currencyCtx} />
 
       {related.length > 0 && (
         <section className="container-page py-10 border-t border-border">
