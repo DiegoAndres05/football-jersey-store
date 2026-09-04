@@ -11,7 +11,7 @@ import { useCartStore } from "@/shared/stores/cart-store";
 import { SITE } from "@/shared/config/site";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
 
-export function Header() {
+export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
   const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -67,6 +67,9 @@ export function Header() {
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
+            {currencySlot && (
+              <div className="hidden sm:block">{currencySlot}</div>
+            )}
             <span aria-hidden className="hidden h-6 w-px bg-border md:ml-2 md:mr-3" />
 
             <form

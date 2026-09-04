@@ -15,6 +15,7 @@ import {
 } from "@/features/products/repositories/product-repository";
 import { whatsappLink } from "@/shared/config/site";
 import { HeroProduct } from "@/components/home/hero-product";
+import { getCurrencyContext } from "@/shared/money/server-helpers";
 
 const BIG_LEAGUES = ["premier-league", "la-liga", "serie-a", "bundesliga", "ligue-1"] as const;
 
@@ -34,7 +35,7 @@ const TRUST_ITEMS = [
 ] as const;
 
 export default async function HomePage() {
-  const [featured, leagues] = await Promise.all([getFeaturedProducts(8), getLeagues()]);
+  const [featured, leagues, currencyCtx] = await Promise.all([getFeaturedProducts(8), getLeagues(), getCurrencyContext()]);
 
   const heroProduct = featured[0] ?? null;
 
@@ -168,7 +169,7 @@ export default async function HomePage() {
           </div>
 
           <div className="mt-8">
-            <ProductGrid products={featuredProducts} priority />
+            <ProductGrid products={featuredProducts} priority currencyContext={currencyCtx} />
           </div>
         </div>
       </section>

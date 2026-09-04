@@ -17,6 +17,7 @@ async function main() {
 
   // ── Cleanup ──
   await prisma.inventoryMovement.deleteMany();
+  await prisma.notificationAttempt.deleteMany();
   await prisma.orderStatusHistory.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
@@ -364,6 +365,9 @@ async function main() {
       { key: "shipping_free_threshold", value: "200000" },
       { key: "shipping_base_fee", value: "12000" },
       { key: "personalization_fee", value: "12000" },
+      { key: "usd_cop_rate", value: "4000" },
+      { key: "usd_enabled", value: "true" },
+      { key: "usd_cop_rate_at", value: new Date().toISOString() },
     ],
   });
 

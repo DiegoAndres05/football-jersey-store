@@ -3,14 +3,27 @@ import Link from "next/link";
 import Image from "next/image";
 import { Heart } from "lucide-react";
 import type { ProductCardData } from "@/features/products/types/product-types";
+import type { CurrencyContext } from "@/shared/money/server-helpers";
 import { Badge } from "@/components/ui/badge";
 import { formatPriceShort } from "@/lib/utils";
+import { formatMoney } from "@/shared/money/format";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
 
-export function ProductCard({ product, priority }: { product: ProductCardData; priority?: boolean }) {
+export function ProductCard({ product, priority, currencyContext }: { product: ProductCardData; priority?: boolean; currencyContext?: CurrencyContext }) {
   const isOutlet = product.season.isRetro;
   const favorite = useFavoritesStore((state) => state.isFavorite(product.id));
   const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+
+  const formatPrice = (amountCop: number) => {
+    if (currencyContext) {
+      return formatMoney({
+        amountCop,
+        currency: currencyContext.currency,
+        copPerUsd: currencyContext.copPerUsd ?? undefined,
+      });
+    }
+    return formatPriceShort(amountCop);
+  };
 
   return (
     <Link
@@ -85,10 +98,10 @@ export function ProductCard({ product, priority }: { product: ProductCardData; p
 
           <div className="flex items-baseline gap-1.5 mt-1">
             <span className="text-sm text-muted-foreground">Desde</span>
-            <span className="text-base font-bold">{formatPriceShort(product.minPrice)}</span>
+            <span className="text-base font-bold">{formatPrice(product.minPrice)}</span>
             {product.maxPrice > product.minPrice && (
               <span className="text-xs text-muted-foreground">
-                hasta {formatPriceShort(product.maxPrice)}
+                hasta {formatPrice(product.maxPrice)}
               </span>
             )}
           </div>

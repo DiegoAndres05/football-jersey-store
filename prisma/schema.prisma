@@ -369,6 +369,9 @@ model Order {
   paymentRef      String?
   paidAt          DateTime?
 
+  saleCurrency       String  @default("COP")  // COP | USD
+  exchangeRateCopPerUsd Int?                  // tasa congelada al confirmar
+
   items           OrderItem[]
   history         OrderStatusHistory[]
   notificationAttempts NotificationAttempt[]
