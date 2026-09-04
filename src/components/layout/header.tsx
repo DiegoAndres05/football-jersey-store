@@ -105,9 +105,11 @@ export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
               </Link>
             </Button>
 
-            <FavoritesBadge />
+            <div className="hidden md:block">
+              <FavoritesBadge />
+            </div>
 
-            <Button variant="ghost" size="icon" asChild aria-label="Vistos recientemente"><Link href="/productos#vistos-recientemente"><History className="h-5 w-5" /></Link></Button>
+            <Button variant="ghost" size="icon" asChild aria-label="Vistos recientemente" className="hidden md:inline-flex"><Link href="/productos#vistos-recientemente"><History className="h-5 w-5" /></Link></Button>
 
             <CartBadge />
 
@@ -171,6 +173,28 @@ export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
           </Button>
         </div>
         <NavLinks mobile onNavClick={() => setIsMobileOpen(false)} />
+
+        <div className="mt-auto pt-4 border-t border-border space-y-1">
+          <div className="px-4 py-2">
+            {currencySlot}
+          </div>
+          <Link
+            href="/favoritos"
+            onClick={() => setIsMobileOpen(false)}
+            className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Heart className="h-4 w-4" />
+            Favoritos
+          </Link>
+          <Link
+            href="/productos#vistos-recientemente"
+            onClick={() => setIsMobileOpen(false)}
+            className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <History className="h-4 w-4" />
+            Vistos recientemente
+          </Link>
+        </div>
       </div>
     </>
   );

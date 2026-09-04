@@ -22,7 +22,7 @@ export function CurrencySelector({ current, rateInfo }: CurrencySelectorProps) {
   );
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center">
       <div className="flex rounded-lg border border-border overflow-hidden">
         <button
           type="button"
@@ -47,12 +47,6 @@ export function CurrencySelector({ current, rateInfo }: CurrencySelectorProps) {
           USD
         </button>
       </div>
-
-      {current === "USD" && rateInfo && (
-        <span className="text-[10px] text-muted-foreground hidden sm:inline">
-          1 USD = {rateInfo.copPerUsd.toLocaleString("es-CO")} COP
-        </span>
-      )}
     </div>
   );
 }
