@@ -87,7 +87,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
   return (
     <div className="container-page py-8">
       <div className="mb-6">
-        <p className="text-sm text-muted-foreground mb-1">
+        <p className="text-sm text-muted-foreground mb-1 transition-colors duration-200 motion-reduce:transition-none">
           {itemCount} {itemCount === 1 ? "artículo" : "artículos"}
         </p>
         <h1 className="text-2xl md:text-3xl font-bold">Tu carrito</h1>
@@ -99,7 +99,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
           {items.map((item) => (
             <div
               key={item.lineId}
-              className="flex gap-4 rounded-xl border border-border bg-card p-4"
+              className="flex gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 motion-reduce:transition-none"
             >
               <Link href={`/productos/${item.productSlug}`} className="shrink-0">
                 {item.imageUrl ? (
@@ -253,7 +253,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
 
           <div className="flex justify-between items-baseline">
             <span className="text-sm font-medium">Total</span>
-            <span className="text-2xl font-bold tabular-nums">{formatMoney({ amountCop: subtotal, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span>
+            <span className="text-2xl font-bold tabular-nums transition-colors duration-200 motion-reduce:transition-none">{formatMoney({ amountCop: subtotal, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span>
           </div>
 
           <Button className="w-full mt-4" asChild>

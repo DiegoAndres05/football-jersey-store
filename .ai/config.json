@@ -1,0 +1,37 @@
+{
+  "version": "0.5.0",
+  "project": {
+    "name": "football-jersey-store",
+    "packageManager": "npm",
+    "language": "TypeScript",
+    "framework": "Next.js",
+    "database": "Prisma",
+    "backend": "Not detected",
+    "testing": "Not detected",
+    "deployment": "Not detected"
+  },
+  "hierarchy": [
+    "user",
+    "cursor",
+    "speckit",
+    "opencode",
+    "tests"
+  ],
+  "workflow": "cursor-understand-think-speckit-plan-delegate-opencode-review",
+  "opencode": {
+    "desktopFirst": true,
+    "agents": [
+      "debugger",
+      "developer",
+      "reviewer",
+      "tester"
+    ],
+    "integration": ".opencode/",
+    "commands": [
+      "ai-task",
+      "ai-review",
+      "ai-test",
+      "ai-debug"
+    ]
+  }
+}
