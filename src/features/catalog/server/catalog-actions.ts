@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { supabaseServer, PRODUCT_IMAGES_BUCKET } from "@/lib/supabase/server";
 import { getSessionUser } from "@/features/auth/server/session";
@@ -10,11 +11,13 @@ import {
   buildUniqueSku,
   createVariantsForAllSizes,
 } from "@/features/catalog/server/variant-service";
+import { deleteProductIfAllowed } from "@/features/catalog/server/product-delete";
+import { saveError, type AdminSaveResult } from "@/shared/admin/admin-save-result";
 
 /**
  * CRUD de catálogo (FASE 4). Solo admin (cookie firmada).
- * Los errores de negocio se propagan como Error con mensaje amigable
- * y se muestran en el error.tsx de cada ruta.
+ * deleteProductAction devuelve AdminSaveResult (nunca lanza) para que la UI
+ * muestre toast/mensaje. El resto de acciones aún propagan Error a error.tsx.
  */
 
 async function requireAdmin() {
@@ -222,37 +225,31 @@ export async function updateProductAction(productId: string, formData: FormData)
   redirect("/admin/productos");
 }
 
-export async function deleteProductAction(productId: string) {
-  await requireAdmin();
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-    include: {
-      _count: { select: { variants: true, supplierProducts: true } },
+export async function deleteProductAction(productId: string): Promise<AdminSaveResult> {
+  const admin = await getSessionUser();
+  if (!admin) return saveError("No autorizado.");
+
+  const result = await deleteProductIfAllowed(productId, {
+    findProduct: (id) =>
+      prisma.product.findUnique({
+        where: { id },
+        include: {
+          _count: { select: { variants: true, supplierProducts: true, images: true } },
+          images: { select: { id: true, storagePath: true } },
+        },
+      }),
+    removeStorage: async (paths) => {
+      await supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).remove(paths);
     },
+    deleteImages: (id) => prisma.productImage.deleteMany({ where: { productId: id } }).then(() => undefined),
+    deleteProduct: (id) => prisma.product.delete({ where: { id } }).then(() => undefined),
   });
-  if (!product) throw new Error("El producto no existe.");
-  const razones: string[] = [];
-  if (product._count.variants > 0) razones.push(`${product._count.variants} variante(s)`);
-  if (product._count.supplierProducts > 0) razones.push(`${product._count.supplierProducts} proveedor(es)`);
-  if (razones.length) {
-    throw new Error(`No se puede eliminar: tiene ${razones.join(" y ")}. Elimina primero sus variantes.`);
+
+  if (result.ok) {
+    revalidatePath("/admin/productos");
+    revalidatePath("/productos");
   }
-  const images = await prisma.productImage.findMany({
-    where: { productId },
-    select: { id: true, storagePath: true },
-  });
-  for (const img of images) {
-    if (img.storagePath) {
-      try {
-        await supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).remove([img.storagePath]);
-      } catch {
-        /* ignore: idempotent */
-      }
-    }
-  }
-  await prisma.productImage.deleteMany({ where: { productId } });
-  await prisma.product.delete({ where: { id: productId } });
-  redirect("/admin/productos");
+  return result;
 }
 
 // ---------------- VARIANTES ----------------
