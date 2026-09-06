@@ -5,8 +5,8 @@ import { ImageIcon, ArrowRight } from "lucide-react";
 import {
   createProductAction,
   updateProductAction,
-  deleteProductAction,
 } from "@/features/catalog/server/catalog-actions";
+import { ProductDeleteButton } from "@/features/catalog/components/product-delete-button";
 import { KIT_TYPES } from "@/features/catalog/types/kit-types";
 import { getTeams, getSeasons } from "@/features/catalog/server/reference-cache";
 
@@ -179,14 +179,15 @@ export default async function AdminProductsPage() {
                     >
                       Variantes
                     </Link>
-                    <form action={deleteProductAction.bind(null, p.id)}>
-                      <button
-                        type="submit"
-                        className="rounded-md border border-destructive/30 px-2.5 py-1 text-xs text-destructive hover:bg-destructive/10 transition-colors"
-                      >
-                        Eliminar
-                      </button>
-                    </form>
+                    <ProductDeleteButton
+                      productId={p.id}
+                      productName={p.name}
+                      counts={{
+                        variants: p._count.variants,
+                        suppliers: p._count.supplierProducts,
+                        images: p._count.images,
+                      }}
+                    />
                   </div>
                 </td>
               </tr>
