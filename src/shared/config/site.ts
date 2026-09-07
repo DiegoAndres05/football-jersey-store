@@ -2,7 +2,7 @@ export const SITE = {
   name: "Flashsport",
   brand: "FLASHSPORT",
   tagline: "Camisetas de fútbol para quienes viven el juego.",
-  whatsappNumber: "+57 300 000 0000",
+  whatsappNumber: "+57 304 614 9520",
   whatsappMessage:
     "Hola Flashsport, estoy buscando una camiseta. ¿Me ayudan?",
   email: "hola@flashsport.co",
