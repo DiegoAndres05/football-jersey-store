@@ -13,6 +13,7 @@
 ### Session 2026-09-06
 
 - Q: ¿A partir de qué ancho deja de ser “una tarjeta completa” y puede haber coverflow/peek de escritorio? → A: Todo lo que no sea escritorio (~1024 px): una tarjeta; coverflow solo en ancho de escritorio.
+- Q: ¿Cómo abre el visitante la ficha de la camiseta que está viendo? → A: No se implementa tarjeta entera como enlace; solo el CTA “Ver camiseta” abre la ficha.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -60,7 +61,7 @@ Como visitante, quiero que en cada momento la foto, el nombre, el equipo/subtít
 **Acceptance Scenarios**:
 
 1. **Given** el carrusel en movimiento, **When** cambia de diapositiva, **Then** imagen, nombre, equipo/subtítulo y CTA cambian **juntos** (misma camiseta).
-2. **Given** una camiseta al frente, **When** pulsa “Ver camiseta”, **Then** abre la ficha de **esa** camiseta.
+2. **Given** una camiseta al frente, **When** pulsa “Ver camiseta”, **Then** abre la ficha de **esa** camiseta. Pulsar solo la foto **no** es un requisito de esta entrega.
 3. **Given** escritorio (~1024 px o más), **When** mira el bloque, **Then** la tarjeta activa es obvia; las vecinas (si se ven) son un peek legible, no recortes que impidan reconocer la foto. Por debajo de ~1024 px no hay coverflow.
 
 ---
@@ -85,7 +86,7 @@ Como visitante, quiero que en cada momento la foto, el nombre, el equipo/subtít
 - **FR-006**: Foto, nombre, equipo/subtítulo y CTA de una diapositiva MUST corresponder siempre a la misma camiseta (sin desfase entre encabezado y foto).
 - **FR-007**: En escritorio (~1024 px o más), la tarjeta activa MUST ser dominante y obvia. Los peeks laterales, si existen, MUST ser más legibles que un recorte agresivo. Por debajo de ~1024 px MUST NOT haber efecto coverflow.
 - **FR-008**: Flechas Anterior/Siguiente, indicadores y Pausar/Reanudar MUST tener nombres accesibles en español, foco por teclado y activación con Enter/Espacio en los botones.
-- **FR-009**: El CTA de la tarjeta activa MUST ser claro y llevar a la ficha de esa camiseta.
+- **FR-009**: El CTA “Ver camiseta” de la tarjeta activa MUST ser claro y llevar a la ficha de esa camiseta. MUST NOT exigirse que toda la tarjeta sea un enlace.
 - **FR-010**: MUST NOT cambiar la fuente de fotos (sigue la selección del admin), ni otras secciones de la home, ni el catálogo/backend.
 
 ### Key Entities
@@ -120,3 +121,4 @@ Como visitante, quiero que en cada momento la foto, el nombre, el equipo/subtít
 - Cambiar cuántas fotos se eligen o el tope de 5.
 - Añadir precios al overlay.
 - Un playground o demo de restaurante.
+- Convertir toda la tarjeta en enlace a la ficha (la foto no tiene que navegar).
