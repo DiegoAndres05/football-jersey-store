@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, ArrowRight, CreditCard, Landmark, Smartphone, ShieldCheck } from "lucide-react";
@@ -16,7 +15,6 @@ import { SHIPPING, shippingFee, SITE } from "@/shared/config/site";
 import { DELIVERY_MODE_INFO } from "@/features/products/types/delivery-mode";
 import { formatMoney } from "@/shared/money/format";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
-import { processMockPayment } from "@/features/payments/services/mock-payment";
 import { submitOrder } from "@/features/orders/server/order-actions";
 import { getImmediateStockByVariantIds } from "@/features/cart/server/cart-stock-actions";
 import { formatReconcileMessage } from "@/features/cart/domain/immediate-quantity";
@@ -28,7 +26,6 @@ import {
 } from "@/features/checkout/schemas/checkout-schema";
 
 export function CheckoutPageClient({ currencyContext }: { currencyContext?: CurrencyContext }) {
-  const router = useRouter();
   const items = useCartStore((s) => s.items);
   const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
   const clearCart = useCartStore((s) => s.clear);
@@ -37,11 +34,19 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
   const [step, setStep] = useState<"form" | "payment">("form");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
-  const [payReference, setPayReference] = useState("");
   const [payError, setPayError] = useState("");
   const formRef = useRef<CheckoutFormValues | null>(null);
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!mounted || step !== "payment") return;
+    if (document.querySelector('script[src="https://checkout.bold.co/library/boldPaymentButton.js"]')) return;
+    const script = document.createElement("script");
+    script.src = "https://checkout.bold.co/library/boldPaymentButton.js";
+    script.async = true;
+    document.head.appendChild(script);
+  }, [mounted, step]);
 
   useEffect(() => {
     if (!mounted || items.length === 0) return;
@@ -137,13 +142,6 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
 
     const payableSubtotal = lines.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
     const payableTotal = payableSubtotal + shippingFee(payableSubtotal);
-    const payment = await processMockPayment({ method: paymentMethod, amount: payableTotal });
-
-    if (!payment.ok) {
-      setPayError(payment.reason);
-      setPaymentStatus("failed");
-      return;
-    }
 
     const result = await submitOrder({
       form: formRef.current,
@@ -156,7 +154,7 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
         deliveryMode: i.deliveryMode,
       })),
       paymentMethod,
-      paymentReference: payment.reference,
+      paymentReference: `BOLD-${Date.now()}`,
     });
 
     if (!result.ok) {
@@ -165,10 +163,52 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
       return;
     }
 
-    setPayReference(payment.reference);
-    setPaymentStatus("success");
-    clearCart();
-    router.replace(`/pedido/confirmado/${result.code}`);
+    try {
+      const hashRes = await fetch("/api/bold/hash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: result.code,
+          amount: payableTotal,
+          currency: "COP",
+        }),
+      });
+
+      if (!hashRes.ok) throw new Error("Error al preparar el pago.");
+      const { hash, apiKey } = await hashRes.json();
+
+      const BoldCheckout = (window as any).BoldCheckout;
+
+      if (!BoldCheckout) {
+        setPayError("El sistema de pago no está listo. Recarga la página e intenta de nuevo.");
+        setPaymentStatus("idle");
+        return;
+      }
+
+      clearCart();
+
+      const checkout = new BoldCheckout({
+        orderId: result.code,
+        currency: "COP",
+        amount: payableTotal.toString(),
+        apiKey,
+        integritySignature: hash,
+        description: `Pedido ${result.code}`,
+        redirectionUrl: `${window.location.origin}/pedido/confirmado/${result.code}`,
+        renderMode: "embedded",
+        customerData: JSON.stringify({
+          email: formRef.current?.email,
+          fullName: formRef.current?.fullName,
+          phone: formRef.current?.phone,
+        }),
+      });
+
+      checkout.open();
+    } catch (err) {
+      console.error("Bold checkout error:", err);
+      setPayError(err instanceof Error ? err.message : "Error al conectar con el sistema de pago.");
+      setPaymentStatus("failed");
+    }
   };
 
   return (
@@ -295,9 +335,9 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
               {paymentStatus === "processing" && (
                 <div className="rounded-xl border border-border bg-card p-8 text-center">
                   <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
-                  <p className="mt-4 text-sm font-medium">Procesando pago simulado…</p>
+                  <p className="mt-4 text-sm font-medium">Conectando con Bold…</p>
                   <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                    Modo demo: no se realiza ningún cobro real ni se solicitan datos de tarjeta.
+                    Abriendo la pasarela de pago segura. No cierres esta página.
                   </p>
                 </div>
               )}
@@ -311,16 +351,14 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
                     Pago aprobado
                   </h3>
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                    Simulación aprobada por {formatMoney({ amountCop: total, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })} con{" "}
-                    {paymentMethod === "CARD" ? "tarjeta" : paymentMethod === "PSE" ? "PSE" : "Nequi"}.
-                    Referencia {payReference}. Creando tu pedido…
+                    Tu pago fue procesado exitosamente. Redirigiendo al resumen del pedido…
                   </p>
                 </div>
               )}
 
               {paymentStatus === "failed" && (
                 <div className="rounded-xl border border-border bg-card p-6 text-center">
-                  <p className="text-sm font-medium">{payError || "No se pudo procesar la simulación."}</p>
+                  <p className="text-sm font-medium text-destructive">{payError || "No se pudo procesar el pago."}</p>
                   <Button className="mt-4" onClick={() => setPaymentStatus("idle")}>
                     Reintentar
                   </Button>

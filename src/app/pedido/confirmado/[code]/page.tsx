@@ -40,15 +40,24 @@ export default async function OrderConfirmationPage({ params }: PageProps) {
           los detalles de entrega.
         </p>
 
-        <p className="mt-4 rounded-lg bg-secondary/60 px-4 py-3 text-xs text-muted-foreground leading-relaxed text-left">
-          Nota: el pago se registró en modo simulación (aún no hay pasarela conectada). El pedido
-          queda pendiente de pago hasta confirmarlo por WhatsApp o con la integración real.
-        </p>
+        <div className="mt-4 rounded-lg bg-secondary/60 px-4 py-3 text-xs text-muted-foreground leading-relaxed text-left">
+          {order.status === "PAID" ? (
+            <p>Pago confirmado. Tu pedido está siendo preparado para envío.</p>
+          ) : order.status === "PAYMENT_FAILED" ? (
+            <p className="text-destructive">El pago no fue procesado. Por favor, intenta de nuevo.</p>
+          ) : (
+            <p>Pago pendiente. Te notificaremos cuando se confirme el pago.</p>
+          )}
+        </div>
 
         <dl className="mt-6 grid grid-cols-2 gap-3 text-left text-sm">
           <div className="rounded-xl border border-border p-4">
             <dt className="text-xs text-muted-foreground uppercase tracking-wide">Estado</dt>
-            <dd className="mt-1 font-medium">Pendiente de pago</dd>
+            <dd className="mt-1 font-medium">
+              {order.status === "PAID" ? "Pago confirmado" : 
+               order.status === "PAYMENT_FAILED" ? "Pago rechazado" :
+               order.status === "PENDING_PAYMENT" ? "Pendiente de pago" : order.status}
+            </dd>
           </div>
           <div className="rounded-xl border border-border p-4">
             <dt className="text-xs text-muted-foreground uppercase tracking-wide">Total</dt>

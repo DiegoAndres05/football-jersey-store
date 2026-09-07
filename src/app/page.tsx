@@ -139,7 +139,7 @@ export default async function HomePage() {
                 href={`/productos?liga=${league.slug}`}
                 className="group flex flex-col rounded-xl border border-border bg-card p-5 transition-all hover:border-foreground/40 hover:shadow-md"
               >
-                <span className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-secondary p-1.5 transition-colors group-hover:bg-foreground/5">
+                <span className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg p-0.104 transition-colors group-hover:bg-foreground/5">
                   {logoSrc ? (
                     <Image
                       src={logoSrc}

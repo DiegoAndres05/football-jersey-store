@@ -228,30 +228,34 @@ export async function updateProductAction(productId: string, formData: FormData)
 }
 
 export async function deleteProductAction(productId: string): Promise<AdminSaveResult> {
-  const admin = await getSessionUser();
-  if (!admin) return saveError("No autorizado.");
+  try {
+    const admin = await getSessionUser();
+    if (!admin) return saveError("No autorizado.");
 
-  const result = await deleteProductIfAllowed(productId, {
-    findProduct: (id) =>
-      prisma.product.findUnique({
-        where: { id },
-        include: {
-          _count: { select: { variants: true, supplierProducts: true, images: true } },
-          images: { select: { id: true, storagePath: true } },
-        },
-      }),
-    removeStorage: async (paths) => {
-      await supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).remove(paths);
-    },
-    deleteImages: (id) => prisma.productImage.deleteMany({ where: { productId: id } }).then(() => undefined),
-    deleteProduct: (id) => prisma.product.delete({ where: { id } }).then(() => undefined),
-  });
+    const result = await deleteProductIfAllowed(productId, {
+      findProduct: (id) =>
+        prisma.product.findUnique({
+          where: { id },
+          include: {
+            _count: { select: { variants: true, supplierProducts: true, images: true } },
+            images: { select: { id: true, storagePath: true } },
+          },
+        }),
+      removeStorage: async (paths) => {
+        await supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).remove(paths);
+      },
+      deleteImages: (id) => prisma.productImage.deleteMany({ where: { productId: id } }).then(() => undefined),
+      deleteProduct: (id) => prisma.product.delete({ where: { id } }).then(() => undefined),
+    });
 
-  if (result.ok) {
-    revalidatePath("/admin/productos");
-    revalidatePath("/productos");
+    if (result.ok) {
+      revalidatePath("/admin/productos");
+      revalidatePath("/productos");
+    }
+    return result;
+  } catch {
+    return saveError("No se pudo eliminar el producto. Intenta de nuevo.");
   }
-  return result;
 }
 
 export async function setProductActiveAction(
