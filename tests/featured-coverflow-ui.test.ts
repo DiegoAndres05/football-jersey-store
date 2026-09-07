@@ -157,3 +157,61 @@ test("visible Pausar/Reanudar control and reduced-motion skips autoplay", () => 
   assert.match(source, /prefers-reduced-motion/);
   assert.match(source, /userPaused/);
 });
+
+// ── 011 tilt + 012 clean face ───────────────────────────────────────────────
+
+test("clean slide face: no glass panel, gated CTA, caption outside photo", () => {
+  const source = readComponent();
+  assert.doesNotMatch(source, /backdrop-blur/);
+  assert.doesNotMatch(source, /bg-white\/10/);
+  assert.doesNotMatch(source, /from-black\/65/);
+  assert.doesNotMatch(source, /to-black\/70/);
+  assert.match(source, /showCta/);
+  assert.match(source, /showCta=\{false\}|showCta=\{isActive\}|showCta\b/);
+  assert.match(source, /SlideCaption|line-clamp-2/);
+  assert.match(source, /current\.name|item\.name/);
+  assert.match(source, /Ver camiseta/);
+  assert.match(source, /\/productos\//);
+  assert.doesNotMatch(source, /\$149/);
+  assert.doesNotMatch(source, /formatMoney/);
+  assert.doesNotMatch(source, /Array\.from\(\{\s*length:\s*4\s*\}\)/);
+});
+
+test("tilt is gated to active desktop slide without scale3d", () => {
+  const source = readComponent();
+  assert.match(source, /tiltEnabled/);
+  assert.match(source, /min-width:\s*1024px/);
+  assert.match(source, /onMouseMove/);
+  assert.match(source, /onMouseLeave/);
+  assert.match(source, /rotateX/);
+  assert.match(source, /rotateY/);
+  assert.doesNotMatch(source, /scale3d/);
+  assert.match(source, /transformStyle:\s*["']preserve-3d["']/);
+  assert.doesNotMatch(source, /transform-style-3d/);
+});
+
+test("010 controls and 009 slide source remain intact", () => {
+  const source = readComponent();
+  const page = readPage();
+  assert.match(source, /lg:hidden/);
+  assert.match(source, /h-11 w-11/);
+  assert.match(source, /aria-current/);
+  assert.match(source, /Pausar/);
+  assert.match(source, /Reanudar/);
+  assert.match(source, /prefers-reduced-motion/);
+  assert.match(source, /userPaused/);
+  assert.match(source, /\/productos\//);
+  assert.match(page, /getHomepageCarouselSlides/);
+  assert.doesNotMatch(page, /cdn\.21st\.dev/);
+  assert.doesNotMatch(source, /cdn\.21st\.dev/);
+});
+
+test("active slide gets CTA; peeks pass showCta false or isActive gate", () => {
+  const source = readComponent();
+  assert.match(source, /showCta=\{isActive\}/);
+  assert.match(source, /showCta(?:\s*\/>|\s+)/);
+  assert.ok(
+    /showCta\s*\/>/.test(source) || /showCta=\{true\}/.test(source),
+    "Mobile active card should enable showCta",
+  );
+});
