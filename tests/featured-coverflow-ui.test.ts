@@ -136,3 +136,24 @@ test("coverflow renders a single slide instead of returning null", () => {
   assert.match(source, /item\.url/);
   assert.doesNotMatch(source, /primaryImage/);
 });
+
+test("mobile shows a single full card without coverflow", () => {
+  const source = readComponent();
+  assert.match(source, /lg:hidden/);
+  assert.match(source, /hidden lg:block|lg:block/);
+  assert.match(source, /line-clamp-2/);
+});
+
+test("dot indicators have a 44px touch target and clear active state", () => {
+  const source = readComponent();
+  assert.match(source, /h-11 w-11/);
+  assert.match(source, /aria-current/);
+});
+
+test("visible Pausar/Reanudar control and reduced-motion skips autoplay", () => {
+  const source = readComponent();
+  assert.match(source, /Pausar/);
+  assert.match(source, /Reanudar/);
+  assert.match(source, /prefers-reduced-motion/);
+  assert.match(source, /userPaused/);
+});

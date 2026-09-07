@@ -11,15 +11,59 @@ interface FeaturedCoverflowCarouselProps {
   items: HomepageCarouselSlide[];
 }
 
+function SlideFace({ item, priority }: { item: HomepageCarouselSlide; priority?: boolean }) {
+  return (
+    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
+      <Image
+        src={item.url}
+        alt={item.altText ?? item.name}
+        fill
+        sizes="(max-width: 1024px) 90vw, 28rem"
+        className="object-cover"
+        priority={priority}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
+        <h3 className="line-clamp-2 text-lg font-semibold text-white md:text-xl">
+          {item.name}
+        </h3>
+        {item.team && (
+          <p className="mt-1 line-clamp-1 text-sm text-white/80">
+            {item.team.name}
+            {item.team.league && (
+              <>
+                <span aria-hidden> · </span>
+                {item.team.league.name}
+              </>
+            )}
+          </p>
+        )}
+        <div className="mt-4">
+          <Button
+            asChild
+            variant="secondary"
+            size="sm"
+            className="bg-white text-foreground hover:bg-white/90"
+          >
+            <Link href={`/productos/${item.slug}`}>Ver camiseta</Link>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
+  const [hoverPaused, setHoverPaused] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
 
   const total = items.length;
   const showControls = total >= 2;
+  const current = items[currentIndex] ?? items[0];
 
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   useEffect(() => {
@@ -30,13 +74,16 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
     return () => mql.removeEventListener("change", handler);
   }, []);
 
+  const autoplayOn =
+    showControls && !userPaused && !hoverPaused && !prefersReducedMotion;
+
   useEffect(() => {
-    if (!showControls || isPaused || prefersReducedMotion) return;
+    if (!autoplayOn) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % total);
     }, 5000);
     return () => clearInterval(interval);
-  }, [showControls, isPaused, prefersReducedMotion, total]);
+  }, [autoplayOn, total]);
 
   const goTo = useCallback((index: number) => {
     setCurrentIndex(index);
@@ -66,6 +113,7 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
+    touchEndX.current = e.touches[0].clientX;
   };
   const handleTouchMove = (e: React.TouchEvent) => {
     touchEndX.current = e.touches[0].clientX;
@@ -79,39 +127,48 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
     }
   };
 
-  const pause = () => setIsPaused(true);
-  const resume = () => setIsPaused(false);
-
-  if (total < 1) return null;
-
-  const current = items[currentIndex] ?? items[0];
+  if (total < 1 || !current) return null;
 
   return (
     <section
       ref={sectionRef}
       tabIndex={0}
       aria-label="Carrusel de camisetas destacadas"
-      className="relative w-full overflow-hidden py-12 md:py-20 focus:outline-none"
-      onMouseEnter={pause}
-      onMouseLeave={resume}
-      onFocus={pause}
-      onBlur={resume}
+      aria-roledescription="carrusel"
+      className="relative w-full overflow-x-hidden py-12 focus:outline-none md:py-20"
+      onMouseEnter={() => setHoverPaused(true)}
+      onMouseLeave={() => setHoverPaused(false)}
+      onFocus={() => setHoverPaused(true)}
+      onBlur={(event) => {
+        const next = event.relatedTarget as Node | null;
+        if (next && event.currentTarget.contains(next)) return;
+        setHoverPaused(false);
+      }}
       onKeyDown={handleKeyDown}
     >
       <div className="mx-auto mb-8 max-w-7xl px-4 text-center">
         <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
           Destacadas
         </h2>
-        {current.team && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            {current.team.name}
-          </p>
-        )}
       </div>
 
+      <div className="relative">
+      {/* Mobile: one full card, no coverflow */}
       <div
-        className="relative mx-auto h-[400px] max-w-5xl px-12 md:h-[500px]"
-        style={{ perspective: "1000px" }}
+        className="px-4 lg:hidden"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <article className="relative mx-auto aspect-[3/4] w-full max-w-sm">
+          <SlideFace item={current} priority />
+        </article>
+      </div>
+
+      {/* Desktop: calmer coverflow with readable peeks */}
+      <div
+        className="relative mx-auto hidden h-[440px] max-w-5xl px-16 lg:block"
+        style={{ perspective: "1200px" }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -127,109 +184,94 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
                   : offset;
 
             const isActive = wrappedOffset === 0;
-            const translateX = isActive ? 0 : wrappedOffset * 40;
-            const rotateY = isActive ? 0 : wrappedOffset * -15;
-            const scale = isActive ? 1 : 0.85;
+            const translateX = wrappedOffset * 58;
+            const rotateY = isActive ? 0 : wrappedOffset * -8;
+            const scale = isActive ? 1 : 0.88;
             const zIndex = isActive ? 10 : 5 - Math.abs(wrappedOffset);
-            const opacity = Math.abs(wrappedOffset) <= 2 ? 1 : 0;
+            const opacity = Math.abs(wrappedOffset) <= 1 ? 1 : 0;
 
             return (
               <div
                 key={item.imageId}
-                className="absolute inset-0 transition-all duration-500 ease-in-out"
+                className="absolute top-0 bottom-0 left-1/2 w-[min(22rem,58%)] -ml-[min(11rem,29%)] transition-transform duration-500 ease-in-out"
                 style={{
                   transform: `translateX(${translateX}%) rotateY(${rotateY}deg) scale(${scale})`,
                   zIndex: zIndex < 0 ? 0 : zIndex,
                   opacity,
-                  pointerEvents: isActive ? "auto" : "none",
+                  pointerEvents: Math.abs(wrappedOffset) <= 1 ? "auto" : "none",
                 }}
                 onClick={() => {
                   if (!isActive) goTo(index);
                 }}
               >
-                <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
-                  <Image
-                    src={item.url}
-                    alt={item.altText ?? item.name}
-                    fill
-                    sizes="(max-width: 768px) 80vw, 50vw"
-                    className="object-cover"
-                    priority={isActive}
-                  />
-
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-                  <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
-                    <h3 className="text-lg font-semibold text-white md:text-xl">
-                      {item.name}
-                    </h3>
-                    {item.team && (
-                      <p className="mt-1 text-sm text-white/80">
-                        {item.team.name}
-                        {item.team.league && (
-                          <>
-                            <span aria-hidden> · </span>
-                            {item.team.league.name}
-                          </>
-                        )}
-                      </p>
-                    )}
-                    <div className="mt-4">
-                      <Button
-                        asChild
-                        variant="secondary"
-                        size="sm"
-                        className="bg-white text-foreground hover:bg-white/90"
-                      >
-                        <Link href={`/productos/${item.slug}`}>
-                          Ver camiseta
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <SlideFace item={item} priority={isActive} />
               </div>
             );
           })}
         </div>
-
-        {showControls && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute left-2 top-1/2 z-20 -translate-y-1/2 bg-background/80 hover:bg-background"
-              onClick={goPrev}
-              aria-label="Anterior"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-2 top-1/2 z-20 -translate-y-1/2 bg-background/80 hover:bg-background"
-              onClick={goNext}
-              aria-label="Siguiente"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </Button>
-          </>
-        )}
       </div>
 
       {showControls && (
-        <div className="mt-6 flex justify-center gap-2">
-          {items.map((item, index) => (
-            <button
-              key={item.imageId}
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute left-2 top-1/2 z-20 h-11 w-11 -translate-y-1/2 bg-background/90 hover:bg-background lg:left-4"
+            onClick={goPrev}
+            aria-label="Anterior"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-2 top-1/2 z-20 h-11 w-11 -translate-y-1/2 bg-background/90 hover:bg-background lg:right-4"
+            onClick={goNext}
+            aria-label="Siguiente"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </Button>
+        </>
+      )}
+      </div>
+
+      {showControls && (
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-1 px-4">
+          {items.map((item, index) => {
+            const isActive = index === currentIndex;
+            return (
+              <button
+                key={item.imageId}
+                type="button"
+                aria-label={`Ir a ${item.name}`}
+                aria-current={isActive ? "true" : undefined}
+                className="flex h-11 w-11 items-center justify-center"
+                onClick={() => goTo(index)}
+              >
+                <span
+                  className={`block rounded-full transition-all ${
+                    isActive
+                      ? "h-3 w-3 bg-foreground"
+                      : "h-2.5 w-2.5 bg-foreground/35 hover:bg-foreground/55"
+                  }`}
+                />
+              </button>
+            );
+          })}
+          {!prefersReducedMotion && (
+            <Button
               type="button"
-              aria-label={`Ir a ${item.name}`}
-              className={`h-2 w-2 rounded-full transition-colors ${
-                index === currentIndex ? "bg-primary" : "bg-muted"
-              }`}
-              onClick={() => goTo(index)}
-            />
-          ))}
+              variant="outline"
+              size="sm"
+              className="ml-2"
+              aria-pressed={userPaused}
+              onClick={() => setUserPaused((paused) => !paused)}
+            >
+              {userPaused ? "Reanudar" : "Pausar"}
+            </Button>
+          )}
         </div>
       )}
     </section>
