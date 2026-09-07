@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   BadgeCheck,
@@ -13,21 +14,18 @@ import {
   getFeaturedProducts,
   getLeagues,
 } from "@/features/products/repositories/product-repository";
+import {
+  BIG_LEAGUE_SLUGS,
+  leagueLogoSrc,
+  leagueMonogram,
+} from "@/features/products/domain/league-logos";
 import { whatsappLink } from "@/shared/config/site";
 import { HeroProduct } from "@/components/home/hero-product";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
 import { getHomepageCarouselSlides } from "@/features/products/repositories/homepage-carousel-repository";
 import { FeaturedCoverflowCarousel } from "@/features/products/components/featured-coverflow-carousel";
 
-const BIG_LEAGUES = ["premier-league", "la-liga", "serie-a", "bundesliga", "ligue-1"] as const;
-
-const LEAGUE_MONOGRAMS: Record<string, string> = {
-  "premier-league": "PL",
-  "la-liga": "LAL",
-  "serie-a": "SA",
-  "bundesliga": "BL",
-  "ligue-1": "L1",
-};
+const BIG_LEAGUES = BIG_LEAGUE_SLUGS;
 
 const TRUST_ITEMS = [
   { icon: Truck, label: "Envíos a todo el país" },
@@ -133,29 +131,44 @@ export default async function HomePage() {
         </div>
 
         <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
-          {bigLeagues.map((league) => (
-            <Link
-              key={league.slug}
-              href={`/productos?liga=${league.slug}`}
-              className="group flex flex-col rounded-xl border border-border bg-card p-5 transition-all hover:border-foreground/40 hover:shadow-md"
-            >
-              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary font-display text-sm font-bold uppercase tracking-tight transition-colors group-hover:bg-foreground group-hover:text-background">
-                {LEAGUE_MONOGRAMS[league.slug] ?? league.name.slice(0, 3).toUpperCase()}
-              </span>
-              <span className="mt-4 font-display text-lg font-bold uppercase leading-tight tracking-tight">
-                {league.name}
-              </span>
-              <span className="mt-1 text-xs text-muted-foreground">
-                {league.productCount > 0
-                  ? `${league.productCount} producto${league.productCount !== 1 ? "s" : ""}`
-                  : "Próximamente"}
-              </span>
-              <span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground transition-colors group-hover:text-foreground">
-                Ver liga
-                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-              </span>
-            </Link>
-          ))}
+          {bigLeagues.map((league) => {
+            const logoSrc = leagueLogoSrc(league.slug);
+            return (
+              <Link
+                key={league.slug}
+                href={`/productos?liga=${league.slug}`}
+                className="group flex flex-col rounded-xl border border-border bg-card p-5 transition-all hover:border-foreground/40 hover:shadow-md"
+              >
+                <span className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-secondary p-1.5 transition-colors group-hover:bg-foreground/5">
+                  {logoSrc ? (
+                    <Image
+                      src={logoSrc}
+                      alt=""
+                      width={44}
+                      height={44}
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <span className="font-display text-sm font-bold uppercase tracking-tight group-hover:text-foreground">
+                      {leagueMonogram(league.slug, league.name)}
+                    </span>
+                  )}
+                </span>
+                <span className="mt-4 font-display text-lg font-bold uppercase leading-tight tracking-tight">
+                  {league.name}
+                </span>
+                <span className="mt-1 text-xs text-muted-foreground">
+                  {league.productCount > 0
+                    ? `${league.productCount} producto${league.productCount !== 1 ? "s" : ""}`
+                    : "Próximamente"}
+                </span>
+                <span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground transition-colors group-hover:text-foreground">
+                  Ver liga
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </section>
 

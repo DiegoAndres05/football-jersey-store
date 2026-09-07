@@ -10,10 +10,13 @@ coverage
 .next/
 out/
 build
+dist/
 
 # misc
 .DS_Store
 *.pem
+.vscode/
+.idea/
 
 # debug
 npm-debug.log*

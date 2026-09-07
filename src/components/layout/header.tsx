@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NavLinks } from "./nav-links";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { SITE } from "@/shared/config/site";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
@@ -15,6 +16,7 @@ export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
   const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isDesktopMenuOpen, setIsDesktopMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -34,6 +36,26 @@ export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
       document.body.style.overflow = "";
     };
   }, [isMobileOpen]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const handleBreakpointChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setIsMobileOpen(false);
+      } else {
+        setIsDesktopMenuOpen(false);
+      }
+    };
+
+    if (mediaQuery.matches) {
+      setIsMobileOpen(false);
+    } else {
+      setIsDesktopMenuOpen(false);
+    }
+
+    mediaQuery.addEventListener("change", handleBreakpointChange);
+    return () => mediaQuery.removeEventListener("change", handleBreakpointChange);
+  }, []);
 
   const submitSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -105,13 +127,47 @@ export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
               </Link>
             </Button>
 
-            <div className="hidden md:block">
+            {/* <div className="hidden xl:block">
               <FavoritesBadge />
-            </div>
+            </div> */}
 
-            <Button variant="ghost" size="icon" asChild aria-label="Vistos recientemente" className="hidden md:inline-flex"><Link href="/productos#vistos-recientemente"><History className="h-5 w-5" /></Link></Button>
+            {/* <Button variant="ghost" size="icon" asChild aria-label="Vistos recientemente" className="hidden xl:inline-flex"><Link href="/productos#vistos-recientemente"><History className="h-5 w-5" /></Link></Button> */}
 
             <CartBadge />
+
+            <Popover open={isDesktopMenuOpen} onOpenChange={setIsDesktopMenuOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hidden lg:inline-flex"
+                  aria-label={isDesktopMenuOpen ? "Cerrar menú" : "Abrir menú"}
+                  aria-expanded={isDesktopMenuOpen}
+                >
+                  <Menu className="h-5 w-5" aria-hidden="true" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64">
+                <nav aria-label="Accesos rápidos" className="space-y-1">
+                  <Link
+                    href="/favoritos"
+                    onClick={() => setIsDesktopMenuOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Heart className="h-4 w-4" aria-hidden="true" />
+                    Favoritos
+                  </Link>
+                  <Link
+                    href="/productos#vistos-recientemente"
+                    onClick={() => setIsDesktopMenuOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <History className="h-4 w-4" aria-hidden="true" />
+                    Vistos recientemente
+                  </Link>
+                </nav>
+              </PopoverContent>
+            </Popover>
 
             <Button
               variant="ghost"
