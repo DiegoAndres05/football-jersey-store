@@ -12,12 +12,14 @@ import {
   createVariantsForAllSizes,
 } from "@/features/catalog/server/variant-service";
 import { deleteProductIfAllowed } from "@/features/catalog/server/product-delete";
+import { deleteVariantIfAllowed } from "@/features/catalog/server/variant-delete";
+import { setProductActiveIfExists } from "@/features/catalog/server/product-visibility";
 import { saveError, type AdminSaveResult } from "@/shared/admin/admin-save-result";
 
 /**
  * CRUD de catálogo (FASE 4). Solo admin (cookie firmada).
- * deleteProductAction devuelve AdminSaveResult (nunca lanza) para que la UI
- * muestre toast/mensaje. El resto de acciones aún propagan Error a error.tsx.
+ * deleteProductAction, deleteVariantAction y setProductActiveAction
+ * devuelven AdminSaveResult (nunca lanzan) para que la UI muestre toast.
  */
 
 async function requireAdmin() {
@@ -252,6 +254,27 @@ export async function deleteProductAction(productId: string): Promise<AdminSaveR
   return result;
 }
 
+export async function setProductActiveAction(
+  productId: string,
+  isActive: boolean,
+): Promise<AdminSaveResult> {
+  const admin = await getSessionUser();
+  if (!admin) return saveError("No autorizado.");
+
+  const result = await setProductActiveIfExists(productId, isActive, {
+    findProduct: (id) => prisma.product.findUnique({ where: { id }, select: { id: true } }),
+    setActive: (id, next) =>
+      prisma.product.update({ where: { id }, data: { isActive: next } }).then(() => undefined),
+  });
+
+  if (result.ok) {
+    revalidatePath("/admin/productos");
+    revalidatePath("/productos");
+    revalidatePath("/");
+  }
+  return result;
+}
+
 // ---------------- VARIANTES ----------------
 
 const variantSchema = z.object({
@@ -360,21 +383,29 @@ export async function updateVariantAction(variantId: string, formData: FormData)
   redirect(`/admin/productos/${variant.product.slug}/variantes`);
 }
 
-export async function deleteVariantAction(variantId: string) {
-  await requireAdmin();
-  const variant = await prisma.productVariant.findUnique({
-    where: { id: variantId },
-    include: { product: { select: { slug: true } } },
+export async function deleteVariantAction(variantId: string): Promise<AdminSaveResult> {
+  const admin = await getSessionUser();
+  if (!admin) return saveError("No autorizado.");
+
+  const result = await deleteVariantIfAllowed(variantId, {
+    findVariant: async (id) => {
+      const variant = await prisma.productVariant.findUnique({
+        where: { id },
+        include: { product: { select: { slug: true } } },
+      });
+      if (!variant) return null;
+      const movementCount = await prisma.inventoryMovement.count({ where: { variantId: id } });
+      return { id: variant.id, productSlug: variant.product.slug, movementCount };
+    },
+    deleteVariant: (id) => prisma.productVariant.delete({ where: { id } }).then(() => undefined),
   });
-  if (!variant) throw new Error("La variante no existe.");
-  const movements = await prisma.inventoryMovement.count({ where: { variantId } });
-  if (movements > 0) {
-    throw new Error(
-      `No se puede eliminar: tiene ${movements} movimiento(s) de inventario. Conserva el histórico.`,
-    );
+
+  if (result.ok) {
+    revalidatePath(`/admin/productos/${result.productSlug}/variantes`);
+    revalidatePath("/admin/productos");
+    return { ok: true };
   }
-  await prisma.productVariant.delete({ where: { id: variantId } });
-  redirect(`/admin/productos/${variant.product.slug}/variantes`);
+  return result;
 }
 
 export async function adjustStockAction(variantId: string, formData: FormData) {

@@ -42,7 +42,7 @@ test("productDeleteBlockedMessage: tono del admin", () => {
   const msg = productDeleteBlockedMessage(["20 variante(s)", "3 proveedor(es)"]);
   assert.equal(
     msg,
-    "No se puede eliminar: tiene 20 variante(s) y 3 proveedor(es). Quita primero esas dependencias.",
+    "No se puede eliminar: tiene 20 variante(s) y 3 proveedor(es). Quita primero esas dependencias, o ocúltalo de la tienda (desactivar).",
   );
 });
 
@@ -80,7 +80,7 @@ test("deleteProductIfAllowed: bloqueado con variantes no toca la BD", async () =
   const result = await deleteProductIfAllowed("prod-1", deps);
   assert.deepEqual(result, {
     ok: false,
-    error: "No se puede eliminar: tiene 20 variante(s) y 3 proveedor(es). Quita primero esas dependencias.",
+    error: "No se puede eliminar: tiene 20 variante(s) y 3 proveedor(es). Quita primero esas dependencias, o ocúltalo de la tienda (desactivar).",
   });
   assert.deepEqual(calls.deleted, []);
   assert.deepEqual(calls.images, []);

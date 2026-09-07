@@ -25,5 +25,5 @@ export function formatReasonList(reasons: string[]): string {
 }
 
 export function productDeleteBlockedMessage(reasons: string[]): string {
-  return `No se puede eliminar: tiene ${formatReasonList(reasons)}. Quita primero esas dependencias.`;
+  return `No se puede eliminar: tiene ${formatReasonList(reasons)}. Quita primero esas dependencias, o ocúltalo de la tienda (desactivar).`;
 }

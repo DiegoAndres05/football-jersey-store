@@ -16,7 +16,7 @@ import {
 import { whatsappLink } from "@/shared/config/site";
 import { HeroProduct } from "@/components/home/hero-product";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
-import { slidesForFeaturedCarousel } from "@/features/products/domain/featured-carousel-slides";
+import { getHomepageCarouselSlides } from "@/features/products/repositories/homepage-carousel-repository";
 import { FeaturedCoverflowCarousel } from "@/features/products/components/featured-coverflow-carousel";
 
 const BIG_LEAGUES = ["premier-league", "la-liga", "serie-a", "bundesliga", "ligue-1"] as const;
@@ -37,7 +37,12 @@ const TRUST_ITEMS = [
 ] as const;
 
 export default async function HomePage() {
-  const [featured, leagues, currencyCtx] = await Promise.all([getFeaturedProducts(8), getLeagues(), getCurrencyContext()]);
+  const [featured, leagues, currencyCtx, coverflowSlides] = await Promise.all([
+    getFeaturedProducts(8),
+    getLeagues(),
+    getCurrencyContext(),
+    getHomepageCarouselSlides(),
+  ]);
 
   const heroProduct = featured[0] ?? null;
 
@@ -47,7 +52,6 @@ export default async function HomePage() {
   );
 
   const featuredProducts = featured.slice(0, 4);
-  const coverflowSlides = slidesForFeaturedCarousel(featured);
 
   return (
     <div>
@@ -104,7 +108,7 @@ export default async function HomePage() {
       </div>
 
       {/* ── FEATURED COVERFLOW ──────────────────────────────────────── */}
-      {coverflowSlides.length >= 2 && (
+      {coverflowSlides.length >= 1 && (
         <FeaturedCoverflowCarousel items={coverflowSlides} />
       )}
 

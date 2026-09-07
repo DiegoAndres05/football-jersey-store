@@ -5,10 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ProductCardData } from "@/features/products/types/product-types";
+import type { HomepageCarouselSlide } from "@/features/products/domain/homepage-carousel-slides";
 
 interface FeaturedCoverflowCarouselProps {
-  items: ProductCardData[];
+  items: HomepageCarouselSlide[];
 }
 
 export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselProps) {
@@ -19,8 +19,8 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
   const touchEndX = useRef<number>(0);
 
   const total = items.length;
+  const showControls = total >= 2;
 
-  // Respect prefers-reduced-motion
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   useEffect(() => {
     const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -30,14 +30,13 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
     return () => mql.removeEventListener("change", handler);
   }, []);
 
-  // Autoplay
   useEffect(() => {
-    if (total < 2 || isPaused || prefersReducedMotion) return;
+    if (!showControls || isPaused || prefersReducedMotion) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % total);
     }, 5000);
     return () => clearInterval(interval);
-  }, [total, isPaused, prefersReducedMotion]);
+  }, [showControls, isPaused, prefersReducedMotion, total]);
 
   const goTo = useCallback((index: number) => {
     setCurrentIndex(index);
@@ -51,9 +50,9 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
     setCurrentIndex((prev) => (prev + 1) % total);
   }, [total]);
 
-  // Keyboard navigation scoped to the section
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLElement>) => {
+      if (!showControls) return;
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         goPrev();
@@ -62,10 +61,9 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
         goNext();
       }
     },
-    [goPrev, goNext],
+    [showControls, goPrev, goNext],
   );
 
-  // Touch / swipe
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
   };
@@ -73,6 +71,7 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
     touchEndX.current = e.touches[0].clientX;
   };
   const handleTouchEnd = () => {
+    if (!showControls) return;
     const delta = touchStartX.current - touchEndX.current;
     if (Math.abs(delta) > 50) {
       if (delta > 0) goNext();
@@ -80,14 +79,12 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
     }
   };
 
-  // Pause on hover/focus
   const pause = () => setIsPaused(true);
   const resume = () => setIsPaused(false);
 
-  // Early return if less than 2 items
-  if (total < 2) return null;
+  if (total < 1) return null;
 
-  const current = items[currentIndex];
+  const current = items[currentIndex] ?? items[0];
 
   return (
     <section
@@ -101,7 +98,6 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
       onBlur={resume}
       onKeyDown={handleKeyDown}
     >
-      {/* Title */}
       <div className="mx-auto mb-8 max-w-7xl px-4 text-center">
         <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
           Destacadas
@@ -113,7 +109,6 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
         )}
       </div>
 
-      {/* Stage */}
       <div
         className="relative mx-auto h-[400px] max-w-5xl px-12 md:h-[500px]"
         style={{ perspective: "1000px" }}
@@ -121,11 +116,9 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* 3D container */}
         <div className="relative h-full w-full" style={{ transformStyle: "preserve-3d" }}>
           {items.map((item, index) => {
             const offset = index - currentIndex;
-            // Wrap around for infinite feel
             const wrappedOffset =
               offset > total / 2
                 ? offset - total
@@ -134,7 +127,7 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
                   : offset;
 
             const isActive = wrappedOffset === 0;
-            const translateX = isActive ? 0 : wrappedOffset * 40; // percent
+            const translateX = isActive ? 0 : wrappedOffset * 40;
             const rotateY = isActive ? 0 : wrappedOffset * -15;
             const scale = isActive ? 1 : 0.85;
             const zIndex = isActive ? 10 : 5 - Math.abs(wrappedOffset);
@@ -142,7 +135,7 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
 
             return (
               <div
-                key={item.id}
+                key={item.imageId}
                 className="absolute inset-0 transition-all duration-500 ease-in-out"
                 style={{
                   transform: `translateX(${translateX}%) rotateY(${rotateY}deg) scale(${scale})`,
@@ -154,28 +147,18 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
                   if (!isActive) goTo(index);
                 }}
               >
-                {/* Card */}
                 <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
-                  {/* Image */}
-                  {item.primaryImage ? (
-                    <Image
-                      src={item.primaryImage.url}
-                      alt={item.primaryImage.altText ?? item.name}
-                      fill
-                      sizes="(max-width: 768px) 80vw, 50vw"
-                      className="object-cover"
-                      priority={isActive}
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center bg-secondary text-muted-foreground">
-                      Sin imagen
-                    </div>
-                  )}
+                  <Image
+                    src={item.url}
+                    alt={item.altText ?? item.name}
+                    fill
+                    sizes="(max-width: 768px) 80vw, 50vw"
+                    className="object-cover"
+                    priority={isActive}
+                  />
 
-                  {/* Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-                  {/* Content */}
                   <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
                     <h3 className="text-lg font-semibold text-white md:text-xl">
                       {item.name}
@@ -210,41 +193,45 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
           })}
         </div>
 
-        {/* Arrows */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background z-20"
-          onClick={goPrev}
-          aria-label="Anterior"
-        >
-          <ChevronLeft className="h-6 w-6" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background z-20"
-          onClick={goNext}
-          aria-label="Siguiente"
-        >
-          <ChevronRight className="h-6 w-6" />
-        </Button>
+        {showControls && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute left-2 top-1/2 z-20 -translate-y-1/2 bg-background/80 hover:bg-background"
+              onClick={goPrev}
+              aria-label="Anterior"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-1/2 z-20 -translate-y-1/2 bg-background/80 hover:bg-background"
+              onClick={goNext}
+              aria-label="Siguiente"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </Button>
+          </>
+        )}
       </div>
 
-      {/* Dots */}
-      <div className="mt-6 flex justify-center gap-2">
-        {items.map((item, index) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-label={`Ir a ${item.name}`}
-            className={`h-2 w-2 rounded-full transition-colors ${
-              index === currentIndex ? "bg-primary" : "bg-muted"
-            }`}
-            onClick={() => goTo(index)}
-          />
-        ))}
-      </div>
+      {showControls && (
+        <div className="mt-6 flex justify-center gap-2">
+          {items.map((item, index) => (
+            <button
+              key={item.imageId}
+              type="button"
+              aria-label={`Ir a ${item.name}`}
+              className={`h-2 w-2 rounded-full transition-colors ${
+                index === currentIndex ? "bg-primary" : "bg-muted"
+              }`}
+              onClick={() => goTo(index)}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

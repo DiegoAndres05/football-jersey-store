@@ -7,8 +7,14 @@ import {
   updateProductAction,
 } from "@/features/catalog/server/catalog-actions";
 import { ProductDeleteButton } from "@/features/catalog/components/product-delete-button";
+import { ProductVisibilityButton } from "@/features/catalog/components/product-visibility-button";
 import { KIT_TYPES } from "@/features/catalog/types/kit-types";
 import { getTeams, getSeasons } from "@/features/catalog/server/reference-cache";
+import { HomepageCarouselPicker } from "@/features/products/components/homepage-carousel-picker";
+import {
+  getHomepageCarouselImageIds,
+  listEligibleCarouselPhotos,
+} from "@/features/products/repositories/homepage-carousel-repository";
 
 export const metadata: Metadata = {
   title: "Productos · Flashsport Admin",
@@ -16,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminProductsPage() {
-  const [products, teams, seasons] = await Promise.all([
+  const [products, teams, seasons, carouselPhotos, selectedCarouselIds] = await Promise.all([
     prisma.product.findMany({
       orderBy: { name: "asc" },
       include: {
@@ -26,6 +32,8 @@ export default async function AdminProductsPage() {
     }),
     getTeams(),
     getSeasons(),
+    listEligibleCarouselPhotos(),
+    getHomepageCarouselImageIds(),
   ]);
 
   const productInputs = (p: (typeof products)[number]) => (
@@ -72,9 +80,15 @@ export default async function AdminProductsPage() {
           Productos <span className="text-muted-foreground">({products.length})</span>
         </h2>
         <p className="text-sm text-muted-foreground">
-          Crea y edita productos. No se puede eliminar un producto con variantes, proveedores o imágenes.
+          Crea y edita productos. Si tiene variantes, proveedores o imágenes no se puede borrar: usa
+          «Ocultar de la tienda» para que deje de venderse. El historial de stock se conserva.
         </p>
       </div>
+
+      <HomepageCarouselPicker
+        photos={carouselPhotos}
+        initialSelectedIds={selectedCarouselIds}
+      />
 
       <form
         action={createProductAction}
@@ -146,6 +160,11 @@ export default async function AdminProductsPage() {
               <tr key={p.id} className="border-b border-border last:border-b-0 align-top">
                 <td className="px-4 py-3 font-medium">
                   {p.name}
+                  {!p.isActive && (
+                    <span className="ml-2 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Oculto
+                    </span>
+                  )}
                   <span className="block text-xs font-normal text-muted-foreground">
                     {p._count.variants} variante(s) · {p._count.supplierProducts} proveedor(es)
                   </span>
@@ -179,6 +198,11 @@ export default async function AdminProductsPage() {
                     >
                       Variantes
                     </Link>
+                    <ProductVisibilityButton
+                      productId={p.id}
+                      productName={p.name}
+                      isActive={p.isActive}
+                    />
                     <ProductDeleteButton
                       productId={p.id}
                       productName={p.name}

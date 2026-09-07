@@ -6,9 +6,9 @@ import { prisma } from "@/lib/prisma";
 import {
   createVariantAction,
   updateVariantAction,
-  deleteVariantAction,
   adjustStockAction,
 } from "@/features/catalog/server/catalog-actions";
+import { VariantDeleteButton } from "@/features/catalog/components/variant-delete-button";
 import { getVersions, getSizes } from "@/features/catalog/server/reference-cache";
 
 export const metadata: Metadata = {
@@ -37,8 +37,10 @@ export default async function AdminProductVariantsPage({
     by: ["variantId"],
     where: { variantId: { in: product.variants.map((v) => v.id) } },
     _sum: { quantity: true },
+    _count: { _all: true },
   });
   const stockByVariant = new Map(movements.map((m) => [m.variantId, m._sum.quantity ?? 0]));
+  const movementCountByVariant = new Map(movements.map((m) => [m.variantId, m._count._all]));
 
   return (
     <div className="space-y-6">
@@ -53,7 +55,8 @@ export default async function AdminProductVariantsPage({
           Variantes · {product.name}
         </h2>
         <p className="text-sm text-muted-foreground">
-          {product.team.name} · el stock se calcula como la suma del ledger de inventario.
+          {product.team.name} · el stock se calcula como la suma del ledger. Una variante con
+          movimientos de inventario no se puede borrar.
         </p>
       </div>
 
@@ -107,6 +110,7 @@ export default async function AdminProductVariantsPage({
             <tbody>
               {product.variants.map((v) => {
                 const stock = stockByVariant.get(v.id) ?? 0;
+                const movementCount = movementCountByVariant.get(v.id) ?? 0;
                 const low = v.lowStockAt !== null && stock <= v.lowStockAt;
                 return (
                   <tr key={v.id} className="border-b border-border last:border-b-0 align-top">
@@ -147,11 +151,11 @@ export default async function AdminProductVariantsPage({
                             Ajustar
                           </button>
                         </form>
-                        <form action={deleteVariantAction.bind(null, v.id)}>
-                          <button type="submit" className="rounded-md border border-destructive/30 px-2.5 py-1 text-xs text-destructive hover:bg-destructive/10 transition-colors">
-                            Eliminar
-                          </button>
-                        </form>
+                        <VariantDeleteButton
+                          variantId={v.id}
+                          label={`${v.size.name} · ${v.version.name}`}
+                          movementCount={movementCount}
+                        />
                       </div>
                     </td>
                   </tr>

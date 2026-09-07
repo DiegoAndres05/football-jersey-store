@@ -19,14 +19,9 @@ test("coverflow component file exists", () => {
   readComponent();
 });
 
-test("component uses slidesForFeaturedCarousel or exports FeaturedCoverflowCarousel", () => {
+test("component exports FeaturedCoverflowCarousel", () => {
   const source = readComponent();
-  const hasSelector = /slidesForFeaturedCarousel/.test(source);
-  const hasExport = /FeaturedCoverflowCarousel/.test(source);
-  assert.ok(
-    hasSelector || hasExport,
-    "Expected slidesForFeaturedCarousel import or FeaturedCoverflowCarousel export in component file",
-  );
+  assert.match(source, /FeaturedCoverflowCarousel/);
 });
 
 test("CTA text is Ver camiseta", () => {
@@ -102,9 +97,16 @@ test("page file exists and can be read", () => {
   readPage();
 });
 
-test("page imports or references slidesForFeaturedCarousel", () => {
+test("page loads homepage carousel slides, not featured products", () => {
   const page = readPage();
-  assert.match(page, /slidesForFeaturedCarousel/);
+  assert.match(page, /getHomepageCarouselSlides/);
+  assert.doesNotMatch(page, /slidesForFeaturedCarousel/);
+});
+
+test("page mounts coverflow when there is at least one slide", () => {
+  const page = readPage();
+  assert.match(page, /coverflowSlides\.length\s*>=\s*1/);
+  assert.doesNotMatch(page, /coverflowSlides\.length\s*>=\s*2/);
 });
 
 test("carousel placement: after trust bar and before Las grandes ligas", () => {
@@ -125,4 +127,12 @@ test("page does not contain restaurant demo artifacts", () => {
   assert.doesNotMatch(page, /Butter Chicken/);
   assert.doesNotMatch(page, /defaultDishes/);
   assert.doesNotMatch(page, /cdn\.21st\.dev/);
+});
+
+test("coverflow renders a single slide instead of returning null", () => {
+  const source = readComponent();
+  assert.doesNotMatch(source, /if \(total < 2\) return null/);
+  assert.match(source, /item\.imageId/);
+  assert.match(source, /item\.url/);
+  assert.doesNotMatch(source, /primaryImage/);
 });
