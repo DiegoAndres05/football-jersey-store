@@ -4,9 +4,19 @@ import { prepareBoldPayment } from "@/features/payments/services/bold-service";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "El cuerpo de la solicitud no es válido." }, { status: 400 });
+    }
     const { orderId, amount, currency } = body;
 
-    if (orderId == null || amount == null || !currency) {
+    if (
+      typeof orderId !== "string" ||
+      (typeof amount !== "number" && typeof amount !== "string") ||
+      (typeof amount === "number" && !Number.isFinite(amount)) ||
+      (typeof amount === "string" && amount.trim() === "") ||
+      typeof currency !== "string" ||
+      currency.trim() === ""
+    ) {
       return NextResponse.json({ error: "Faltan parámetros: orderId, amount, currency." }, { status: 400 });
     }
 

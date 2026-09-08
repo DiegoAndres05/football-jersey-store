@@ -16,8 +16,9 @@ function getBoldConfig() {
 
 /**
  * Generate integrity hash for Bold checkout.
- * Hash = SHA-256({orderId}{amount}{currency}{secretKey})
+ * Hash = SHA-256 of {orderId}{amount}{currency}{secretKey}
  * Must be generated server-side (secret key never exposed to frontend).
+ * Amount must be integer (no decimals) per Bold docs.
  */
 export function generateBoldIntegrityHash(
   orderId: string,
