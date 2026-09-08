@@ -26,6 +26,11 @@ const AVAILABILITY_OPTIONS = [
   { value: "OUT_OF_STOCK", label: "Agotado" },
 ] as const;
 
+const DELIVERY_MODE_OPTIONS = [
+  { value: "INMEDIATA", label: "Entrega inmediata" },
+  { value: "BAJO_PEDIDO", label: "Bajo pedido" },
+] as const;
+
 function Chip({
   active,
   onClick,
@@ -89,6 +94,7 @@ export function ProductFilters({
     version: searchParams.get("version") ?? "",
     size: searchParams.get("talla") ?? "",
     availability: searchParams.get("disponibilidad") ?? "",
+    deliveryMode: searchParams.get("modalidad") ?? "",
     search: searchParams.get("q") ?? "",
     sort: searchParams.get("sort") ?? "default",
   };
@@ -183,6 +189,25 @@ export function ProductFilters({
               disabled={isPending}
               onClick={() =>
                 setParam("disponibilidad", active.availability === opt.value ? "" : opt.value)
+              }
+            >
+              {opt.label}
+            </Chip>
+          ))}
+        </div>
+      </div>
+
+      {/* Delivery mode */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-2 block">Modalidad de entrega</label>
+        <div className="flex flex-wrap gap-1.5">
+          {DELIVERY_MODE_OPTIONS.map((opt) => (
+            <Chip
+              key={opt.value}
+              active={active.deliveryMode === opt.value}
+              disabled={isPending}
+              onClick={() =>
+                setParam("modalidad", active.deliveryMode === opt.value ? "" : opt.value)
               }
             >
               {opt.label}

@@ -7,11 +7,19 @@ import type { CurrencyContext } from "@/shared/money/server-helpers";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/shared/money/format";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
+import { listingAvailabilityFromCardFlags } from "@/features/products/domain/listing-availability";
+import { cn } from "@/lib/utils";
 
 export function ProductCard({ product, priority, currencyContext }: { product: ProductCardData; priority?: boolean; currencyContext?: CurrencyContext }) {
   const isOutlet = product.season.isRetro;
   const favorite = useFavoritesStore((state) => state.isFavorite(product.id));
   const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+  const listing = listingAvailabilityFromCardFlags({
+    availability: product.availability,
+    canBackorder: product.canBackorder,
+  });
+  const isSoldOut = listing === "SOLD_OUT";
+  const isBackorderOnly = listing === "BACKORDER_ONLY";
 
   const formatPrice = (amountCop: number) =>
     formatMoney({
@@ -23,16 +31,22 @@ export function ProductCard({ product, priority, currencyContext }: { product: P
   return (
     <Link
       href={`/productos/${product.slug}`}
-      className="group flex flex-col rounded-xl border border-border bg-card overflow-hidden transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn(
+        "group flex flex-col rounded-xl border border-border bg-card overflow-hidden transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        isSoldOut && "opacity-70",
+      )}
     >
-      <div className="relative aspect-[3/4] bg-secondary overflow-hidden">
+      <div className={cn("relative aspect-[3/4] bg-secondary overflow-hidden", isSoldOut && "grayscale")}>
         {product.primaryImage ? (
           <Image
             src={product.primaryImage.url}
             alt={product.primaryImage.altText ?? product.name}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className={cn(
+              "object-cover transition-transform duration-500 group-hover:scale-105",
+              isSoldOut && "grayscale",
+            )}
             priority={priority}
           />
         ) : (
@@ -75,16 +89,14 @@ export function ProductCard({ product, priority, currencyContext }: { product: P
         </p>
 
         <div className="mt-auto pt-2">
-          {product.availability === "OUT_OF_STOCK" ? (
-            product.canBackorder ? (
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-warning">
-                Bajo pedido · 15–20 días
-              </p>
-            ) : (
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-destructive">
-                Agotada
-              </p>
-            )
+          {isSoldOut ? (
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-destructive">
+              Agotada
+            </p>
+          ) : isBackorderOnly ? (
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-warning">
+              Bajo pedido · 15–20 días
+            </p>
           ) : product.availableSizes.length > 0 ? (
             <p className="text-[11px] tracking-wider text-muted-foreground">
               Tallas: <span className="text-foreground">{product.availableSizes.join(" · ")}</span>

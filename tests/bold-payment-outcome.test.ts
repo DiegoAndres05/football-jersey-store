@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   normalizeBoldOutcome,
   normalizeWebhookEventType,
+  parseReturnTxHint,
+  resolveReturnPersistence,
 } from "@/features/payments/domain/bold-payment-outcome";
 
 describe("normalizeBoldOutcome", () => {
@@ -106,6 +108,49 @@ describe("normalizeWebhookEventType", () => {
 
   it("returns null for undefined input", () => {
     assert.equal(normalizeWebhookEventType(undefined), null);
+  });
+});
+
+describe("resolveReturnPersistence", () => {
+  it("API APPROVED → APPLY_APPROVED regardless of hint", () => {
+    assert.equal(resolveReturnPersistence("APPROVED", "APPROVED"), "APPLY_APPROVED");
+    assert.equal(resolveReturnPersistence("APPROVED", "REJECTED"), "APPLY_APPROVED");
+    assert.equal(resolveReturnPersistence("APPROVED", null), "APPLY_APPROVED");
+  });
+
+  it("API REJECTED → APPLY_REJECTED even if hint is APPROVED", () => {
+    assert.equal(resolveReturnPersistence("REJECTED", "APPROVED"), "APPLY_REJECTED");
+    assert.equal(resolveReturnPersistence("REJECTED", null), "APPLY_REJECTED");
+  });
+
+  it("API PENDING/UNAVAILABLE + hint APPROVED → APPLY_APPROVED", () => {
+    assert.equal(resolveReturnPersistence("PENDING", "APPROVED"), "APPLY_APPROVED");
+    assert.equal(resolveReturnPersistence("UNAVAILABLE", "APPROVED"), "APPLY_APPROVED");
+  });
+
+  it("API PENDING/UNAVAILABLE + hint REJECTED/PENDING/null → NOOP (no fail from query)", () => {
+    assert.equal(resolveReturnPersistence("PENDING", "REJECTED"), "NOOP");
+    assert.equal(resolveReturnPersistence("PENDING", "PENDING"), "NOOP");
+    assert.equal(resolveReturnPersistence("PENDING", null), "NOOP");
+    assert.equal(resolveReturnPersistence("UNAVAILABLE", "REJECTED"), "NOOP");
+    assert.equal(resolveReturnPersistence("UNAVAILABLE", null), "NOOP");
+  });
+});
+
+describe("parseReturnTxHint", () => {
+  it("maps approved query → APPROVED", () => {
+    assert.equal(parseReturnTxHint("approved"), "APPROVED");
+  });
+
+  it("maps rejected query → REJECTED", () => {
+    assert.equal(parseReturnTxHint("rejected"), "REJECTED");
+  });
+
+  it("absent or empty → null", () => {
+    assert.equal(parseReturnTxHint(null), null);
+    assert.equal(parseReturnTxHint(undefined), null);
+    assert.equal(parseReturnTxHint(""), null);
+    assert.equal(parseReturnTxHint("   "), null);
   });
 });
 

@@ -9,7 +9,10 @@ export const productSortSchema = z.enum([
   "newest",
 ]);
 
+/** AVAILABLE = comprable; OUT_OF_STOCK = agotada total (sin inmediata ni bajo pedido). */
 export const productAvailabilitySchema = z.enum(["AVAILABLE", "OUT_OF_STOCK"]);
+
+export const productDeliveryModeSchema = z.enum(["INMEDIATA", "BAJO_PEDIDO"]);
 
 export const productFiltersParamsSchema = z.object({
   q: z.string().trim().max(100).optional(),
@@ -19,6 +22,7 @@ export const productFiltersParamsSchema = z.object({
   version: z.string().max(60).optional(),
   talla: z.string().max(10).optional(),
   disponibilidad: productAvailabilitySchema.optional(),
+  modalidad: productDeliveryModeSchema.optional(),
   sort: productSortSchema.optional(),
   page: z.coerce.number().int().positive().max(1000).optional(),
 });

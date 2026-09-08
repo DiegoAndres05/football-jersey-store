@@ -35,6 +35,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
       await reconcileBoldOrder({
         orderCode: code,
         boldOrderId,
+        returnTxStatus: boldTxStatus,
       });
 
       // Re-read order after reconciliation
@@ -74,7 +75,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
 
         {/* Title */}
         <h1 className="mt-5 font-display text-2xl md:text-3xl font-bold uppercase tracking-tight">
-          {uiMode === "paid" && "¡Pago confirmado!"}
+          {uiMode === "paid" && "Pago aprobado"}
           {uiMode === "failed" && "Pago rechazado"}
           {uiMode === "confirming" && "Confirmando pago…"}
           {uiMode === "pending" && "Pedido recibido"}
@@ -139,7 +140,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
           <div className="rounded-xl border border-border p-4">
             <dt className="text-xs text-muted-foreground uppercase tracking-wide">Estado</dt>
             <dd className="mt-1 font-medium">
-              {uiMode === "paid" && "Pago confirmado"}
+              {uiMode === "paid" && "Pago aprobado"}
               {uiMode === "failed" && "Pago rechazado"}
               {uiMode === "confirming" && "Confirmando…"}
               {uiMode === "pending" && "Pendiente de pago"}

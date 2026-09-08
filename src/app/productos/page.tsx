@@ -52,6 +52,7 @@ export default async function ProductosPage({ searchParams }: PageProps) {
     version: raw.version,
     size: raw.talla,
     availability: raw.disponibilidad,
+    deliveryMode: raw.modalidad,
     search: raw.q,
     sort: raw.sort,
     page: raw.page ?? 1,
@@ -275,6 +276,12 @@ function buildActiveFilters(
       label: "Disponibilidad",
       format: (v) => (v === "AVAILABLE" ? "Disponible" : "Agotado"),
     },
+    {
+      key: "modalidad",
+      param: "modalidad",
+      label: "Modalidad",
+      format: (v) => (v === "INMEDIATA" ? "Entrega inmediata" : "Bajo pedido"),
+    },
     { key: "q", param: "q", label: "Búsqueda", format: (v) => v },
     { key: "sort", param: "sort", label: "Orden", format: (v) => SORT_LABELS[v] ?? v },
   ];
@@ -330,6 +337,7 @@ function paramsToQuery(filters: FilterParams): string {
   if (filters.version) p.set("version", filters.version);
   if (filters.size) p.set("talla", filters.size);
   if (filters.availability) p.set("disponibilidad", filters.availability);
+  if (filters.deliveryMode) p.set("modalidad", filters.deliveryMode);
   if (filters.search) p.set("q", filters.search);
   if (filters.sort && filters.sort !== "default") p.set("sort", filters.sort);
   return p.toString() ? `&${p.toString()}` : "";

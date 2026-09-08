@@ -7,7 +7,7 @@ import type { BoldPaymentOutcome } from "@/features/payments/domain/bold-payment
  * Source of the payment event — distinguishes webhook from confirmation reconcile
  * in audit history.
  */
-export type BoldPaymentSource = "webhook" | "reconcile";
+export type BoldPaymentSource = "webhook" | "reconcile" | "return";
 
 export type ApplyBoldPaymentInput = {
   orderCode: string;

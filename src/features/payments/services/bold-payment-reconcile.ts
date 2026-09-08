@@ -1,11 +1,22 @@
 import "server-only";
 import { getBoldTransactionStatus } from "@/features/payments/services/bold-service";
-import { normalizeBoldOutcome, type BoldPaymentOutcome } from "@/features/payments/domain/bold-payment-outcome";
-import { applyBoldPayment, type ApplyBoldPaymentResult } from "@/features/orders/services/apply-bold-payment";
+import {
+  normalizeBoldOutcome,
+  parseReturnTxHint,
+  resolveReturnPersistence,
+  type BoldPaymentOutcome,
+} from "@/features/payments/domain/bold-payment-outcome";
+import {
+  applyBoldPayment,
+  type ApplyBoldPaymentResult,
+  type BoldPaymentSource,
+} from "@/features/orders/services/apply-bold-payment";
 
 export type ReconcileBoldOrderInput = {
   orderCode: string;
   boldOrderId?: string | null;
+  /** Raw `bold-tx-status` from confirmation URL */
+  returnTxStatus?: string | null;
 };
 
 export type ReconcileBoldOrderResult = {
@@ -14,43 +25,50 @@ export type ReconcileBoldOrderResult = {
 };
 
 /**
- * Reconcile a Bold order by querying the Bold transaction API.
+ * Reconcile a Bold order by querying the Bold transaction API, with optional
+ * return-URL fallback when the API is inconclusive and the hint is approved.
  *
- * 1. Primary lookup by orderCode.
- * 2. If inconclusive and boldOrderId is provided, secondary lookup.
- * 3. Map provider status → domain outcome.
- * 4. On APPROVED/REJECTED, apply the shared payment transition.
- * 5. On PENDING/UNAVAILABLE, do not change order status.
+ * @see specs/017-bold-retorno-aprobado/contracts/bold-payment-reconcile.md
  */
 export async function reconcileBoldOrder(
   input: ReconcileBoldOrderInput,
 ): Promise<ReconcileBoldOrderResult> {
-  const { orderCode, boldOrderId } = input;
+  const { orderCode, boldOrderId, returnTxStatus } = input;
 
-  // Primary lookup by order code
   let txStatus = await getBoldTransactionStatus(orderCode);
   let rawStatus = txStatus?.status ?? null;
 
-  // Secondary lookup by Bold transaction/order ID if primary was inconclusive
-  if (!rawStatus && boldOrderId) {
-    txStatus = await getBoldTransactionStatus(boldOrderId);
-    rawStatus = txStatus?.status ?? null;
+  if ((!rawStatus || normalizeBoldOutcome(rawStatus) === "PENDING") && boldOrderId) {
+    const secondary = await getBoldTransactionStatus(boldOrderId);
+    if (secondary?.status) {
+      txStatus = secondary;
+      rawStatus = secondary.status;
+    }
   }
 
-  const outcome = normalizeBoldOutcome(rawStatus);
+  // Null / missing API → treat as UNAVAILABLE for decision table (same as PENDING for fallback)
+  const apiOutcome: BoldPaymentOutcome = rawStatus
+    ? normalizeBoldOutcome(rawStatus)
+    : "UNAVAILABLE";
 
-  // Only apply on definitive outcomes
-  if (outcome === "APPROVED" || outcome === "REJECTED") {
-    const providerRef = txStatus?.transactionId ?? boldOrderId ?? undefined;
-    const apply = await applyBoldPayment({
-      orderCode,
-      outcome,
-      source: "reconcile",
-      providerRef,
-    });
-    return { outcome, apply };
+  const returnHint = parseReturnTxHint(returnTxStatus);
+  const action = resolveReturnPersistence(apiOutcome, returnHint);
+
+  if (action === "NOOP") {
+    return { outcome: apiOutcome === "UNAVAILABLE" ? "PENDING" : apiOutcome };
   }
 
-  // PENDING or UNAVAILABLE — no status change
-  return { outcome };
+  const providerRef = txStatus?.transactionId ?? boldOrderId ?? undefined;
+  const outcome = action === "APPLY_APPROVED" ? "APPROVED" : "REJECTED";
+  const source: BoldPaymentSource =
+    action === "APPLY_APPROVED" && apiOutcome !== "APPROVED" ? "return" : "reconcile";
+
+  const apply = await applyBoldPayment({
+    orderCode,
+    outcome,
+    source,
+    providerRef,
+  });
+
+  return { outcome, apply };
 }

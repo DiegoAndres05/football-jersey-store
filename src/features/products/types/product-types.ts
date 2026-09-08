@@ -26,13 +26,18 @@ export type ProductCardData = {
 
 export type Availability = "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK";
 
+/** Catalog delivery-mode filter (URL `modalidad`). Independent of disponibilidad. */
+export type DeliveryModeFilter = "INMEDIATA" | "BAJO_PEDIDO";
+
 export type ProductFilters = {
   league?: string;
   team?: string;
   season?: string;
   version?: string;
   size?: string;
+  /** AVAILABLE = purchasable; OUT_OF_STOCK = sold out total (not backorder-only). */
   availability?: Availability;
+  deliveryMode?: DeliveryModeFilter;
   search?: string;
   sort?: SortOption;
   page?: number;

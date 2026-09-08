@@ -1,4 +1,4 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read [specs/015-bold-confirmacion-pago/plan.md](../specs/015-bold-confirmacion-pago/plan.md)
+shell commands, and other information, read [specs/017-bold-retorno-aprobado/plan.md](../specs/017-bold-retorno-aprobado/plan.md)
 <!-- SPECKIT END -->

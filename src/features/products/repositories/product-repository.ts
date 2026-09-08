@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { buildProductWhere } from "./product-where";
+import { productMatchesCatalogFilters } from "../domain/catalog-filter-match";
 import type {
   ProductCardData,
   ProductListResult,
@@ -50,29 +51,37 @@ export async function getProducts(filters: ProductFilters): Promise<ProductListR
   const isPriceSort = filters.sort === "price-asc" || filters.sort === "price-desc";
   const hasAvailabilityFilter =
     filters.availability === "AVAILABLE" || filters.availability === "OUT_OF_STOCK";
+  const hasDeliveryModeFilter =
+    filters.deliveryMode === "INMEDIATA" || filters.deliveryMode === "BAJO_PEDIDO";
+  const hasPurchasableSizeFilter = Boolean(filters.size);
+  const needsVariantInfos =
+    hasAvailabilityFilter || hasDeliveryModeFilter || hasPurchasableSizeFilter;
 
-  // El sort por precio y el filtro de disponibilidad requieren agregados
-  // (min/max precio real y stock real del ledger), así que se calculan por
-  // lote sobre los candidatos y la paginación se hace sobre los ids filtrados.
-  if (isPriceSort || hasAvailabilityFilter) {
+  // Precio, disponibilidad (comprable), modalidad y talla comprable usan
+  // agregados de ledger / variant infos; la paginación va sobre ids filtrados.
+  if (isPriceSort || needsVariantInfos) {
     const candidateIds = (
       await prisma.product.findMany({ where, select: { id: true }, orderBy })
     ).map((p) => p.id);
 
     const rangesByProductId = await getPriceRangesByProductIds(candidateIds);
-    const variantInfosByProductId = hasAvailabilityFilter
+    const variantInfosByProductId = needsVariantInfos
       ? await getVariantInfosByProductIds(candidateIds)
       : undefined;
 
     let allowedIds = candidateIds;
 
-    if (hasAvailabilityFilter) {
-      allowedIds = candidateIds.filter((id) => {
-        const isAvailable = (variantInfosByProductId?.get(id) ?? []).some(
-          (info) => info.stock > 0,
-        );
-        return filters.availability === "AVAILABLE" ? isAvailable : !isAvailable;
-      });
+    if (needsVariantInfos && variantInfosByProductId) {
+      allowedIds = candidateIds.filter((id) =>
+        productMatchesCatalogFilters(variantInfosByProductId.get(id) ?? [], {
+          availability:
+            filters.availability === "AVAILABLE" || filters.availability === "OUT_OF_STOCK"
+              ? filters.availability
+              : undefined,
+          deliveryMode: filters.deliveryMode,
+          sizeCode: filters.size,
+        }),
+      );
     }
 
     if (isPriceSort) {

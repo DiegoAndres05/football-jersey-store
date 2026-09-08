@@ -69,3 +69,37 @@ export function normalizeWebhookEventType(eventType: string | null | undefined):
   if (t === "SALE_REJECTED") return "REJECTED";
   return null;
 }
+
+export type ResolveReturnAction = "APPLY_APPROVED" | "APPLY_REJECTED" | "NOOP";
+
+export type ReturnHint = Extract<BoldPaymentOutcome, "APPROVED" | "REJECTED" | "PENDING"> | null;
+
+/**
+ * Decide whether to persist PAID/FAILED after Bold API lookup + optional return hint.
+ * API REJECTED always wins. APPROVED hint can persist PAID when API is inconclusive.
+ * Never persist FAILED from return hint alone.
+ *
+ * @see specs/017-bold-retorno-aprobado/contracts/bold-payment-reconcile.md
+ */
+export function resolveReturnPersistence(
+  apiOutcome: BoldPaymentOutcome,
+  returnHint: ReturnHint,
+): ResolveReturnAction {
+  if (apiOutcome === "APPROVED") return "APPLY_APPROVED";
+  if (apiOutcome === "REJECTED") return "APPLY_REJECTED";
+  // PENDING / UNAVAILABLE
+  if (returnHint === "APPROVED") return "APPLY_APPROVED";
+  return "NOOP";
+}
+
+/**
+ * Parse raw `bold-tx-status` query into a return hint.
+ * Absent/empty param → null (do not invent PENDING from missing param).
+ */
+export function parseReturnTxHint(raw: string | null | undefined): ReturnHint {
+  if (raw == null) return null;
+  if (!raw.trim()) return null;
+  const outcome = normalizeBoldOutcome(raw);
+  if (outcome === "UNAVAILABLE") return null;
+  return outcome;
+}
