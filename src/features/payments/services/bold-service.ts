@@ -1,11 +1,13 @@
 import "server-only";
 import { createHmac } from "node:crypto";
+import { canonicalizeBoldSale } from "@/features/payments/domain/bold-checkout-attrs";
+import { computeBoldIntegritySignature } from "@/features/payments/domain/bold-integrity";
 
 const BOLD_API_BASE = "https://api.online.payments.bold.co";
 
 function getBoldConfig() {
-  const identityKey = process.env.BOLD_IDENTITY_KEY;
-  const secretKey = process.env.BOLD_SECRET_KEY;
+  const identityKey = process.env.BOLD_IDENTITY_KEY?.trim();
+  const secretKey = process.env.BOLD_SECRET_KEY?.trim();
   if (!identityKey || !secretKey) {
     throw new Error("Faltan BOLD_IDENTITY_KEY o BOLD_SECRET_KEY en las variables de entorno.");
   }
@@ -17,10 +19,27 @@ function getBoldConfig() {
  * Hash = SHA-256({orderId}{amount}{currency}{secretKey})
  * Must be generated server-side (secret key never exposed to frontend).
  */
-export function generateBoldIntegrityHash(orderId: string, amount: number, currency: string): string {
+export function generateBoldIntegrityHash(
+  orderId: string,
+  amount: number | string,
+  currency: string,
+): string {
   const { secretKey } = getBoldConfig();
-  const data = `${orderId}${amount}${currency}${secretKey}`;
-  return createHmac("sha256", secretKey).update(data).digest("hex");
+  return computeBoldIntegritySignature(orderId, amount, currency, secretKey);
+}
+
+export function prepareBoldPayment(input: {
+  orderId: string;
+  amount: number | string;
+  currency: string;
+}) {
+  const { identityKey, secretKey } = getBoldConfig();
+  const sale = canonicalizeBoldSale(input);
+  return {
+    ...sale,
+    hash: computeBoldIntegritySignature(sale.orderId, sale.amount, sale.currency, secretKey),
+    apiKey: identityKey,
+  };
 }
 
 /**
