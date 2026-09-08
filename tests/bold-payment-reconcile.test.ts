@@ -180,6 +180,10 @@ describe("reconcile API route correctness (source-level)", () => {
     assert.match(route, /status:\s*"PENDING"/);
   });
 
+  it("maps applied PAYMENT_FAILED to client status REJECTED", () => {
+    assert.match(route, /toStatus === "PAID" \? "PAID" : "REJECTED"/);
+  });
+
   it("returns proper status codes", () => {
     assert.match(route, /400/);
     assert.match(route, /404/);
@@ -239,6 +243,11 @@ describe("ConfirmationPaymentStatus client component (source-level)", () => {
   it("handles REJECTED response", () => {
     assert.match(component, /status === "REJECTED"/);
     assert.match(component, /setMode\("failed"\)/);
+  });
+
+  it("refreshes the confirmation page after PAID or REJECTED", () => {
+    assert.match(component, /useRouter/);
+    assert.match(component, /router\.refresh\(\)/);
   });
 
   it("clears timer on unmount", () => {

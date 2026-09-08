@@ -1,7 +1,12 @@
 import "server-only";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { notifyOrderPaid } from "@/features/notifications/services/notification-service";
 import type { BoldPaymentOutcome } from "@/features/payments/domain/bold-payment-outcome";
+import {
+  planReservationCancellations,
+  shouldReleaseReservations,
+} from "@/features/orders/repositories/inventory-plan";
 
 /**
  * Source of the payment event — distinguishes webhook from confirmation reconcile
@@ -26,11 +31,10 @@ export type ApplyBoldPaymentResult =
  *
  * - Only acts when order is in `PENDING_PAYMENT`.
  * - APPROVED → PAID + paidAt + history + notifyOrderPaid (fire-and-forget).
- * - REJECTED → PAYMENT_FAILED + history.
- * - Already PAID or other state → NOOP / NOT_PENDING.
- * - Order not found → NOT_FOUND.
- *
- * Designed to be called from both webhook and confirmation reconcile.
+ *   Inventory is unchanged (no SALE in this change).
+ * - REJECTED → PAYMENT_FAILED + history + CANCELLATION rows that reverse
+ *   this order's RESERVATION movements (same Prisma transaction).
+ * - Already PAID / PAYMENT_FAILED / other → NOOP / NOT_PENDING (no inventory).
  */
 export async function applyBoldPayment(
   input: ApplyBoldPaymentInput,
@@ -57,15 +61,19 @@ export async function applyBoldPayment(
       ? `Pago aprobado vía Bold ${source}.`
       : `Pago rechazado vía Bold ${source}.`;
 
+  let applied = false;
+  let productIdsToRevalidate: string[] = [];
+
   try {
     await prisma.$transaction(async (tx) => {
-      // Re-check status inside transaction for concurrency safety
+      await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${order.id} FOR UPDATE`;
+
       const current = await tx.order.findUnique({
         where: { id: order.id },
         select: { status: true },
       });
       if (!current || current.status !== "PENDING_PAYMENT") {
-        return; // another call already transitioned — no-op
+        return;
       }
 
       await tx.order.update({
@@ -85,16 +93,84 @@ export async function applyBoldPayment(
           note: note ?? defaultNote,
         },
       });
+
+      if (outcome === "REJECTED") {
+        const existingCancellationCount = await tx.inventoryMovement.count({
+          where: { orderReference: orderCode, type: "CANCELLATION" },
+        });
+
+        if (
+          shouldReleaseReservations({
+            currentStatus: current.status,
+            outcome,
+            existingCancellationCount,
+          })
+        ) {
+          const reservations = await tx.inventoryMovement.findMany({
+            where: { orderReference: orderCode, type: "RESERVATION" },
+            select: { variantId: true, quantity: true },
+          });
+          const cancellations = planReservationCancellations(reservations);
+          if (cancellations.length > 0) {
+            await tx.inventoryMovement.createMany({
+              data: cancellations.map((m) => ({
+                variantId: m.variantId,
+                type: "CANCELLATION",
+                quantity: m.quantity,
+                reference: orderCode,
+                orderReference: orderCode,
+                reason: "Liberación de reserva por pago rechazado (Bold).",
+              })),
+            });
+          }
+        }
+
+        const items = await tx.orderItem.findMany({
+          where: { orderId: order.id },
+          select: { productId: true },
+        });
+        productIdsToRevalidate = items
+          .map((item) => item.productId)
+          .filter((id): id is string => Boolean(id));
+      }
+
+      applied = true;
     });
   } catch (err) {
     console.error("[applyBoldPayment] Transaction failed:", err);
     return { applied: false, reason: "NOT_PENDING" };
   }
 
-  // Fire-and-forget notification for approved payments
+  if (!applied) {
+    return { applied: false, reason: "NOT_PENDING" };
+  }
+
   if (toStatus === "PAID") {
     void notifyOrderPaid(order.id).catch(() => undefined);
   }
 
+  if (toStatus === "PAYMENT_FAILED") {
+    try {
+      await revalidateCatalogAfterRejectedPayment(productIdsToRevalidate);
+    } catch (err) {
+      console.error("[applyBoldPayment] catalog revalidate failed:", err);
+    }
+  }
+
   return { applied: true, toStatus, orderId: order.id };
+}
+
+async function revalidateCatalogAfterRejectedPayment(productIds: string[]) {
+  revalidatePath("/productos");
+  revalidatePath("/");
+
+  if (productIds.length === 0) return;
+
+  const products = await prisma.product.findMany({
+    where: { id: { in: [...new Set(productIds)] } },
+    select: { slug: true },
+  });
+  for (const product of products) {
+    revalidatePath(`/productos/${product.slug}`);
+  }
 }

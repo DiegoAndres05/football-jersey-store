@@ -32,6 +32,6 @@
 ## Notes
 
 - Validation iteration 1 (2026-09-07): all items pass.
-- Relación con `015-bold-confirmacion-pago`: esta spec relaja “la query no basta para persistir pagado” **solo** cuando el retorno es `approved` y el proveedor no confirma un rechazo. El aviso asíncrono sigue siendo fuente de verdad en producción e idempotente.
-- “Consulta al proveedor” y “aviso asíncrono” son el comportamiento del cobro Bold, no un stack (Next.js, Prisma, etc.).
-- Listo para `/speckit.clarify` o `/speckit.plan`.
+- Clarification 2026-09-08: Option B — Bold API/webhook are the only payment authority; URL is not.
+- Relación con código: `resolveReturnPersistence` ignora returnHint; REJECTED libera RESERVATION.
+- Listo para `/speckit.plan`.

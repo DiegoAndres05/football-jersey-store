@@ -39,3 +39,40 @@ export function planInventoryMovements(
   }
   return { ok: true, movements };
 }
+
+export type ReservationRow = {
+  variantId: string;
+  quantity: number;
+};
+
+/**
+ * Compensates RESERVATION rows (signed negatives from createOrder) with
+ * CANCELLATION quantities that restore SUM(quantity) per variant.
+ * Empty input (e.g. only BAJO_PEDIDO) → no movements.
+ */
+export function planReservationCancellations(
+  reservations: readonly ReservationRow[],
+): PlannedMovement[] {
+  const byVariant = new Map<string, number>();
+  for (const row of reservations) {
+    const restore = -row.quantity;
+    if (restore === 0) continue;
+    byVariant.set(row.variantId, (byVariant.get(row.variantId) ?? 0) + restore);
+  }
+  return [...byVariant.entries()].map(([variantId, quantity]) => ({
+    variantId,
+    quantity,
+  }));
+}
+
+export function shouldReleaseReservations(input: {
+  currentStatus: string;
+  outcome: "APPROVED" | "REJECTED";
+  existingCancellationCount: number;
+}): boolean {
+  return (
+    input.currentStatus === "PENDING_PAYMENT" &&
+    input.outcome === "REJECTED" &&
+    input.existingCancellationCount === 0
+  );
+}

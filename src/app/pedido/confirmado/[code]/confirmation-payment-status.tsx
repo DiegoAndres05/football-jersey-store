@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, RotateCcw } from "lucide-react";
 
 type ReconcileStatus = "PAID" | "REJECTED" | "PENDING" | "ERROR";
@@ -21,6 +22,7 @@ export function ConfirmationPaymentStatus({
   orderCode: string;
   boldOrderId?: string | null;
 }) {
+  const router = useRouter();
   const [mode, setMode] = useState(initialMode);
   const [attempt, setAttempt] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -58,11 +60,13 @@ export function ConfirmationPaymentStatus({
 
     if (status === "PAID") {
       setMode("paid");
+      router.refresh();
       return;
     }
 
     if (status === "REJECTED") {
       setMode("failed");
+      router.refresh();
       return;
     }
 
@@ -76,7 +80,7 @@ export function ConfirmationPaymentStatus({
       }
       return next;
     });
-  }, [callReconcile]);
+  }, [callReconcile, router]);
 
   // Start initial reconciliation on mount
   useEffect(() => {

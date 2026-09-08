@@ -33,13 +33,9 @@ export type ReconcileBoldOrderResult = {
 };
 
 /**
- * Reconcile a Bold order by querying the Bold transaction API, with optional
- * return-URL fallback when the API is inconclusive and the hint is approved.
- *
- * When `returnTxStatus` is omitted, the server relies solely on Bold's API
- * response — no client-provided payment status is trusted.
- *
- * @see specs/017-bold-retorno-aprobado/contracts/bold-payment-reconcile.md
+ * Reconcile a Bold order by querying the Bold transaction API.
+ * `returnTxStatus` is accepted for compatibility but ignored by
+ * `resolveReturnPersistence` (Bold API is the sole payment authority).
  */
 export async function reconcileBoldOrder(
   input: ReconcileBoldOrderInput,

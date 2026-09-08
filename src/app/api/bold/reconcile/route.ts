@@ -80,12 +80,13 @@ export async function POST(request: Request) {
       // Intentionally omit returnTxStatus — server queries Bold directly
     });
 
-    // 4. Return outcome
+    // 4. Return outcome — client contract: PAID | REJECTED | PENDING | ERROR
     if (result.apply?.applied) {
       console.log(
         `[Bold Reconcile API] Order ${orderCode}: finalized → ${result.apply.toStatus}`,
       );
-      return NextResponse.json({ status: result.apply.toStatus });
+      const status = result.apply.toStatus === "PAID" ? "PAID" : "REJECTED";
+      return NextResponse.json({ status });
     }
 
     if (result.outcome === "PENDING" || result.outcome === "UNAVAILABLE") {
