@@ -64,13 +64,13 @@ describe("P0 Security: reconcile endpoint accepts no payment status from client"
 
   it("Zod schema does not accept 'returnTxStatus'", () => {
     // The string 'returnTxStatus' appears in a comment, not in the Zod schema or function params
-    const zodMatch = route.match(/ReconcileSchema\s*=\s*z\.object\(\{[^}]+\}\)/s);
+    const zodMatch = route.match(/ReconcileSchema\s*=\s*z\.object\(\{[^}]+\}\)/);
     assert.ok(zodMatch, "Zod schema found");
     assert.doesNotMatch(zodMatch[0], /returnTxStatus/, "Zod schema does not define returnTxStatus");
   });
 
   it("Zod schema does not accept 'bold-tx-status'", () => {
-    const zodMatch = route.match(/ReconcileSchema\s*=\s*z\.object\(\{[^}]+\}\)/s);
+    const zodMatch = route.match(/ReconcileSchema\s*=\s*z\.object\(\{[^}]+\}\)/);
     assert.ok(zodMatch, "Zod schema found");
     assert.doesNotMatch(zodMatch[0], /bold-tx-status/, "Zod schema does not define bold-tx-status");
   });
