@@ -15,6 +15,7 @@
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
     "admin:password": "tsx scripts/admin-set-password.ts",
     "studio": "prisma studio",
+    "clean:orders": "tsx scripts/clean-orders.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

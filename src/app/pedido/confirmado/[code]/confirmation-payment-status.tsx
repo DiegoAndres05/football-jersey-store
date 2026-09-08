@@ -1,55 +1,139 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, RotateCcw } from "lucide-react";
+
+type ReconcileStatus = "PAID" | "REJECTED" | "PENDING" | "ERROR";
 
 /**
- * Client component that polls (router.refresh) while the payment is in
- * "confirming" state. Stops when status resolves to paid/failed or
- * attempts are exhausted — never marks as failed by timeout.
+ * Client component that calls POST /api/bold/reconcile to verify payment
+ * status with the Bold API. Uses bounded polling for PENDING states.
  *
- * Spec: T015 — soft-retry ~2s × 3–4.
+ * Security: Never sends bold-tx-status or any client-provided payment status.
+ * Only sends orderCode + optional boldOrderId for server-side lookup.
  */
 export function ConfirmationPaymentStatus({
   initialMode,
   orderCode,
+  boldOrderId,
 }: {
   initialMode: "paid" | "failed" | "confirming" | "pending";
   orderCode: string;
+  boldOrderId?: string | null;
 }) {
-  const router = useRouter();
   const [mode, setMode] = useState(initialMode);
-  const attemptsRef = useRef(0);
-  const MAX_ATTEMPTS = 4;
-  const INTERVAL_MS = 2000;
+  const [attempt, setAttempt] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const mountedRef = useRef(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const MAX_ATTEMPTS = 6;
+  const RETRY_DELAY_MS = 2000;
+
+  const callReconcile = useCallback(async () => {
+    try {
+      const res = await fetch("/api/bold/reconcile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderCode, boldOrderId }),
+      });
+
+      if (!res.ok) {
+        return "ERROR" as ReconcileStatus;
+      }
+
+      const data = await res.json();
+      return (data.status as ReconcileStatus) ?? "PENDING";
+    } catch {
+      return "ERROR" as ReconcileStatus;
+    }
+  }, [orderCode, boldOrderId]);
+
+  const reconcile = useCallback(async () => {
+    if (!mountedRef.current) return;
+
+    const status = await callReconcile();
+
+    if (!mountedRef.current) return;
+
+    if (status === "PAID") {
+      setMode("paid");
+      return;
+    }
+
+    if (status === "REJECTED") {
+      setMode("failed");
+      return;
+    }
+
+    // PENDING or ERROR — schedule next retry if budget remains
+    setAttempt((prev) => {
+      const next = prev + 1;
+      if (next < MAX_ATTEMPTS && mountedRef.current) {
+        timerRef.current = setTimeout(() => {
+          if (mountedRef.current) reconcile();
+        }, RETRY_DELAY_MS);
+      }
+      return next;
+    });
+  }, [callReconcile]);
+
+  // Start initial reconciliation on mount
   useEffect(() => {
-    if (mode !== "confirming") return;
-    if (attemptsRef.current >= MAX_ATTEMPTS) return;
+    mountedRef.current = true;
 
-    const timer = setInterval(() => {
-      attemptsRef.current += 1;
-      router.refresh();
-    }, INTERVAL_MS);
+    if (mode === "confirming") {
+      reconcile();
+    }
 
-    return () => clearInterval(timer);
-  }, [mode, router]);
+    return () => {
+      mountedRef.current = false;
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — mount-only
 
-  // Update mode when parent re-renders with new initialMode
+  // Manual retry after exhaustion
+  const handleManualRetry = async () => {
+    setIsRetrying(true);
+    setAttempt(0);
+    await reconcile();
+    setIsRetrying(false);
+  };
+
+  // Update mode when parent re-renders (e.g., after webhook triggers page reload)
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
 
-  if (mode === "confirming") {
+  const exhausted = attempt >= MAX_ATTEMPTS && mode === "confirming";
+
+  if (mode === "confirming" && !exhausted) {
     return (
       <p className="text-xs text-muted-foreground">
         <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
         Verificando estado del pago con Bold…
-        {attemptsRef.current < MAX_ATTEMPTS && (
-          <span className="ml-1">(intento {attemptsRef.current + 1}/{MAX_ATTEMPTS})</span>
-        )}
+        <span className="ml-1">(intento {attempt + 1}/{MAX_ATTEMPTS})</span>
       </p>
+    );
+  }
+
+  if (exhausted) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">
+          No pudimos confirmar el pago automáticamente. El pago puede estar
+          procesándose. Te notificaremos por correo cuando se confirme.
+        </p>
+        <button
+          type="button"
+          onClick={handleManualRetry}
+          disabled={isRetrying}
+          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50"
+        >
+          <RotateCcw className="h-3 w-3" />
+          {isRetrying ? "Verificando…" : "Verificar de nuevo"}
+        </button>
+      </div>
     );
   }
 

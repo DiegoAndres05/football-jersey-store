@@ -123,16 +123,12 @@ describe("resolveReturnPersistence", () => {
     assert.equal(resolveReturnPersistence("REJECTED", null), "APPLY_REJECTED");
   });
 
-  it("API PENDING/UNAVAILABLE + hint APPROVED → APPLY_APPROVED", () => {
-    assert.equal(resolveReturnPersistence("PENDING", "APPROVED"), "APPLY_APPROVED");
-    assert.equal(resolveReturnPersistence("UNAVAILABLE", "APPROVED"), "APPLY_APPROVED");
-  });
-
-  it("API PENDING/UNAVAILABLE + hint REJECTED/PENDING/null → NOOP (no fail from query)", () => {
+  it("API PENDING/UNAVAILABLE → NOOP (returnHint is IGNORED — Bold API is sole authority)", () => {
+    assert.equal(resolveReturnPersistence("PENDING", "APPROVED"), "NOOP");
     assert.equal(resolveReturnPersistence("PENDING", "REJECTED"), "NOOP");
     assert.equal(resolveReturnPersistence("PENDING", "PENDING"), "NOOP");
     assert.equal(resolveReturnPersistence("PENDING", null), "NOOP");
-    assert.equal(resolveReturnPersistence("UNAVAILABLE", "REJECTED"), "NOOP");
+    assert.equal(resolveReturnPersistence("UNAVAILABLE", "APPROVED"), "NOOP");
     assert.equal(resolveReturnPersistence("UNAVAILABLE", null), "NOOP");
   });
 });

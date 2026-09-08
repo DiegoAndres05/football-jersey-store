@@ -75,20 +75,26 @@ export type ResolveReturnAction = "APPLY_APPROVED" | "APPLY_REJECTED" | "NOOP";
 export type ReturnHint = Extract<BoldPaymentOutcome, "APPROVED" | "REJECTED" | "PENDING"> | null;
 
 /**
- * Decide whether to persist PAID/FAILED after Bold API lookup + optional return hint.
- * API REJECTED always wins. APPROVED hint can persist PAID when API is inconclusive.
- * Never persist FAILED from return hint alone.
+ * Decide whether to persist PAID/FAILED after Bold API lookup.
  *
- * @see specs/017-bold-retorno-aprobado/contracts/bold-payment-reconcile.md
+ * Bold API is the SOLE authority for payment status:
+ * - APPROVED  → APPLY_APPROVED
+ * - REJECTED  → APPLY_REJECTED
+ * - PENDING   → NOOP (wait for webhook or next reconcile)
+ * - UNAVAILABLE → NOOP (never approve on network/config errors)
+ *
+ * returnHint is accepted for API compatibility but IGNORED.
+ * No client-provided data (URL params, POST body) can influence payment finalization.
+ *
+ * @security The returnHint fallback was removed to prevent URL manipulation attacks.
+ * @see tests/bold-payment-security.test.ts
  */
 export function resolveReturnPersistence(
   apiOutcome: BoldPaymentOutcome,
-  returnHint: ReturnHint,
+  _returnHint: ReturnHint,
 ): ResolveReturnAction {
   if (apiOutcome === "APPROVED") return "APPLY_APPROVED";
   if (apiOutcome === "REJECTED") return "APPLY_REJECTED";
-  // PENDING / UNAVAILABLE
-  if (returnHint === "APPROVED") return "APPLY_APPROVED";
   return "NOOP";
 }
 

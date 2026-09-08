@@ -231,7 +231,7 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
         apiKey: payload.apiKey,
         integritySignature: payload.hash,
         description: `Pedido ${payload.orderId}`,
-        redirectionUrl: `${window.location.origin}/pedido/confirmado/${payload.orderId}`,
+        redirectionUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/pedido/confirmado/${payload.orderId}`,
         customer: {
           email: formRef.current?.email,
           fullName: formRef.current?.fullName,

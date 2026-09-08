@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { CheckCircle2, ArrowRight, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getOrderByCode } from "@/features/orders/repositories/order-repository";
-import { reconcileBoldOrder } from "@/features/payments/services/bold-payment-reconcile";
 import { ConfirmationPaymentStatus } from "./confirmation-payment-status";
 import { DELIVERY_MODE_INFO, type DeliveryMode } from "@/features/products/types/delivery-mode";
 import { formatMoney } from "@/shared/money/format";
@@ -26,26 +25,6 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
 
   if (!order) notFound();
 
-  // If order is still pending and Bold return params are present, reconcile
-  if (order.status === "PENDING_PAYMENT") {
-    const boldTxStatus = typeof sp["bold-tx-status"] === "string" ? sp["bold-tx-status"] : null;
-    const boldOrderId = typeof sp["bold-order-id"] === "string" ? sp["bold-order-id"] : null;
-
-    if (boldTxStatus || boldOrderId) {
-      await reconcileBoldOrder({
-        orderCode: code,
-        boldOrderId,
-        returnTxStatus: boldTxStatus,
-      });
-
-      // Re-read order after reconciliation
-      const refreshed = await getOrderByCode(code);
-      if (refreshed) {
-        Object.assign(order, refreshed);
-      }
-    }
-  }
-
   const orderCurrency = (order.saleCurrency ?? "COP") as SaleCurrency;
   const orderRate = order.exchangeRateCopPerUsd ?? undefined;
 
@@ -53,7 +32,10 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
   const hasBoldParams =
     typeof sp["bold-tx-status"] === "string" || typeof sp["bold-order-id"] === "string";
 
-  // Determine UI mode
+  const boldOrderId = typeof sp["bold-order-id"] === "string" ? sp["bold-order-id"] : null;
+
+  // Determine UI mode — always start as "confirming" when Bold redirect params are present.
+  // The client component handles reconciliation via POST /api/bold/reconcile.
   const uiMode =
     order.status === "PAID"
       ? "paid"
@@ -126,7 +108,11 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
             </p>
           )}
           {uiMode === "confirming" && (
-            <ConfirmationPaymentStatus initialMode="confirming" orderCode={order.code} />
+            <ConfirmationPaymentStatus
+              initialMode="confirming"
+              orderCode={order.code}
+              boldOrderId={boldOrderId}
+            />
           )}
           {uiMode === "pending" && (
             <p>
