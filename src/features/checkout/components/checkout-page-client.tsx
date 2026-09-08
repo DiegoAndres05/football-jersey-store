@@ -24,6 +24,46 @@ import {
   type CheckoutFormValues,
   type PaymentMethod,
 } from "@/features/checkout/schemas/checkout-schema";
+import { buildBoldCheckoutPayload } from "@/features/payments/domain/bold-checkout-attrs";
+
+const BOLD_SCRIPT_SRC = "https://checkout.bold.co/library/boldPaymentButton.js";
+
+function hasBoldCheckout(): boolean {
+  return Boolean((window as Window & { BoldCheckout?: unknown }).BoldCheckout);
+}
+
+function loadBoldCheckoutScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (hasBoldCheckout()) {
+      resolve();
+      return;
+    }
+
+    const fail = () => reject(new Error("No se pudo cargar Bold."));
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${BOLD_SCRIPT_SRC}"]`);
+    if (existing) {
+      const timer = window.setTimeout(fail, 8000);
+      const done = (ok: boolean) => {
+        window.clearTimeout(timer);
+        if (ok && hasBoldCheckout()) resolve();
+        else fail();
+      };
+      existing.addEventListener("load", () => done(true), { once: true });
+      existing.addEventListener("error", () => done(false), { once: true });
+      queueMicrotask(() => {
+        if (hasBoldCheckout()) done(true);
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = BOLD_SCRIPT_SRC;
+    script.async = true;
+    script.onload = () => (hasBoldCheckout() ? resolve() : fail());
+    script.onerror = fail;
+    document.head.appendChild(script);
+  });
+}
 
 export function CheckoutPageClient({ currencyContext }: { currencyContext?: CurrencyContext }) {
   const items = useCartStore((s) => s.items);
@@ -41,11 +81,9 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
 
   useEffect(() => {
     if (!mounted || step !== "payment") return;
-    if (document.querySelector('script[src="https://checkout.bold.co/library/boldPaymentButton.js"]')) return;
-    const script = document.createElement("script");
-    script.src = "https://checkout.bold.co/library/boldPaymentButton.js";
-    script.async = true;
-    document.head.appendChild(script);
+    void loadBoldCheckoutScript().catch((err) => {
+      console.error("Bold script load failed:", err);
+    });
   }, [mounted, step]);
 
   useEffect(() => {
@@ -140,9 +178,6 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
       return;
     }
 
-    const payableSubtotal = lines.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
-    const payableTotal = payableSubtotal + shippingFee(payableSubtotal);
-
     const result = await submitOrder({
       form: formRef.current,
       lines: lines.map((i) => ({
@@ -164,20 +199,24 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
     }
 
     try {
+      await loadBoldCheckoutScript();
+
       const hashRes = await fetch("/api/bold/hash", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId: result.code,
-          amount: payableTotal,
+          amount: result.total,
           currency: "COP",
         }),
       });
 
-      if (!hashRes.ok) throw new Error("Error al preparar el pago.");
-      const { hash, apiKey } = await hashRes.json();
+      const payload = await hashRes.json();
+      if (!hashRes.ok) {
+        throw new Error(typeof payload.error === "string" ? payload.error : "Error al preparar el pago.");
+      }
 
-      const BoldCheckout = (window as any).BoldCheckout;
+      const BoldCheckout = (window as Window & { BoldCheckout?: new (config: object) => { open: () => void } }).BoldCheckout;
 
       if (!BoldCheckout) {
         setPayError("El sistema de pago no está listo. Recarga la página e intenta de nuevo.");
@@ -185,25 +224,24 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
         return;
       }
 
-      clearCart();
-
-      const checkout = new BoldCheckout({
-        orderId: result.code,
-        currency: "COP",
-        amount: payableTotal.toString(),
-        apiKey,
-        integritySignature: hash,
-        description: `Pedido ${result.code}`,
-        redirectionUrl: `${window.location.origin}/pedido/confirmado/${result.code}`,
-        renderMode: "embedded",
-        customerData: JSON.stringify({
+      const checkoutConfig = buildBoldCheckoutPayload({
+        orderId: payload.orderId,
+        amount: payload.amount,
+        currency: payload.currency,
+        apiKey: payload.apiKey,
+        integritySignature: payload.hash,
+        description: `Pedido ${payload.orderId}`,
+        redirectionUrl: `${window.location.origin}/pedido/confirmado/${payload.orderId}`,
+        customer: {
           email: formRef.current?.email,
           fullName: formRef.current?.fullName,
           phone: formRef.current?.phone,
-        }),
+        },
       });
 
+      const checkout = new BoldCheckout(checkoutConfig);
       checkout.open();
+      clearCart();
     } catch (err) {
       console.error("Bold checkout error:", err);
       setPayError(err instanceof Error ? err.message : "Error al conectar con el sistema de pago.");

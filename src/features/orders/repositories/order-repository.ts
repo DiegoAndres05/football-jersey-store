@@ -30,7 +30,11 @@ function orderCode(): string {
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let rand = "";
+  for (let i = 0; i < 6; i += 1) {
+    rand += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
   return `FS-${y}-${m}-${rand}`;
 }
 
@@ -41,7 +45,7 @@ function orderCode(): string {
  * El pago queda como "PENDING_PAYMENT": la pasarela es una simulación.
  */
 export async function createOrder(input: CreateOrderInput): Promise<
-  { ok: true; code: string } | { ok: false; error: string }
+  { ok: true; code: string; total: number } | { ok: false; error: string }
 > {
   const parsed = checkoutFormSchema.safeParse(input.form);
   if (!parsed.success) {
@@ -211,7 +215,7 @@ export async function createOrder(input: CreateOrderInput): Promise<
       return created;
     });
 
-    return { ok: true, code: order.code };
+    return { ok: true, code: order.code, total: order.total };
   } catch (err) {
     const noStock = err instanceof Error && err.message.startsWith("NO_STOCK:");
     if (!noStock) console.error("createOrder failed:", err);
