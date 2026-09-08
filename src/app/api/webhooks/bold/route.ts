@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { notifyOrderPaid } from "@/features/notifications/services/notification-service";
+import { applyBoldPayment } from "@/features/orders/services/apply-bold-payment";
+import { normalizeWebhookEventType } from "@/features/payments/domain/bold-payment-outcome";
 
 export const runtime = "nodejs";
 
@@ -23,53 +23,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ received: true });
     }
 
-    const order = await prisma.order.findUnique({
-      where: { code: referenceId },
-      select: { id: true, status: true },
-    });
+    const outcome = normalizeWebhookEventType(eventType);
 
-    if (!order) {
-      console.warn(`[Bold Webhook] Order not found: ${referenceId}`);
+    if (!outcome) {
+      console.warn(`[Bold Webhook] Unknown event type: ${eventType}`);
       return NextResponse.json({ received: true });
     }
 
-    if (eventType === "SALE_APPROVED") {
-      if (order.status === "PENDING_PAYMENT") {
-        await prisma.$transaction(async (tx) => {
-          await tx.order.update({
-            where: { id: order.id },
-            data: { status: "PAID", paidAt: new Date() },
-          });
-          await tx.orderStatusHistory.create({
-            data: {
-              orderId: order.id,
-              fromStatus: order.status,
-              toStatus: "PAID",
-              createdBy: `bold-webhook:${payload.subject ?? "unknown"}`,
-              note: "Pago aprobado vía Bold webhook.",
-            },
-          });
-        });
-        void notifyOrderPaid(order.id).catch(() => undefined);
-      }
-    } else if (eventType === "SALE_REJECTED") {
-      if (order.status === "PENDING_PAYMENT") {
-        await prisma.$transaction(async (tx) => {
-          await tx.order.update({
-            where: { id: order.id },
-            data: { status: "PAYMENT_FAILED" },
-          });
-          await tx.orderStatusHistory.create({
-            data: {
-              orderId: order.id,
-              fromStatus: order.status,
-              toStatus: "PAYMENT_FAILED",
-              createdBy: `bold-webhook:${payload.subject ?? "unknown"}`,
-              note: "Pago rechazado vía Bold webhook.",
-            },
-          });
-        });
-      }
+    // At this point outcome is "APPROVED" | "REJECTED" (webhook only produces these)
+    const result = await applyBoldPayment({
+      orderCode: referenceId,
+      outcome: outcome as "APPROVED" | "REJECTED",
+      source: "webhook",
+      providerRef: payload.subject ?? undefined,
+    });
+
+    if (!result.applied) {
+      console.log(`[Bold Webhook] No action: ${result.reason} (order: ${referenceId})`);
     }
 
     return NextResponse.json({ received: true });
