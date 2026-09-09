@@ -252,7 +252,10 @@ const importSchema = z.object({
         season: z.string().trim().regex(/^(\d{4}|\d{2})-\d{2}$/, "Temporada inválida."),
         type: z.enum(["LOCAL", "VISITANTE", "TERCERA"]),
         imageUrl: z.union([z.string().url("Imagen inválida."), z.null()]),
-        sourceUrl: z.string().url("URL de origen inválida."),
+        sourceUrl: z.string().refine(
+          (v) => v === "" || z.string().url().safeParse(v).success,
+          "URL de origen inválida.",
+        ),
       }),
     )
     .min(1, "Selecciona al menos una camiseta.")

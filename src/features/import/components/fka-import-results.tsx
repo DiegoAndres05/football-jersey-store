@@ -91,7 +91,13 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
     setImporting(true);
     setImportResult(null);
     try {
-      setImportResult(await importFkaKitsAction(confirm.kits, { createSeasons: true, createTeams: true }));
+      const res = await importFkaKitsAction(confirm.kits, { createSeasons: true, createTeams: true });
+      setImportResult(res);
+    } catch (err) {
+      setImportResult({
+        ok: false,
+        error: err instanceof Error ? err.message : "Error inesperado al importar.",
+      });
     } finally {
       setImporting(false);
       setConfirm(null);
