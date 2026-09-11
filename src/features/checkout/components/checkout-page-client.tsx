@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, ArrowRight, CreditCard, Landmark, Smartphone, ShieldCheck } from "lucide-react";
@@ -14,6 +15,7 @@ import { useCartStore } from "@/shared/stores/cart-store";
 import { SHIPPING, shippingFee, SITE } from "@/shared/config/site";
 import { DELIVERY_MODE_INFO } from "@/features/products/types/delivery-mode";
 import { formatMoney } from "@/shared/money/format";
+import { SALE_CURRENCY_COOKIE, type SaleCurrency } from "@/shared/currency/sale-currency";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
 import { submitOrder } from "@/features/orders/server/order-actions";
 import { getImmediateStockByVariantIds } from "@/features/cart/server/cart-stock-actions";
@@ -27,6 +29,34 @@ import {
 import { buildBoldCheckoutPayload } from "@/features/payments/domain/bold-checkout-attrs";
 
 const BOLD_SCRIPT_SRC = "https://checkout.bold.co/library/boldPaymentButton.js";
+const DESTINATION_COUNTRIES = [
+  "Colombia",
+  "Estados Unidos",
+  "España",
+  "México",
+  "Ecuador",
+  "Perú",
+  "Chile",
+  "Argentina",
+  "Panamá",
+  "Venezuela",
+];
+
+function normalizeCountry(country: string): string {
+  return country.trim().toLocaleLowerCase("es-CO");
+}
+
+function checkoutCurrencyForCountry(
+  country: string,
+  currencyContext?: CurrencyContext,
+): { currency: SaleCurrency; copPerUsd: number | null } {
+  const isColombia = normalizeCountry(country) === normalizeCountry(SITE.country);
+  if (isColombia) return { currency: "COP", copPerUsd: currencyContext?.copPerUsd ?? null };
+  if (currencyContext?.copPerUsd && currencyContext.copPerUsd > 0) {
+    return { currency: "USD", copPerUsd: currencyContext.copPerUsd };
+  }
+  return { currency: "COP", copPerUsd: currencyContext?.copPerUsd ?? null };
+}
 
 function hasBoldCheckout(): boolean {
   return Boolean((window as Window & { BoldCheckout?: unknown }).BoldCheckout);
@@ -66,6 +96,7 @@ function loadBoldCheckoutScript(): Promise<void> {
 }
 
 export function CheckoutPageClient({ currencyContext }: { currencyContext?: CurrencyContext }) {
+  const router = useRouter();
   const items = useCartStore((s) => s.items);
   const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
   const clearCart = useCartStore((s) => s.clear);
@@ -104,7 +135,7 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
     };
   }, [mounted, items.length]);
 
-  const { register, handleSubmit, formState: { errors, isValid } } = useForm<CheckoutFormValues>({
+  const { register, handleSubmit, watch, formState: { errors, isValid } } = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema),
     mode: "onBlur",
     defaultValues: {
@@ -117,6 +148,7 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
       shippingLine2: "",
       shippingCity: "",
       shippingState: "",
+      shippingCountry: SITE.country,
       shippingZipCode: "",
       notes: "",
     },
@@ -128,6 +160,20 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
   );
   const total = subtotal + fee;
   const remaining = SHIPPING.freeThreshold - subtotal;
+  const destinationCountry = watch("shippingCountry") || SITE.country;
+  const checkoutCurrency = {
+    currency: currencyContext?.currency ?? "COP",
+    copPerUsd: currencyContext?.copPerUsd ?? null,
+  };
+  const moneyContext = {
+    currency: checkoutCurrency.currency,
+    copPerUsd: checkoutCurrency.copPerUsd ?? undefined,
+  };
+  const shippingScope = normalizeCountry(destinationCountry) === normalizeCountry(SITE.country)
+    ? SHIPPING.methodName
+    : "Destino internacional";
+
+  const shippingCountryField = register("shippingCountry");
 
   if (!mounted) return null;
 
@@ -190,6 +236,7 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
       })),
       paymentMethod,
       paymentReference: `BOLD-${Date.now()}`,
+      saleCurrency: checkoutCurrencyForCountry(formRef.current.shippingCountry, currencyContext).currency,
     });
 
     if (!result.ok) {
@@ -206,8 +253,8 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId: result.code,
-          amount: result.total,
-          currency: "COP",
+          amount: result.paymentAmount,
+          currency: result.saleCurrency,
         }),
       });
 
@@ -289,8 +336,8 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
               <section className="rounded-xl border border-border bg-card p-5">
                 <h2 className="font-display text-lg font-bold uppercase tracking-tight mb-1">Envío</h2>
                 <p className="text-xs text-muted-foreground mb-4">
-                  {SITE.country} · {SHIPPING.methodName} ·{" "}
-                  {fee === 0 ? "Gratis en este pedido" : formatMoney({ amountCop: SHIPPING.flatFee, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}
+                  {destinationCountry} · {shippingScope} ·{" "}
+                  {fee === 0 ? "Gratis en este pedido" : formatMoney({ amountCop: SHIPPING.flatFee, ...moneyContext })}
                 </p>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
@@ -311,6 +358,28 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label htmlFor="shippingLine2">Complemento (opcional)</Label>
                     <Input id="shippingLine2" {...register("shippingLine2")} placeholder="Torre, bloque, unidad..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="shippingCountry">País de destino</Label>
+                    <select
+                      id="shippingCountry"
+                      {...shippingCountryField}
+                      onChange={(event) => {
+                        void shippingCountryField.onChange(event);
+                        const nextCurrency = checkoutCurrencyForCountry(event.target.value, currencyContext).currency;
+                        document.cookie = `${SALE_CURRENCY_COOKIE}=${nextCurrency}; path=/; max-age=31536000; SameSite=Lax`;
+                        router.refresh();
+                      }}
+                      autoComplete="country-name"
+                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {DESTINATION_COUNTRIES.map((country) => (
+                        <option key={country} value={country}>
+                          {country}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.shippingCountry && <p className="text-xs text-destructive">{errors.shippingCountry.message}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="shippingCity">Ciudad</Label>
@@ -405,7 +474,7 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
 
               {paymentStatus === "idle" && (
                 <Button onClick={payNow} className="w-full sm:w-auto">
-                  Pagar {formatMoney({ amountCop: total, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })} <ShieldCheck className="h-4 w-4" />
+                  Pagar {formatMoney({ amountCop: total, ...moneyContext })} <ShieldCheck className="h-4 w-4" />
                 </Button>
               )}
             </div>
@@ -441,7 +510,7 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
                     {DELIVERY_MODE_INFO[item.deliveryMode].eta}
                   </p>
                 </div>
-                <p className="text-sm font-medium tabular-nums">{formatMoney({ amountCop: item.unitPrice * item.quantity, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</p>
+                <p className="text-sm font-medium tabular-nums">{formatMoney({ amountCop: item.unitPrice * item.quantity, ...moneyContext })}</p>
               </div>
             ))}
           </div>
@@ -451,15 +520,15 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Subtotal</dt>
-              <dd className="font-medium tabular-nums">{formatMoney({ amountCop: subtotal, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</dd>
+              <dd className="font-medium tabular-nums">{formatMoney({ amountCop: subtotal, ...moneyContext })}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">Envío ({SHIPPING.methodName})</dt>
-              <dd className="font-medium tabular-nums">{fee === 0 ? "Gratis" : formatMoney({ amountCop: fee, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</dd>
+              <dt className="text-muted-foreground">Envío ({shippingScope})</dt>
+              <dd className="font-medium tabular-nums">{fee === 0 ? "Gratis" : formatMoney({ amountCop: fee, ...moneyContext })}</dd>
             </div>
             {remaining > 0 && (
               <p className="rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
-                Te faltan {formatMoney({ amountCop: remaining, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })} para envío gratis.
+                Te faltan {formatMoney({ amountCop: remaining, ...moneyContext })} para envío gratis.
               </p>
             )}
           </dl>
@@ -468,7 +537,7 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
 
           <div className="flex justify-between items-baseline">
             <span className="text-sm font-medium">Total</span>
-            <span className="text-2xl font-bold tabular-nums">{formatMoney({ amountCop: total, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span>
+            <span className="text-2xl font-bold tabular-nums">{formatMoney({ amountCop: total, ...moneyContext })}</span>
           </div>
         </aside>
       </div>

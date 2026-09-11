@@ -158,7 +158,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailData 
   const stockByVariantId = await getStockByVariantIds(product.variants.map((v) => v.id));
   const variantsWithStock: VariantWithStock[] = product.variants.map((v) => {
     const stock = stockByVariantId.get(v.id) ?? 0;
-    return { ...v, stock, availability: computeAvailability(stock) };
+    return { ...v, stock, availability: computeAvailability(stock, v.allowsBackorder) };
   });
 
   const players = [...product.team.players].sort(
@@ -214,9 +214,11 @@ export async function computeStock(variantId: string): Promise<number> {
 
 export function computeAvailability(
   stock: number | null,
+  allowsBackorder = false,
 ): "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK" {
   if (stock === null) return "ON_DEMAND";
   if (stock > 0) return "AVAILABLE";
+  if (allowsBackorder) return "ON_DEMAND";
   return "OUT_OF_STOCK";
 }
 
@@ -315,8 +317,9 @@ async function mapProductCards(
     const infos = (variantInfosByProductId.get(p.id) ?? []).sort(
       (a, b) => a.sizePosition - b.sizePosition,
     );
-    const stocks = infos.map((info) => info.stock);
-    const availableSizes = [...new Set(infos.filter((i) => i.stock > 0).map((i) => i.sizeCode))];
+    const availableSizes = [
+      ...new Set(infos.filter((i) => i.stock > 0 || i.allowsBackorder).map((i) => i.sizeCode)),
+    ];
     const versionNames = [
       ...new Set(
         [...infos]
@@ -337,7 +340,7 @@ async function mapProductCards(
       primaryImage: p.images[0] ?? null,
       minPrice: range.min,
       maxPrice: range.max,
-      availability: availabilityFromStocks(stocks),
+      availability: availabilityFromVariantInfos(infos),
       availableSizes,
       versionNames,
       canBackorder: infos.some((info) => info.allowsBackorder),
@@ -345,8 +348,9 @@ async function mapProductCards(
   });
 }
 
-function availabilityFromStocks(stocks: number[]): Availability {
-  if (stocks.some((stock) => stock > 0)) return "AVAILABLE";
+function availabilityFromVariantInfos(infos: VariantInfo[]): Availability {
+  if (infos.some((info) => info.stock > 0)) return "AVAILABLE";
+  if (infos.some((info) => info.allowsBackorder)) return "ON_DEMAND";
   return "OUT_OF_STOCK";
 }
 

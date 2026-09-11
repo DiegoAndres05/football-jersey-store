@@ -23,8 +23,7 @@ export function listingAvailabilityFromCardFlags(input: {
   availability: "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK";
   canBackorder: boolean;
 }): ListingAvailability {
-  if (input.availability === "AVAILABLE" || input.availability === "ON_DEMAND") {
-    return "IN_STOCK";
-  }
+  if (input.availability === "AVAILABLE") return "IN_STOCK";
+  if (input.availability === "ON_DEMAND") return "BACKORDER_ONLY";
   return input.canBackorder ? "BACKORDER_ONLY" : "SOLD_OUT";
 }

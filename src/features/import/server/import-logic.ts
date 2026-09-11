@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { FkaKit, FkaKitType } from "../fka/types.ts";
 import { resolveSeason, resolveTeam } from "../fka/resolver.ts";
 import type { DbProduct, DbSeason, DbTeam } from "../fka/resolver.ts";
-import { normalizeSeason } from "../fka/normalizer.ts";
+import { normalizeLeagueName, normalizeSeason, normalizeTeamName } from "../fka/normalizer.ts";
 
 /**
  * Lógica pura de importación MVP de camisetas FKA como productos BORRADOR.
@@ -108,6 +108,35 @@ export function seasonToCreateData(fkaSeason: string): SeasonCreateData | null {
   return { slug: `${start}-${end}`, name: `Temporada ${start}/${end}`, year };
 }
 
+export type LeagueCreateData = { slug: string; name: string; country: string | null };
+export type MissingTeamContext = {
+  teamName: string;
+  leagueName: string | null;
+  leagueUrl?: string | null;
+  country?: string | null;
+};
+
+function cleanNullableString(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+export function leagueToCreateData(context: MissingTeamContext): LeagueCreateData | null {
+  const name = cleanNullableString(context.leagueName);
+  if (!name) return null;
+  const slug = slugifyImport(name);
+  if (!slug || slug === "sin-nombre") return null;
+  return { slug, name, country: cleanNullableString(context.country) };
+}
+
+export function requireFkaLeagueName(context: MissingTeamContext): string {
+  const leagueName = cleanNullableString(context.leagueName);
+  if (!leagueName) {
+    throw new Error(`FKA no proporcionó liga/competición para crear el equipo "${context.teamName}" automáticamente.`);
+  }
+  return leagueName;
+}
+
 /**
  * Temporadas (normalizadas, ej. "2026-27") que faltan en la BD para los kits
  * cuyo equipo SÍ se encontró. Solo considera kits con equipo resuelto; si el
@@ -151,6 +180,42 @@ export function missingTeams(kits: FkaKit[], dbTeams: DbTeam[]): string[] {
     }
   }
   return Array.from(missing);
+}
+
+export function missingTeamContexts(kits: FkaKit[], dbTeams: DbTeam[]): MissingTeamContext[] {
+  const missing = new Map<string, MissingTeamContext>();
+  for (const kit of kits) {
+    const team = resolveTeam(dbTeams, kit.team);
+    if (team) continue;
+
+    const key = normalizeTeamName(kit.team);
+    if (!key) continue;
+    const current = missing.get(key);
+    const next: MissingTeamContext = {
+      teamName: kit.team,
+      leagueName: cleanNullableString(kit.leagueName),
+      leagueUrl: cleanNullableString(kit.leagueUrl),
+      country: cleanNullableString(kit.country),
+    };
+
+    if (!current) {
+      missing.set(key, next);
+      continue;
+    }
+
+    const currentLeagueKey = current.leagueName ? normalizeLeagueName(current.leagueName) : "";
+    const nextLeagueKey = next.leagueName ? normalizeLeagueName(next.leagueName) : "";
+    if (currentLeagueKey && nextLeagueKey && currentLeagueKey !== nextLeagueKey) {
+      throw new Error(
+        `FKA devolvió ligas distintas para el equipo "${kit.team}": "${current.leagueName}" y "${next.leagueName}".`,
+      );
+    }
+
+    if (!current.leagueName && next.leagueName) {
+      missing.set(key, next);
+    }
+  }
+  return Array.from(missing.values());
 }
 
 export async function importFkaKitsAsDrafts(

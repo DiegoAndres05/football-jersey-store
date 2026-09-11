@@ -7,7 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { whatsappLink } from "@/shared/config/site";
-import { getAvailableDeliveryModes, type DeliveryMode } from "@/features/products/types/delivery-mode";
+import {
+  getAvailableDeliveryModes,
+  resolveDeliveryModeSelection,
+  type DeliveryMode,
+} from "@/features/products/types/delivery-mode";
 import { ProductGallery } from "./product-gallery";
 import { ProductVariantSelector } from "./product-variant-selector";
 import { ProductCustomization } from "./product-customization";
@@ -113,8 +117,8 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
 
   useEffect(() => {
     if (!currentVariant) return;
-    const [first] = getAvailableDeliveryModes(currentVariant.stock, currentVariant.allowsBackorder);
-    if (first) setDeliveryMode(first);
+    const modes = getAvailableDeliveryModes(currentVariant.stock, currentVariant.allowsBackorder);
+    setDeliveryMode((selected) => resolveDeliveryModeSelection(selected, modes) ?? selected);
   }, [currentVariant]);
 
   return (

@@ -1,9 +1,18 @@
 import type { FkaKit, FkaKitType, ImportStatus } from "./types.ts";
-import { normalizeTeamName, seasonSlug, seasonToYear } from "./normalizer.ts";
+import { normalizeLeagueName, normalizeTeamName, seasonSlug, seasonToYear } from "./normalizer.ts";
 
+export type DbLeague = { id: string; name: string; slug: string };
 export type DbTeam = { id: string; name: string };
 export type DbSeason = { id: string; name: string; slug: string; year: number | null };
 export type DbProduct = { id: string; teamId: string; seasonId: string; kitType: string };
+
+export function resolveLeague(leagues: DbLeague[], fkaLeagueName: string): DbLeague | null {
+  const key = normalizeLeagueName(fkaLeagueName);
+  if (!key) return null;
+  return leagues.find((league) => {
+    return normalizeLeagueName(league.name) === key || normalizeLeagueName(league.slug) === key;
+  }) ?? null;
+}
 
 export function resolveTeam(teams: DbTeam[], fkaTeam: string): DbTeam | null {
   const key = normalizeTeamName(fkaTeam);

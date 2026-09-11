@@ -6,6 +6,7 @@ import {
   deriveListingAvailability,
   listingAvailabilityFromCardFlags,
 } from "../src/features/products/domain/listing-availability.ts";
+import { computeAvailability } from "../src/features/products/repositories/product-repository.ts";
 
 describe("deriveListingAvailability", () => {
   it("IN_STOCK when any variant has stock", () => {
@@ -45,9 +46,21 @@ describe("listingAvailabilityFromCardFlags", () => {
       "BACKORDER_ONLY",
     );
     assert.equal(
+      listingAvailabilityFromCardFlags({ availability: "ON_DEMAND", canBackorder: true }),
+      "BACKORDER_ONLY",
+    );
+    assert.equal(
       listingAvailabilityFromCardFlags({ availability: "OUT_OF_STOCK", canBackorder: false }),
       "SOLD_OUT",
     );
+  });
+});
+
+describe("computeAvailability", () => {
+  it("marks zero-stock backorder variants as ON_DEMAND", () => {
+    assert.equal(computeAvailability(0, true), "ON_DEMAND");
+    assert.equal(computeAvailability(0, false), "OUT_OF_STOCK");
+    assert.equal(computeAvailability(2, true), "AVAILABLE");
   });
 });
 

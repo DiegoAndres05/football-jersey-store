@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { shippingFee, SHIPPING } from "../src/shared/config/site.ts";
 import { checkoutFormSchema } from "../src/features/checkout/schemas/checkout-schema.ts";
 import { parseProductFiltersParams } from "../src/features/products/schemas/product-filters-schema.ts";
@@ -14,6 +15,7 @@ const VALID_FORM = {
   shippingLine1: "Calle 123 # 45-67",
   shippingCity: "Bogotá",
   shippingState: "Cundinamarca",
+  shippingCountry: "Colombia",
   shippingZipCode: "110111",
   notes: "",
 };
@@ -44,6 +46,26 @@ test("checkout: campos de envío requeridos", () => {
   assert.equal(sinCiudad.success, false);
   const sinDireccion = checkoutFormSchema.safeParse({ ...VALID_FORM, shippingLine1: "" });
   assert.equal(sinDireccion.success, false);
+  const sinPais = checkoutFormSchema.safeParse({ ...VALID_FORM, shippingCountry: "" });
+  assert.equal(sinPais.success, false);
+});
+
+test("checkout: país de destino es requerido", () => {
+  const { shippingCountry: _country, ...legacyForm } = VALID_FORM;
+  const res = checkoutFormSchema.safeParse(legacyForm);
+  assert.equal(res.success, false);
+});
+
+test("checkout: país de destino gobierna moneda y payload de Bold", () => {
+  const source = readFileSync("src/features/checkout/components/checkout-page-client.tsx", "utf8");
+  assert.match(source, /checkoutCurrencyForCountry/);
+  assert.match(source, /SALE_CURRENCY_COOKIE/);
+  assert.match(source, /router\.refresh/);
+  assert.doesNotMatch(source, /setSelectedCurrency/);
+  assert.match(source, /Destino internacional/);
+  assert.match(source, /amount: result\.paymentAmount/);
+  assert.match(source, /currency: result\.saleCurrency/);
+  assert.match(source, /saleCurrency: checkoutCurrencyForCountry/);
 });
 
 test("checkout: zipCode y notes opcionales", () => {

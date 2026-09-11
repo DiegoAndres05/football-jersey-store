@@ -1,6 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { getAvailableDeliveryModes } from "@/features/products/types/delivery-mode";
+import {
+  getAvailableDeliveryModes,
+  resolveDeliveryModeSelection,
+} from "@/features/products/types/delivery-mode";
 
 describe("getAvailableDeliveryModes", () => {
   it("con stock ofrece INMEDIATA (+ BAJO_PEDIDO si permite backorder)", () => {
@@ -21,5 +24,20 @@ describe("getAvailableDeliveryModes", () => {
   it("stock negativo se trata como sin stock", () => {
     assert.deepEqual(getAvailableDeliveryModes(-3, true), ["BAJO_PEDIDO"]);
     assert.deepEqual(getAvailableDeliveryModes(-3, false), []);
+  });
+});
+
+describe("resolveDeliveryModeSelection", () => {
+  it("conserva BAJO_PEDIDO al cambiar a una variante que tambien lo permite", () => {
+    assert.equal(
+      resolveDeliveryModeSelection("BAJO_PEDIDO", ["INMEDIATA", "BAJO_PEDIDO"]),
+      "BAJO_PEDIDO",
+    );
+  });
+
+  it("usa la primera modalidad disponible si la seleccionada ya no aplica", () => {
+    assert.equal(resolveDeliveryModeSelection("BAJO_PEDIDO", ["INMEDIATA"]), "INMEDIATA");
+    assert.equal(resolveDeliveryModeSelection("INMEDIATA", ["BAJO_PEDIDO"]), "BAJO_PEDIDO");
+    assert.equal(resolveDeliveryModeSelection("INMEDIATA", []), null);
   });
 });

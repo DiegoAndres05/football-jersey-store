@@ -65,6 +65,15 @@ export function normalizeTeamName(raw: string): string {
     .trim();
 }
 
+export function normalizeLeagueName(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
 export function teamSimilarity(a: string, b: string): number {
   const na = normalizeTeamName(a);
   const nb = normalizeTeamName(b);

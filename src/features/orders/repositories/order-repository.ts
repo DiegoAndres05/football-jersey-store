@@ -9,6 +9,8 @@ import {
 import type { DeliveryMode } from "@/features/products/types/delivery-mode";
 import { planInventoryMovements } from "./inventory-plan";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
+import { toUsdCents } from "@/shared/money/convert";
+import type { SaleCurrency } from "@/shared/currency/sale-currency";
 
 export type OrderLineInput = {
   variantId: string;
@@ -24,6 +26,7 @@ export type CreateOrderInput = {
   lines: OrderLineInput[];
   paymentMethod: PaymentMethod;
   paymentReference: string;
+  saleCurrency?: SaleCurrency;
 };
 
 function orderCode(): string {
@@ -45,7 +48,7 @@ function orderCode(): string {
  * El pago queda como "PENDING_PAYMENT": la pasarela es una simulación.
  */
 export async function createOrder(input: CreateOrderInput): Promise<
-  { ok: true; code: string; total: number } | { ok: false; error: string }
+  { ok: true; code: string; total: number; paymentAmount: number; saleCurrency: SaleCurrency } | { ok: false; error: string }
 > {
   const parsed = checkoutFormSchema.safeParse(input.form);
   if (!parsed.success) {
@@ -111,8 +114,14 @@ export async function createOrder(input: CreateOrderInput): Promise<
   const code = orderCode();
 
   const currencyCtx = await getCurrencyContext();
-  const saleCurrency = currencyCtx.currency;
-  const exchangeRateCopPerUsd = currencyCtx.currency === "USD" && currencyCtx.copPerUsd ? currencyCtx.copPerUsd : null;
+  const saleCurrency = input.saleCurrency === "USD" ? "USD" : "COP";
+  const exchangeRateCopPerUsd = saleCurrency === "USD" ? currencyCtx.copPerUsd : null;
+  if (saleCurrency === "USD" && (!exchangeRateCopPerUsd || exchangeRateCopPerUsd <= 0)) {
+    return { ok: false, error: "No pudimos calcular el pago en USD. Intenta de nuevo o elige Colombia como país de destino." };
+  }
+  const paymentAmount = saleCurrency === "USD" && exchangeRateCopPerUsd
+    ? toUsdCents(total, exchangeRateCopPerUsd)
+    : total;
 
   try {
     const order = await prisma.$transaction(async (tx) => {
@@ -155,6 +164,7 @@ export async function createOrder(input: CreateOrderInput): Promise<
                   line2: f.shippingLine2 || null,
                   city: f.shippingCity,
                   state: f.shippingState,
+                  country: f.shippingCountry,
                   zipCode: f.shippingZipCode || null,
                   isDefault: true,
                 },
@@ -181,6 +191,7 @@ export async function createOrder(input: CreateOrderInput): Promise<
           shippingLine2: f.shippingLine2 || null,
           shippingCity: f.shippingCity,
           shippingState: f.shippingState,
+          shippingCountry: f.shippingCountry,
           shippingZipCode: f.shippingZipCode || null,
           notes: f.notes || null,
           paymentMethod: input.paymentMethod,
@@ -215,7 +226,7 @@ export async function createOrder(input: CreateOrderInput): Promise<
       return created;
     });
 
-    return { ok: true, code: order.code, total: order.total };
+    return { ok: true, code: order.code, total: order.total, paymentAmount, saleCurrency };
   } catch (err) {
     const noStock = err instanceof Error && err.message.startsWith("NO_STOCK:");
     if (!noStock) console.error("createOrder failed:", err);

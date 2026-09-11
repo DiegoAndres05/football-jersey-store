@@ -4,6 +4,7 @@ import {
   mapKitType,
   normalizeSeason,
   normalizeTitle,
+  normalizeLeagueName,
   normalizeTeamName,
   seasonSlug,
   seasonToYear,
@@ -12,6 +13,7 @@ import {
 } from "../src/features/import/fka/normalizer.ts";
 import {
   extractKitLinks,
+  extractTeamContext,
   findSeasonLink,
   parseKitDetail,
   parseSeasonFromUrl,
@@ -19,6 +21,7 @@ import {
 } from "../src/features/import/fka/parser.ts";
 import {
   resolveImport,
+  resolveLeague,
   resolveSeason,
   resolveTeam,
   isDuplicate,
@@ -85,6 +88,12 @@ test("normalizeTeamName: normaliza acentos y artículos", () => {
   assert.equal(normalizeTeamName("Real Madrid"), "real madrid");
 });
 
+test("normalizeLeagueName: iguala LaLiga y La Liga sin fuzzy matching", () => {
+  assert.equal(normalizeLeagueName("LaLiga"), normalizeLeagueName("La Liga"));
+  assert.equal(normalizeLeagueName("Premier League"), "premierleague");
+  assert.notEqual(normalizeLeagueName("La Liga"), normalizeLeagueName("Liga BetPlay"));
+});
+
 test("teamSimilarity: reconoce nombres equivalentes", () => {
   assert.equal(teamSimilarity("FC Barcelona", "Barcelona"), 1);
   assert.equal(teamSimilarity("Atlético de Madrid", "Atlético Madrid"), 1);
@@ -122,6 +131,39 @@ test("findSeasonLink: localiza el enlace de temporada en la página del equipo",
   ];
   assert.equal(findSeasonLink(anchors, "t16", "2026-27"), anchors[1].href);
   assert.equal(findSeasonLink(anchors, "t16", "2030-31"), null);
+});
+
+test("extractTeamContext: obtiene país y liga desde breadcrumb de season page", () => {
+  const page: FetchedPage = {
+    url: "https://www.footballkitarchive.com/es/real-madrid-camisetas-2025-26-t16/",
+    title: "Camisetas Real Madrid 2025-26 - Football Kit Archive",
+    anchors: [],
+    breadcrumbs: [
+      { text: "España", href: "https://www.footballkitarchive.com/es/espana-camisetas/" },
+      { text: "La Liga", href: "https://www.footballkitarchive.com/es/la-liga-camisetas-l150/" },
+      { text: "2025-26", href: "https://www.footballkitarchive.com/es/la-liga-camisetas-2025-26-l150/" },
+      { text: "Real Madrid", href: "https://www.footballkitarchive.com/es/real-madrid-camisetas-t16/" },
+    ],
+    rows: [],
+    images: [],
+  };
+  assert.deepEqual(extractTeamContext(page), {
+    leagueName: "La Liga",
+    leagueUrl: "https://www.footballkitarchive.com/es/la-liga-camisetas-l150/",
+    country: "España",
+  });
+});
+
+test("extractTeamContext: no usa Competiciones del kit como liga primaria", () => {
+  const page: FetchedPage = {
+    url: "https://www.footballkitarchive.com/es/camiseta-local-real-madrid-2025-26-320888/",
+    title: "Camiseta Local Real Madrid 2025-26 - Football Kit Archive",
+    anchors: [],
+    breadcrumbs: [],
+    rows: ["Competiciones Champions League"],
+    images: [],
+  };
+  assert.deepEqual(extractTeamContext(page), { leagueName: null, leagueUrl: null, country: null });
 });
 
 // ---------------- PARSER: enlaces de camisetas (estructura real FKA) ----------------
@@ -187,8 +229,57 @@ test("parseKitDetail: extrae title/team/season/type/imageUrl/sourceUrl", () => {
   assert.equal(kit?.team, "Real Madrid");
   assert.equal(kit?.season, "2026-27");
   assert.equal(kit?.type, "LOCAL");
+  assert.equal(kit?.leagueName, null);
   assert.equal(kit?.imageUrl, "https://www.footballkitarchive.com/cdn/2026/06/11/hash/camiseta-local-real-madrid-2026-27.jpg");
   assert.equal(kit?.sourceUrl, page.url);
+});
+
+test("parseKitDetail: prioriza og:image sobre img[data-src]", () => {
+  const page: FetchedPage = {
+    url: "https://www.footballkitarchive.com/es/camiseta-local-real-madrid-2025-26-320888/",
+    title: "Camiseta Local Real Madrid 2025-26 - Football Kit Archive",
+    anchors: [],
+    rows: ["Equipo Real Madrid", "Temporada 25-26", "Tipo Local"],
+    images: [
+      { src: "data:image/png", dataSrc: "/cdn/2026/04/10/hash-small/camiseta-local-real-madrid-2025-26.jpg" },
+    ],
+    metaImages: [
+      {
+        property: "og:image",
+        name: null,
+        content: "https://www.footballkitarchive.com/cdn/2026/04/10/hash/camiseta-local-real-madrid-2025-26.jpg",
+      },
+    ],
+  };
+
+  const kit = parseKitDetail(page);
+  assert.equal(
+    kit?.imageUrl,
+    "https://www.footballkitarchive.com/cdn/2026/04/10/hash/camiseta-local-real-madrid-2025-26.jpg",
+  );
+});
+
+test("parseKitDetail: usa twitter:image si no existe og:image", () => {
+  const page: FetchedPage = {
+    url: "https://www.footballkitarchive.com/es/camiseta-visitante-real-madrid-2025-26-338203/",
+    title: "Camiseta Visitante Real Madrid 2025-26 - Football Kit Archive",
+    anchors: [],
+    rows: ["Equipo Real Madrid", "Temporada 25-26", "Tipo Visitante"],
+    images: [],
+    metaImages: [
+      {
+        property: null,
+        name: "twitter:image",
+        content: "/cdn/2026/04/10/hash/camiseta-visitante-real-madrid-2025-26.jpg",
+      },
+    ],
+  };
+
+  const kit = parseKitDetail(page);
+  assert.equal(
+    kit?.imageUrl,
+    "https://www.footballkitarchive.com/cdn/2026/04/10/hash/camiseta-visitante-real-madrid-2025-26.jpg",
+  );
 });
 
 test("parseKitDetail: descarta fichas sin datos esenciales", () => {
@@ -225,6 +316,17 @@ test("resolveSeason: encuentra temporada por año o slug", () => {
   assert.equal(resolveSeason(SEASONS, "2027-28"), null);
 });
 
+test("resolveLeague: reutiliza liga existente por nombre o slug normalizado", () => {
+  const leagues = [
+    { id: "l1", name: "La Liga", slug: "la-liga" },
+    { id: "l2", name: "Premier League", slug: "premier-league" },
+  ];
+  assert.equal(resolveLeague(leagues, "LaLiga")?.id, "l1");
+  assert.equal(resolveLeague(leagues, "la liga")?.id, "l1");
+  assert.equal(resolveLeague(leagues, "PremierLeague")?.id, "l2");
+  assert.equal(resolveLeague(leagues, "Liga BetPlay"), null);
+});
+
 test("isDuplicate: detecta producto equivalente", () => {
   const products = [{ id: "p1", teamId: "t1", seasonId: "s1", kitType: "LOCAL" }];
   assert.equal(isDuplicate(products, "t1", "s1", "LOCAL"), true);
@@ -237,6 +339,9 @@ const KIT: FkaKit = {
   team: "Real Madrid",
   season: "2026-27",
   type: "LOCAL",
+  leagueName: "La Liga",
+  leagueUrl: "https://www.footballkitarchive.com/es/la-liga-camisetas-l150/",
+  country: "España",
   imageUrl: "https://www.footballkitarchive.com/cdn/2026/06/11/hash/camiseta-local-real-madrid-2026-27.jpg",
   sourceUrl: "https://www.footballkitarchive.com/es/camiseta-local-real-madrid-2026-27-439615/",
 };

@@ -138,7 +138,7 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
                 ))}
               </ul>
               <p className="mt-1 text-xs text-amber-800">
-                Se crearán automáticamente en la liga &ldquo;Otros&rdquo;.
+                Se crearán automáticamente con la liga detectada en Football Kit Archive.
               </p>
             </>
           )}

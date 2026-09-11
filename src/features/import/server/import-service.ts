@@ -52,8 +52,9 @@ function makeSupabaseImageGateway(download: ImageDownloader): ImageGateway {
 }
 
 /**
- * downloadImage: transport de descarga de imagen. Por defecto usa fetch
- * directo con Referer (válido en tests y producción).
+ * downloadImage: transport de descarga de imagen. En producción la action
+ * inyecta la descarga vía la sesión CDP del navegador FKA; el default directo
+ * queda como fallback testeable.
  */
 export function importFkaKitsAsDraftsWithRealDeps(
   kits: FkaKit[],

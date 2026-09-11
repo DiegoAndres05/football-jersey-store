@@ -1,5 +1,3 @@
-import "server-only";
-
 /**
  * Descarga y validación de imágenes de Football Kit Archive.
  * Único propósito: convertir la imageUrl de FKA en un buffer seguro

@@ -8,8 +8,12 @@ import {
 } from "../src/features/import/fka/fka-image.ts";
 import {
   importFkaKitsAsDrafts,
+  leagueToCreateData,
+  missingTeamContexts,
   missingSeasons,
+  requireFkaLeagueName,
   seasonToCreateData,
+  teamToCreateData,
   type ImportStore,
   type ImageGateway,
   type FkaImportResult,
@@ -144,6 +148,9 @@ function kit(overrides: Partial<FkaKit> = {}): FkaKit {
     team: "Real Madrid",
     season: "2025-26",
     type: "LOCAL",
+    leagueName: "La Liga",
+    leagueUrl: "https://www.footballkitarchive.com/es/la-liga-camisetas-l150/",
+    country: "España",
     imageUrl: "https://www.footballkitarchive.com/cdn/2025/01/01/hash/local.jpg",
     sourceUrl: "https://www.footballkitarchive.com/es/camiseta-local-real-madrid-2025-26-1/",
     ...overrides,
@@ -396,6 +403,76 @@ test("missingSeasons: lista temporadas únicas faltantes solo con equipo encontr
 test("missingSeasons: sin temporadas faltantes devuelve lista vacía", () => {
   const missing = missingSeasons([kit(), kit({ team: "FC Barcelona" })], TEAMS, SEASONS);
   assert.deepEqual(missing, []);
+});
+
+test("leagueToCreateData: crea liga desde FKA sin usar Otros", () => {
+  const data = leagueToCreateData({
+    teamName: "Girona FC",
+    leagueName: "La Liga",
+    leagueUrl: "https://www.footballkitarchive.com/es/la-liga-camisetas-l150/",
+    country: "España",
+  });
+  assert.deepEqual(data, { slug: "la-liga", name: "La Liga", country: "España" });
+  assert.notEqual(data?.slug, "otros");
+});
+
+test("teamToCreateData: asocia equipo nuevo con la liga resuelta", () => {
+  assert.deepEqual(teamToCreateData("Girona FC", "league-la-liga"), {
+    name: "Girona FC",
+    slug: "girona-fc",
+    leagueId: "league-la-liga",
+  });
+});
+
+test("missingTeamContexts: conserva una liga para todos los kits de una season", () => {
+  const contexts = missingTeamContexts(
+    [
+      kit({ team: "Girona FC", type: "LOCAL", title: "Local Girona" }),
+      kit({ team: "Girona FC", type: "VISITANTE", title: "Visitante Girona" }),
+    ],
+    TEAMS,
+  );
+  assert.deepEqual(contexts, [
+    {
+      teamName: "Girona FC",
+      leagueName: "La Liga",
+      leagueUrl: "https://www.footballkitarchive.com/es/la-liga-camisetas-l150/",
+      country: "España",
+    },
+  ]);
+});
+
+test("missingTeamContexts: no duplica equipos faltantes equivalentes", () => {
+  const contexts = missingTeamContexts(
+    [
+      kit({ team: "Girona FC" }),
+      kit({ team: "Girona" }),
+    ],
+    TEAMS,
+  );
+  assert.equal(contexts.length, 1);
+  assert.equal(contexts[0].teamName, "Girona FC");
+});
+
+test("requireFkaLeagueName: falla con error claro si FKA no entrega liga", () => {
+  assert.throws(
+    () => requireFkaLeagueName({ teamName: "Girona FC", leagueName: null, leagueUrl: null, country: "España" }),
+    /FKA no proporcionó liga\/competición/,
+  );
+});
+
+test("missingTeamContexts: rechaza ligas contradictorias para el mismo equipo", () => {
+  assert.throws(
+    () =>
+      missingTeamContexts(
+        [
+          kit({ team: "Girona FC", leagueName: "La Liga" }),
+          kit({ team: "Girona FC", leagueName: "Premier League" }),
+        ],
+        TEAMS,
+      ),
+    /ligas distintas/,
+  );
 });
 
 test("importación: crea la temporada antes de importar permite importar el kit", async () => {

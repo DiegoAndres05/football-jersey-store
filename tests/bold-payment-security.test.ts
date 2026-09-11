@@ -90,8 +90,10 @@ describe("P0 Security: reconcile endpoint accepts no payment status from client"
     assert.match(callText, /orderCurrency/, "must pass orderCurrency");
   });
 
-  it("reconcileBoldOrder passes orderTotal from DB (not from client)", () => {
-    assert.match(route, /orderTotal:\s*order\.total/, "orderTotal must come from DB order object");
+  it("reconcileBoldOrder passes order amount derived from DB (not from client)", () => {
+    assert.match(route, /expectedPaymentAmount/, "orderTotal must be derived from the DB order object");
+    assert.match(route, /order\.total/, "expected amount must use persisted order total");
+    assert.match(route, /order\.exchangeRateCopPerUsd/, "USD expected amount must use persisted exchange rate");
   });
 });
 
@@ -178,6 +180,18 @@ describe("P0 Security: confirmation page never trusts URL for payment status", (
       /typeof sp\["bold-tx-status"\] === "string"/,
       "bold-tx-status is checked for presence only (boolean), not used as value",
     );
+  });
+});
+
+describe("P0 Security: reconcile validates charged currency amount", () => {
+  it("converts USD orders before comparing the Bold amount", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/app/api/bold/reconcile/route.ts"),
+      "utf8",
+    );
+    assert.match(source, /toUsdCents/);
+    assert.match(source, /expectedPaymentAmount/);
+    assert.match(source, /orderTotal: expectedPaymentAmount/);
   });
 });
 

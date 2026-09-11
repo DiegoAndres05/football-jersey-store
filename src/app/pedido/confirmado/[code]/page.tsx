@@ -148,7 +148,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
             <dt className="text-xs text-muted-foreground uppercase tracking-wide">Envío a</dt>
             <dd className="mt-1">
               {order.shippingFullName} · {order.shippingLine1}, {order.shippingCity},{" "}
-              {order.shippingState}
+              {order.shippingState}, {order.shippingCountry}
             </dd>
           </div>
         </dl>

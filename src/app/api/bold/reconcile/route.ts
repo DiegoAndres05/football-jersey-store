@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getOrderByCode } from "@/features/orders/repositories/order-repository";
 import { reconcileBoldOrder } from "@/features/payments/services/bold-payment-reconcile";
+import { toUsdCents } from "@/shared/money/convert";
 
 export const runtime = "nodejs";
 
@@ -71,12 +72,18 @@ export async function POST(request: Request) {
       );
     }
 
+    const orderCurrency = order.saleCurrency ?? "COP";
+    const expectedPaymentAmount =
+      orderCurrency === "USD" && order.exchangeRateCopPerUsd
+        ? toUsdCents(order.total, order.exchangeRateCopPerUsd)
+        : order.total;
+
     // 3. Reconcile with Bold API (no returnTxStatus — server-only trust)
     const result = await reconcileBoldOrder({
       orderCode,
       boldOrderId,
-      orderTotal: order.total,
-      orderCurrency: order.saleCurrency ?? "COP",
+      orderTotal: expectedPaymentAmount,
+      orderCurrency,
       // Intentionally omit returnTxStatus — server queries Bold directly
     });
 

@@ -4,17 +4,28 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/features/auth/server/session";
 import { FkaFetcher } from "../fka/fetcher";
+import { fkaErrorUserMessage } from "../fka/http";
 import {
+  extractTeamContext,
   extractKitLinks,
   findSeasonLink,
   isSeasonPage,
   parseKitDetail,
   parseTeamIdFromUrl,
 } from "../fka/parser";
-import { resolveImport } from "../fka/resolver";
-import type { ImportPreviewItem, FkaSearchInput, FkaKit } from "../fka/types";
+import { resolveImport, resolveLeague } from "../fka/resolver";
+import type { DbLeague } from "../fka/resolver";
+import type { ImportPreviewItem, FkaSearchInput, FkaKit, FkaTeamContext } from "../fka/types";
 import { importFkaKitsAsDraftsWithRealDeps, type FkaImportResult } from "./import-service";
-import { missingSeasons, seasonToCreateData, missingTeams, teamToCreateData } from "./import-logic";
+import {
+  leagueToCreateData,
+  missingSeasons,
+  missingTeamContexts,
+  requireFkaLeagueName,
+  seasonToCreateData,
+  teamToCreateData,
+} from "./import-logic";
+import type { MissingTeamContext } from "./import-logic";
 
 const searchSchema = z.object({
   teams: z.array(z.string().trim().min(1)).min(1, "Escribe al menos un equipo.").max(10),
@@ -27,11 +38,9 @@ export type FkaPreviewResult =
   | { ok: false; error: string };
 
 /**
- * El CDN de FKA bloquea las imágenes cuando se solicitan sin el Referer
- * correcto (hotlink protection de Cloudflare → 403). La descarga se hace
- * con Referer de FKA vía downloadFkaImage y se devuelve como data URL
- * en previewImage. imageUrl se conserva intacto para el flujo de
- * importación.
+ * La miniatura de preview se descarga a través de la misma sesión CDP que
+ * navega FKA. imageUrl se conserva intacto para que el flujo de importación
+ * descargue la misma imagen original.
  */
 async function withPreviewImage(
   fetcher: FkaFetcher,
@@ -46,6 +55,15 @@ async function withPreviewImage(
   }
 }
 
+function withTeamContext<T extends Omit<FkaKit, "source">>(kit: T, context: FkaTeamContext): T {
+  return {
+    ...kit,
+    leagueName: context.leagueName,
+    leagueUrl: context.leagueUrl,
+    country: context.country,
+  };
+}
+
 export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<FkaPreviewResult> {
   const admin = await getSessionUser();
   if (!admin) return { ok: false, error: "No autorizado." };
@@ -55,19 +73,21 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
 
-  const [{ teams, seasons, products }, fetcher] = await Promise.all([
-    prisma.$transaction(async (tx) => {
-      const [teams, seasons, products] = await Promise.all([
-        tx.team.findMany({ select: { id: true, name: true } }),
-        tx.season.findMany({ select: { id: true, name: true, slug: true, year: true } }),
-        tx.product.findMany({ select: { id: true, teamId: true, seasonId: true, kitType: true } }),
-      ]);
-      return { teams, seasons, products };
-    }),
-    FkaFetcher.connect(),
-  ]);
+  let fetcher: FkaFetcher | null = null;
 
   try {
+    const [{ teams, seasons, products }, connectedFetcher] = await Promise.all([
+      prisma.$transaction(async (tx) => {
+        const [teams, seasons, products] = await Promise.all([
+          tx.team.findMany({ select: { id: true, name: true } }),
+          tx.season.findMany({ select: { id: true, name: true, slug: true, year: true } }),
+          tx.product.findMany({ select: { id: true, teamId: true, seasonId: true, kitType: true } }),
+        ]);
+        return { teams, seasons, products };
+      }),
+      FkaFetcher.connect(),
+    ]);
+    fetcher = connectedFetcher;
     const items: ImportPreviewItem[] = [];
     for (const teamName of parsed.data.teams) {
       const team = await fetcher.searchTeam(teamName);
@@ -79,6 +99,9 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
             team: teamName,
             season: parsed.data.season,
             type: parsed.data.types[0],
+            leagueName: null,
+            leagueUrl: null,
+            country: null,
             imageUrl: null,
             sourceUrl: "",
           },
@@ -91,6 +114,7 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
       }
 
       const teamPage = await fetcher.fetchPage(team.url);
+      const teamContext = extractTeamContext(teamPage);
       const teamId = parseTeamIdFromUrl(teamPage.url);
       if (!teamId) {
         items.push({
@@ -100,6 +124,9 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
             team: team.name,
             season: parsed.data.season,
             type: parsed.data.types[0],
+            leagueName: teamContext.leagueName,
+            leagueUrl: teamContext.leagueUrl,
+            country: teamContext.country,
             imageUrl: null,
             sourceUrl: team.url,
           },
@@ -120,6 +147,9 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
             team: team.name,
             season: parsed.data.season,
             type: parsed.data.types[0],
+            leagueName: teamContext.leagueName,
+            leagueUrl: teamContext.leagueUrl,
+            country: teamContext.country,
             imageUrl: null,
             sourceUrl: team.url,
           },
@@ -132,6 +162,8 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
       }
 
       const seasonPage = await fetcher.fetchPage(seasonLink);
+      const seasonContext = extractTeamContext(seasonPage);
+      const fkaTeamContext = seasonContext.leagueName ? seasonContext : teamContext;
       if (!isSeasonPage(seasonPage.url)) {
         items.push({
           kit: {
@@ -140,6 +172,9 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
             team: team.name,
             season: parsed.data.season,
             type: parsed.data.types[0],
+            leagueName: fkaTeamContext.leagueName,
+            leagueUrl: fkaTeamContext.leagueUrl,
+            country: fkaTeamContext.country,
             imageUrl: null,
             sourceUrl: seasonLink,
           },
@@ -163,6 +198,9 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
             team: team.name,
             season: parsed.data.season,
             type: parsed.data.types[0],
+            leagueName: fkaTeamContext.leagueName,
+            leagueUrl: fkaTeamContext.leagueUrl,
+            country: fkaTeamContext.country,
             imageUrl: null,
             sourceUrl: seasonLink,
           },
@@ -186,6 +224,9 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
                 team: team.name,
                 season: parsed.data.season,
                 type: link.type ?? parsed.data.types[0],
+                leagueName: fkaTeamContext.leagueName,
+                leagueUrl: fkaTeamContext.leagueUrl,
+                country: fkaTeamContext.country,
                 imageUrl: null,
                 sourceUrl: link.url,
               },
@@ -197,7 +238,7 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
             continue;
           }
 
-          const { kit, previewImage } = await withPreviewImage(fetcher, parsedKit);
+          const { kit, previewImage } = await withPreviewImage(fetcher, withTeamContext(parsedKit, fkaTeamContext));
           const resolution = resolveImport(kit, teams, seasons, products);
           items.push({
             kit: { ...kit, source: "football-kit-archive" },
@@ -224,6 +265,9 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
               team: team.name,
               season: parsed.data.season,
               type: link.type ?? parsed.data.types[0],
+              leagueName: fkaTeamContext.leagueName,
+              leagueUrl: fkaTeamContext.leagueUrl,
+              country: fkaTeamContext.country,
               imageUrl: null,
               sourceUrl: link.url,
             },
@@ -237,8 +281,10 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
     }
 
     return { ok: true, items };
+  } catch (err) {
+    return { ok: false, error: fkaErrorUserMessage(err) };
   } finally {
-    await fetcher.close();
+    await fetcher?.close();
   }
 }
 
@@ -251,6 +297,9 @@ const importSchema = z.object({
         team: z.string().trim().min(1, "Falta el equipo.").max(100),
         season: z.string().trim().regex(/^(\d{4}|\d{2})-\d{2}$/, "Temporada inválida."),
         type: z.enum(["LOCAL", "VISITANTE", "TERCERA"]),
+        leagueName: z.string().trim().min(1, "Liga inválida.").max(100).nullable().optional(),
+        leagueUrl: z.union([z.string().url("URL de liga inválida."), z.null()]).optional(),
+        country: z.string().trim().min(1, "País inválido.").max(80).nullable().optional(),
         imageUrl: z.union([z.string().url("Imagen inválida."), z.null()]),
         sourceUrl: z.string().refine(
           (v) => v === "" || z.string().url().safeParse(v).success,
@@ -272,12 +321,13 @@ export type FkaImportActionOptions = { createSeasons?: boolean; createTeams?: bo
 
 async function loadImportContext() {
   return prisma.$transaction(async (tx) => {
-    const [teams, seasons, products] = await Promise.all([
+    const [teams, seasons, products, leagues] = await Promise.all([
       tx.team.findMany({ select: { id: true, name: true } }),
       tx.season.findMany({ select: { id: true, name: true, slug: true, year: true } }),
       tx.product.findMany({ select: { id: true, teamId: true, seasonId: true, kitType: true } }),
+      tx.league.findMany({ select: { id: true, name: true, slug: true } }),
     ]);
-    return { teams, seasons, products };
+    return { teams, seasons, products, leagues };
   });
 }
 
@@ -293,18 +343,33 @@ async function createMissingSeasons(seasons: string[]): Promise<void> {
   );
 }
 
-async function createMissingTeams(teamNames: string[]): Promise<void> {
-  const otrosLeague = await prisma.league.findUnique({ where: { slug: "otros" } });
-  if (!otrosLeague) throw new Error("Falta la liga 'Otros' para crear equipos automáticamente.");
-  const toCreate = teamNames
-    .map((name) => teamToCreateData(name, otrosLeague.id))
-    .filter((d): d is NonNullable<typeof d> => d !== null);
-  if (toCreate.length === 0) return;
-  await prisma.$transaction(
-    toCreate.map((data) =>
-      prisma.team.upsert({ where: { slug: data.slug }, update: {}, create: data }),
-    ),
-  );
+async function resolveOrCreateLeague(context: MissingTeamContext, leagues: DbLeague[]): Promise<DbLeague> {
+  const leagueName = requireFkaLeagueName(context);
+  const existing = resolveLeague(leagues, leagueName);
+  if (existing) return existing;
+
+  const data = leagueToCreateData(context);
+  if (!data) {
+    throw new Error(`No se pudo crear la liga "${leagueName}" obtenida desde FKA.`);
+  }
+
+  const league = await prisma.league.upsert({
+    where: { slug: data.slug },
+    update: {},
+    create: data,
+    select: { id: true, name: true, slug: true },
+  });
+  if (!resolveLeague(leagues, league.name)) leagues.push(league);
+  return league;
+}
+
+async function createMissingTeams(contexts: MissingTeamContext[], leagues: DbLeague[]): Promise<void> {
+  for (const context of contexts) {
+    const league = await resolveOrCreateLeague(context, leagues);
+    const data = teamToCreateData(context.teamName, league.id);
+    if (!data) continue;
+    await prisma.team.upsert({ where: { slug: data.slug }, update: {}, create: data });
+  }
 }
 
 export async function importFkaKitsAction(
@@ -318,20 +383,35 @@ export async function importFkaKitsAction(
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
+  const parsedKits: FkaKit[] = parsed.data.kits.map((kit) => ({
+    ...kit,
+    leagueName: kit.leagueName ?? null,
+    leagueUrl: kit.leagueUrl ?? null,
+    country: kit.country ?? null,
+  }));
 
   const db = await loadImportContext();
 
-  const missingT = missingTeams(parsed.data.kits, db.teams);
+  let missingT: MissingTeamContext[];
+  try {
+    missingT = missingTeamContexts(parsedKits, db.teams);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Error al resolver equipos faltantes." };
+  }
   if (missingT.length > 0 && !options.createTeams) {
-    return { ok: true, needsTeams: true, teams: missingT };
+    return { ok: true, needsTeams: true, teams: missingT.map((team) => team.teamName) };
   }
   if (missingT.length > 0 && options.createTeams) {
-    await createMissingTeams(missingT);
+    try {
+      await createMissingTeams(missingT, db.leagues);
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "Error al crear equipos faltantes." };
+    }
     const teams = await prisma.team.findMany({ select: { id: true, name: true } });
     db.teams = teams;
   }
 
-  const missing = missingSeasons(parsed.data.kits, db.teams, db.seasons);
+  const missing = missingSeasons(parsedKits, db.teams, db.seasons);
   if (missing.length > 0 && !options.createSeasons) {
     return { ok: true, needsSeasons: true, seasons: missing };
   }
@@ -341,17 +421,20 @@ export async function importFkaKitsAction(
     db.seasons = seasons;
   }
 
-  const fetcher = await FkaFetcher.connect();
+  let fetcher: FkaFetcher | null = null;
   try {
+    fetcher = await FkaFetcher.connect();
     const result = await importFkaKitsAsDraftsWithRealDeps(
-      parsed.data.kits,
+      parsedKits,
       db.teams,
       db.seasons,
       db.products,
       fetcher.downloadImage.bind(fetcher),
     );
     return { ok: true, result };
+  } catch (err) {
+    return { ok: false, error: fkaErrorUserMessage(err) };
   } finally {
-    await fetcher.close();
+    await fetcher?.close();
   }
 }

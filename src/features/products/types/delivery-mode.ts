@@ -31,3 +31,11 @@ export function getAvailableDeliveryModes(
   if (allowsBackorder) modes.push("BAJO_PEDIDO");
   return modes;
 }
+
+export function resolveDeliveryModeSelection(
+  selected: DeliveryMode,
+  availableModes: readonly DeliveryMode[],
+): DeliveryMode | null {
+  if (availableModes.includes(selected)) return selected;
+  return availableModes[0] ?? null;
+}
