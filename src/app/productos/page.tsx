@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,31 +19,49 @@ import { parseProductFiltersParams } from "@/features/products/schemas/product-f
 import type { ProductFilters as FilterParams } from "@/features/products/types/product-types";
 import { RecentlyViewed } from "@/features/products/components/recently-viewed";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
+import { resolvePublicOrigin } from "@/shared/config/public-origin";
+import { INDEXABLE, NOINDEX_FOLLOW } from "@/features/seo/domain/robots-policy";
+import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
+import { decideCatalogIndexation } from "@/features/seo/domain/catalog-indexation";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-
-export const metadata: Metadata = {
-  title: "Catálogo de camisetas de fútbol",
-  description:
-    "Explora nuestro catálogo de camisetas de fútbol: ligas, equipos, temporadas y tallas. Envío a toda Colombia.",
-  alternates: { canonical: `${siteUrl}/productos` },
-  openGraph: {
-    title: "Catálogo de camisetas de fútbol | Flashsport",
-    description:
-      "Explora nuestro catálogo de camisetas de fútbol: ligas, equipos, temporadas y tallas.",
-    url: `${siteUrl}/productos`,
-    siteName: "Flashsport",
-    type: "website",
-    locale: "es_CO",
-  },
-};
+const siteUrl = resolvePublicOrigin();
 
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
+export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
+  const params = await searchParams;
+  const decision = decideCatalogIndexation(params as Record<string, string | undefined>);
+
+  const robots = decision.action === "noindex" ? NOINDEX_FOLLOW : INDEXABLE;
+
+  return {
+    title: "Catálogo de camisetas de fútbol",
+    description:
+      "Explora nuestro catálogo de camisetas de fútbol: ligas, equipos, temporadas y tallas. Envío a toda Colombia.",
+    robots,
+    alternates: { canonical: `${siteUrl}/productos` },
+    openGraph: {
+      title: "Catálogo de camisetas de fútbol | Flashsport",
+      description:
+        "Explora nuestro catálogo de camisetas de fútbol: ligas, equipos, temporadas y tallas.",
+      url: `${siteUrl}/productos`,
+      siteName: "Flashsport",
+      type: "website",
+      locale: "es_CO",
+    },
+  };
+}
+
 export default async function ProductosPage({ searchParams }: PageProps) {
   const params = await searchParams;
+
+  const decision = decideCatalogIndexation(params as Record<string, string | undefined>);
+  if (decision.action === "redirect") {
+    permanentRedirect(decision.destination);
+  }
+
   const raw = parseProductFiltersParams(params);
 
   const filters: FilterParams = {
@@ -76,7 +95,17 @@ export default async function ProductosPage({ searchParams }: PageProps) {
   });
   const hasActiveFilters = activeFilters.length > 0;
 
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: "Inicio", path: "/" },
+    { name: "Catálogo", path: "/productos" },
+  ]);
+
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
     <div className="container-page py-8 md:py-12">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
@@ -233,6 +262,7 @@ export default async function ProductosPage({ searchParams }: PageProps) {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

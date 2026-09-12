@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, ArrowRight } from "lucide-react";
 import { getLeagues, getTeamsByLeague } from "@/features/products/repositories/product-repository";
+import { resolvePublicOrigin } from "@/shared/config/public-origin";
+import { INDEXABLE } from "@/features/seo/domain/robots-policy";
+import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Ligas",
+  description:
+    "Explora las principales ligas de fútbol del mundo. Encuentra camisetas de equipos por competición.",
+  robots: INDEXABLE,
+  alternates: { canonical: `${resolvePublicOrigin()}/ligas` },
 };
 
 export default async function LigasPage() {
@@ -12,7 +20,17 @@ export default async function LigasPage() {
     leagues.map((l) => getTeamsByLeague(l.slug)),
   );
 
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: "Inicio", path: "/" },
+    { name: "Ligas", path: "/ligas" },
+  ]);
+
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
     <div className="container-page py-8 md:py-12 max-w-5xl">
       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
         <Link href="/" className="hover:text-foreground transition-colors">Inicio</Link>
@@ -57,7 +75,7 @@ export default async function LigasPage() {
                 {teams.map((team) => (
                   <Link
                     key={team.slug}
-                    href={`/productos?liga=${league.slug}&equipo=${team.slug}`}
+                    href={`/equipos/${team.slug}`}
                     className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:border-foreground hover:bg-accent transition-colors"
                   >
                     {team.name}
@@ -70,5 +88,6 @@ export default async function LigasPage() {
         })}
       </div>
     </div>
+    </>
   );
 }

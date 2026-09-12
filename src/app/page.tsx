@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -19,11 +20,22 @@ import {
   leagueLogoSrc,
   leagueMonogram,
 } from "@/features/products/domain/league-logos";
+import { leagueLogoAlt } from "@/features/seo/domain/product-image-alt";
 import { whatsappLink } from "@/shared/config/site";
 import { HeroProduct } from "@/components/home/hero-product";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
 import { getHomepageCarouselSlides } from "@/features/products/repositories/homepage-carousel-repository";
 import { FeaturedCoverflowCarousel } from "@/features/products/components/featured-coverflow-carousel";
+import { resolvePublicOrigin } from "@/shared/config/public-origin";
+import { INDEXABLE } from "@/features/seo/domain/robots-policy";
+
+export const metadata: Metadata = {
+  title: "Flashsport — Camisetas de fútbol",
+  description:
+    "Camisetas de fútbol de las mejores ligas del mundo. Equipos, temporadas y tallas reales, con envío a toda Colombia.",
+  robots: INDEXABLE,
+  alternates: { canonical: resolvePublicOrigin() },
+};
 
 const BIG_LEAGUES = BIG_LEAGUE_SLUGS;
 
@@ -136,14 +148,14 @@ export default async function HomePage() {
             return (
               <Link
                 key={league.slug}
-                href={`/productos?liga=${league.slug}`}
+                href={`/ligas/${league.slug}`}
                 className="group flex flex-col rounded-xl border border-border bg-card p-5 transition-all hover:border-foreground/40 hover:shadow-md"
               >
                 <span className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg p-0.104 transition-colors group-hover:bg-foreground/5">
                   {logoSrc ? (
                     <Image
                       src={logoSrc}
-                      alt=""
+                      alt={leagueLogoAlt(league.name)}
                       width={44}
                       height={44}
                       className="h-full w-full object-contain"

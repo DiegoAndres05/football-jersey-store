@@ -8,9 +8,9 @@ const FOOTER_LINKS = [
     links: [
       { href: "/productos", label: "Catálogo" },
       { href: "/ligas", label: "Ligas" },
-      { href: "/productos?liga=la-liga", label: "La Liga" },
-      { href: "/productos?liga=premier-league", label: "Premier League" },
-      { href: "/productos?liga=ligue-1", label: "Ligue 1" },
+      { href: "/ligas/la-liga", label: "La Liga" },
+      { href: "/ligas/premier-league", label: "Premier League" },
+      { href: "/ligas/ligue-1", label: "Ligue 1" },
     ],
   },
   {

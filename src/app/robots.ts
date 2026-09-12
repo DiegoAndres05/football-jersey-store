@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
+import { resolvePublicOrigin } from "@/shared/config/public-origin";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+const BASE_URL = resolvePublicOrigin();
 
 export default function robots(): MetadataRoute.Robots {
   return {

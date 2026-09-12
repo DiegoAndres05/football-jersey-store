@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { getProducts } from "@/features/products/repositories/product-repository";
 import { FavoritesPageClient } from "@/features/products/components/favorites-page-client";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
+import { NOINDEX_NOFOLLOW } from "@/features/seo/domain/robots-policy";
 
-export const metadata: Metadata = { title: "Favoritos" };
+export const metadata: Metadata = { title: "Favoritos", robots: NOINDEX_NOFOLLOW };
 
 export default async function FavoritesPage() {
   const [result, currencyCtx] = await Promise.all([

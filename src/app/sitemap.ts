@@ -1,15 +1,25 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
+import { resolvePublicOrigin } from "@/shared/config/public-origin";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+const BASE_URL = resolvePublicOrigin();
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [products, leagues] = await Promise.all([
+  const [products, leagues, teams] = await Promise.all([
     prisma.product.findMany({
       where: { isActive: true },
       select: { slug: true, updatedAt: true },
     }),
-    prisma.league.findMany({ select: { slug: true } }),
+    prisma.league.findMany({
+      select: { slug: true },
+      where: {
+        teams: { some: { products: { some: { isActive: true } } } },
+      },
+    }),
+    prisma.team.findMany({
+      select: { slug: true },
+      where: { products: { some: { isActive: true } } },
+    }),
   ]);
 
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -29,7 +39,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8 as const,
     })),
     ...leagues.map((l) => ({
-      url: `${BASE_URL}/productos?liga=${l.slug}`,
+      url: `${BASE_URL}/ligas/${l.slug}`,
+      priority: 0.6 as const,
+    })),
+    ...teams.map((t) => ({
+      url: `${BASE_URL}/equipos/${t.slug}`,
       priority: 0.6 as const,
     })),
   ];

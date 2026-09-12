@@ -266,6 +266,57 @@ export async function getTeamsByLeague(leagueSlug?: string): Promise<TeamData[]>
   return teams;
 }
 
+export async function getLeagueBySlug(slug: string) {
+  const league = await prisma.league.findUnique({
+    where: { slug },
+    include: {
+      _count: { select: { teams: true } },
+      teams: {
+        include: {
+          _count: { select: { products: { where: { isActive: true } } } },
+        },
+      },
+    },
+  });
+  if (!league) return null;
+  const activeProducts = await prisma.product.count({
+    where: { isActive: true, team: { leagueId: league.id } },
+  });
+  if (activeProducts === 0) return null;
+  return { ...league, activeProducts };
+}
+
+export async function getTeamBySlug(slug: string) {
+  const team = await prisma.team.findUnique({
+    where: { slug },
+    include: { league: true },
+  });
+  if (!team) return null;
+  const activeProducts = await prisma.product.count({
+    where: { isActive: true, teamId: team.id },
+  });
+  if (activeProducts === 0) return null;
+  return { ...team, activeProducts };
+}
+
+export async function getProductsByLeague(leagueId: string, limit = 50) {
+  return prisma.product.findMany({
+    where: { isActive: true, team: { leagueId } },
+    include: { team: true, season: true, images: { take: 1 } },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}
+
+export async function getProductsByTeam(teamId: string, limit = 50) {
+  return prisma.product.findMany({
+    where: { isActive: true, teamId },
+    include: { team: true, season: true, images: { take: 1 } },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}
+
 export async function getSeasons() {
   return prisma.season.findMany({ orderBy: { year: "desc" } });
 }

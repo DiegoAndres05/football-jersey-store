@@ -8,6 +8,7 @@ import { ConfirmationPaymentStatus } from "./confirmation-payment-status";
 import { DELIVERY_MODE_INFO, type DeliveryMode } from "@/features/products/types/delivery-mode";
 import { formatMoney } from "@/shared/money/format";
 import type { SaleCurrency } from "@/shared/currency/sale-currency";
+import { NOINDEX_NOFOLLOW } from "@/features/seo/domain/robots-policy";
 
 interface PageProps {
   params: Promise<{ code: string }>;
@@ -16,6 +17,7 @@ interface PageProps {
 
 export const metadata: Metadata = {
   title: "Pedido confirmado",
+  robots: NOINDEX_NOFOLLOW,
 };
 
 export default async function OrderConfirmationPage({ params, searchParams }: PageProps) {
@@ -68,9 +70,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
           {uiMode === "paid" && (
             <>
               Tu pedido <span className="font-semibold text-foreground">{order.code}</span> fue
-              pagado exitosamente. Te escribiremos a{" "}
-              <span className="font-semibold text-foreground">{order.customerEmail}</span> con
-              los detalles de entrega.
+              pagado exitosamente. Te notificaremos por correo con los detalles de entrega.
             </>
           )}
           {uiMode === "failed" && (
@@ -90,9 +90,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
           {uiMode === "pending" && (
             <>
               Tu pedido <span className="font-semibold text-foreground">{order.code}</span> fue
-              registrado. Te escribiremos a{" "}
-              <span className="font-semibold text-foreground">{order.customerEmail}</span> con
-              los detalles de entrega.
+              registrado. Te notificaremos por correo con los detalles de entrega.
             </>
           )}
         </p>

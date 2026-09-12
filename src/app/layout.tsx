@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SITE } from "@/shared/config/site";
+import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import "./globals.css";
 
 // Fuentes locales (self-hosted) para builds reproducibles sin red.
@@ -17,21 +18,16 @@ const inter = localFont({
   display: "swap",
 });
 
+const siteUrl = resolvePublicOrigin();
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     default: "Flashsport — Camisetas de fútbol",
     template: "%s · Flashsport",
   },
   description:
     "Camisetas de fútbol de calidad, réplicas de tus equipos favoritos, con personalización y envío a toda Colombia.",
-  keywords: [
-    "camisetas de fútbol",
-    "camisetas de equipos",
-    "réplicas de camisetas",
-    "personalización de camisetas",
-    "Flashsport",
-    "Colombia",
-  ],
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
@@ -42,7 +38,7 @@ export const metadata: Metadata = {
       "Camisetas de fútbol de calidad con personalización y envío a toda Colombia.",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Flashsport — Camisetas de fútbol",
     description:
       "Camisetas de fútbol de calidad con personalización y envío a toda Colombia.",
@@ -54,7 +50,6 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const organizationJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",

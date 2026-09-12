@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { productImageAlt } from "@/features/seo/domain/product-image-alt";
 
 type ImageData = {
   id: string;
@@ -12,7 +13,18 @@ type ImageData = {
   isPrimary: boolean;
 };
 
-export function ProductGallery({ images }: { images: ImageData[] }) {
+type ProductData = {
+  name: string;
+  team?: { name: string } | null;
+};
+
+export function ProductGallery({
+  images,
+  product,
+}: {
+  images: ImageData[];
+  product: ProductData;
+}) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const current = images[selectedIndex] ?? images[0];
 
@@ -34,7 +46,7 @@ export function ProductGallery({ images }: { images: ImageData[] }) {
         {current && (
           <Image
             src={current.url}
-            alt={current.altText ?? "Imagen del producto"}
+            alt={productImageAlt(current, product)}
             fill
             sizes="(max-width: 768px) 100vw, 50vw"
             className="object-cover"
@@ -49,7 +61,7 @@ export function ProductGallery({ images }: { images: ImageData[] }) {
             <button
               key={img.id}
               aria-pressed={i === selectedIndex}
-              aria-label={img.altText ?? `Imagen ${i + 1} del producto`}
+              aria-label={productImageAlt(img, product)}
               onClick={() => onThumbnailClick(i)}
               className={cn(
                 "relative w-16 h-20 shrink-0 rounded-lg overflow-hidden border-2 transition-all",
@@ -60,7 +72,7 @@ export function ProductGallery({ images }: { images: ImageData[] }) {
             >
               <Image
                 src={img.url}
-                alt={img.altText ?? ""}
+                alt={productImageAlt(img, product)}
                 fill
                 sizes="64px"
                 className="object-cover"

@@ -6,12 +6,15 @@ import { getProductBySlug, getRelatedProducts } from "@/features/products/reposi
 import { ProductDetailClient } from "@/features/products/components/product-detail-client";
 import { ProductGrid } from "@/features/products/components/product-grid";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
+import { resolvePublicOrigin } from "@/shared/config/public-origin";
+import { buildProductJsonLd } from "@/features/seo/domain/product-json-ld";
+import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+const siteUrl = resolvePublicOrigin();
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -61,39 +64,38 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   const primaryImage = product.images.find((img) => img.isPrimary) ?? product.images[0];
   const imageUrl = primaryImage?.url;
-  const minPrice = product.variants.length > 0
-    ? Math.min(...product.variants.map((v) => v.salePrice))
-    : null;
-  const availability = product.variants.some((v) => v.availability === "AVAILABLE")
-    ? "https://schema.org/InStock"
-    : product.variants.some((v) => v.availability === "ON_DEMAND")
-      ? "https://schema.org/PreOrder"
-      : "https://schema.org/OutOfStock";
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Product",
+  const jsonLd = buildProductJsonLd({
+    slug: product.slug,
     name: product.name,
-    description: product.description ?? `${product.name} - ${product.team.name} · ${product.season.name}`,
-    image: imageUrl ? [imageUrl] : undefined,
-    brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
-    category: product.kitType,
-    url: `${siteUrl}/productos/${product.slug}`,
-    offers: minPrice !== null ? {
-      "@type": "Offer",
-      priceCurrency: "COP",
-      price: minPrice,
-      availability,
-      url: `${siteUrl}/productos/${product.slug}`,
-      itemCondition: "https://schema.org/NewCondition",
-    } : undefined,
-  };
+    description: product.description,
+    brand: product.brand,
+    kitType: product.kitType,
+    imageUrl,
+    teamName: product.team.name,
+    seasonName: product.season.name,
+    variants: product.variants.map((v) => ({
+      sku: v.sku,
+      salePrice: v.salePrice,
+      stock: v.availability,
+    })),
+  });
+
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: "Inicio", path: "/" },
+    { name: "Catálogo", path: "/productos" },
+    { name: product.name, path: `/productos/${product.slug}` },
+  ]);
 
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       <ProductDetailClient product={product} currencyContext={currencyCtx} />
@@ -109,7 +111,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
               </p>
             </div>
             <Link
-              href={`/productos?equipo=${product.team.slug}`}
+              href={`/equipos/${product.team.slug}`}
               className="hidden sm:flex items-center gap-1 text-sm font-medium hover:underline"
             >
               Ver todo <ArrowRight className="h-4 w-4" />

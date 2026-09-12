@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NOINDEX_NOFOLLOW } from "@/features/seo/domain/robots-policy";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Mi cuenta",
+  robots: NOINDEX_NOFOLLOW,
 };
 
 export default function CuentaPage() {

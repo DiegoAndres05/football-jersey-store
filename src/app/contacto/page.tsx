@@ -1,10 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, MessageCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SITE, whatsappLink } from "@/shared/config/site";
+import { resolvePublicOrigin } from "@/shared/config/public-origin";
+import { INDEXABLE } from "@/features/seo/domain/robots-policy";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Contacto",
+  description:
+    "Contacta a Flashsport por WhatsApp o correo para pedidos, dudas de tallas y envíos.",
+  robots: INDEXABLE,
+  alternates: { canonical: `${resolvePublicOrigin()}/contacto` },
 };
 
 export default function ContactoPage() {

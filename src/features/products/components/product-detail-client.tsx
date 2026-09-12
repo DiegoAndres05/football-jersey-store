@@ -134,7 +134,7 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
 
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
         {/* Left: Gallery */}
-        <ProductGallery images={product.images} />
+        <ProductGallery images={product.images} product={product} />
 
         {/* Right: Product info */}
         <div className="space-y-6">
