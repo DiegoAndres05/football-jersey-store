@@ -28,6 +28,9 @@ export const metadata: Metadata = {
   },
   description:
     "Camisetas de fútbol de calidad, réplicas de tus equipos favoritos, con personalización y envío a toda Colombia.",
+  verification: {
+    google: "YEctg6SwsHUdA0jRQbxmfoHBYFt_YIoRHglGtDFmnIE",
+  },
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
