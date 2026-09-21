@@ -38,8 +38,8 @@ export type FkaPreviewResult =
   | { ok: false; error: string };
 
 /**
- * La miniatura de preview se descarga a través de la misma sesión CDP que
- * navega FKA. imageUrl se conserva intacto para que el flujo de importación
+ * La miniatura de preview se descarga por HTTPS desde FKA.
+ * imageUrl se conserva intacto para que el flujo de importación
  * descargue la misma imagen original.
  */
 async function withPreviewImage(

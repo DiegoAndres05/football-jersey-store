@@ -9,6 +9,8 @@
  * - Nunca se confía en una URL arbitraria del cliente.
  */
 
+import { FKA_USER_AGENT } from "./http.ts";
+
 const ALLOWED_HOSTS = new Set(["www.footballkitarchive.com", "cdn.footballkitarchive.com"]);
 const FKA_ORIGIN = "https://www.footballkitarchive.com";
 
@@ -61,7 +63,9 @@ export async function downloadFkaImage(url: string, timeoutMs = 15000): Promise<
       signal: controller.signal,
       redirect: "follow",
       headers: {
+        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
         Referer: `${FKA_ORIGIN}/`,
+        "User-Agent": FKA_USER_AGENT,
       },
     });
   } catch (err) {
