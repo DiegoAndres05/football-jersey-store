@@ -33,6 +33,9 @@ export const checkoutFormSchema = z.object({
   shippingCountry: z.string().trim().min(2, "Escoge el país de destino").max(80, "País demasiado largo"),
   shippingZipCode: z.string().max(12, "Código postal demasiado largo").optional().or(z.literal("")),
   notes: z.string().max(500, "Nota demasiado larga").optional().or(z.literal("")),
+  consentTerms: z.boolean().default(false),
+  consentPrivacy: z.boolean().default(false),
+  consentDataProcessing: z.boolean().default(false),
 });
 
 export type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;

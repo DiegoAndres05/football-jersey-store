@@ -148,9 +148,9 @@ export default async function ProductosPage({ searchParams }: PageProps) {
           {/* Mobile filters */}
           <div className="lg:hidden my-6">
             <details className="group">
-              <summary className="flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm font-medium cursor-pointer hover:bg-accent transition-colors">
+              <summary className="flex min-h-12 items-center justify-between rounded-lg border border-border bg-card p-3 text-sm font-medium cursor-pointer hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 <div className="flex items-center gap-2">
-                  Filtros
+                  <span id="mobile-filter-label">Filtros</span>
                   {hasActiveFilters && (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold text-background">
                       {activeFilters.length}
@@ -159,7 +159,7 @@ export default async function ProductosPage({ searchParams }: PageProps) {
                 </div>
                 <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
               </summary>
-              <div className="mt-3">
+              <div className="mt-3" aria-labelledby="mobile-filter-label">
                 <ProductFilters
                   leagues={leagues.map((l) => ({ slug: l.slug, name: l.name, country: l.country }))}
                   teams={teams.map((t) => ({ slug: t.slug, name: t.name }))}
@@ -173,7 +173,7 @@ export default async function ProductosPage({ searchParams }: PageProps) {
 
           {/* Active filter chips */}
           {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-2 mb-6">
+            <div className="flex flex-wrap items-center gap-2 mb-6" aria-label="Filtros activos">
               {activeFilters.map((f) => (
                 <a
                   key={f.param}
@@ -197,7 +197,16 @@ export default async function ProductosPage({ searchParams }: PageProps) {
             {result.products.length === 0 ? (
               <EmptyState variant={hasActiveFilters ? "results" : "catalog"} />
             ) : (
-              <ProductGrid products={result.products} priority currencyContext={currencyCtx} />
+              <ProductGrid
+                products={result.products}
+                priority
+                currencyContext={currencyCtx}
+                contextQuery={new URLSearchParams(
+                  Object.entries(params).flatMap(([key, value]) =>
+                    Array.isArray(value) ? value.map((item) => [key, item]) : value ? [[key, value]] : [],
+                  ),
+                ).toString()}
+              />
             )}
           </Suspense>
 

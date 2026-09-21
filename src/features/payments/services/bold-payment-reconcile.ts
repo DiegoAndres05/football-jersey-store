@@ -87,26 +87,26 @@ export async function reconcileBoldOrder(
 
     // Cross-order protection: Bold reference_id must match our order code
     const boldRefId = txStatus?.referenceId?.trim();
-    if (boldRefId && boldRefId !== orderCode) {
+    if (!boldRefId || boldRefId !== orderCode) {
       validationErrors.push(
         `reference_id mismatch: Bold="${boldRefId}" vs order="${orderCode}"`,
       );
     }
 
     // Amount validation: Bold API amount must match order total
-    if (orderTotal != null && txStatus?.amount != null) {
-      if (txStatus.amount !== orderTotal) {
+    if (orderTotal != null) {
+      if (txStatus?.amount == null || txStatus.amount !== orderTotal) {
         validationErrors.push(
-          `amount mismatch: Bold=${txStatus.amount} vs order=${orderTotal}`,
+          `amount mismatch: Bold=${txStatus?.amount} vs order=${orderTotal}`,
         );
       }
     }
 
     // Currency validation: Bold API currency must match order currency
-    if (orderCurrency && txStatus?.currency) {
-      const boldCurrency = txStatus.currency.trim().toUpperCase();
+    if (orderCurrency) {
+      const boldCurrency = txStatus?.currency?.trim().toUpperCase();
       const expectedCurrency = orderCurrency.trim().toUpperCase();
-      if (boldCurrency !== expectedCurrency) {
+      if (!boldCurrency || boldCurrency !== expectedCurrency) {
         validationErrors.push(
           `currency mismatch: Bold="${boldCurrency}" vs order="${expectedCurrency}"`,
         );

@@ -1,17 +1,18 @@
 import "server-only";
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { prisma } from "@/lib/prisma";
 import { canonicalizeBoldSale } from "@/features/payments/domain/bold-checkout-attrs";
 import { computeBoldIntegritySignature } from "@/features/payments/domain/bold-integrity";
+import { canOpenBold, getPaymentConfig } from "@/shared/config/payment";
 
 const BOLD_API_BASE = "https://payments.api.bold.co";
 
 function getBoldConfig() {
-  const identityKey = process.env.BOLD_IDENTITY_KEY?.trim();
-  const secretKey = process.env.BOLD_SECRET_KEY?.trim();
-  if (!identityKey || !secretKey) {
-    throw new Error("Faltan BOLD_IDENTITY_KEY o BOLD_SECRET_KEY en las variables de entorno.");
+  const config = getPaymentConfig();
+  if (config.provider !== "bold-sandbox" || !config.ready || !config.identityKey || !config.secretKey) {
+    throw new Error("Bold no está habilitado en modo sandbox.");
   }
-  return { identityKey, secretKey };
+  return { identityKey: config.identityKey, secretKey: config.secretKey };
 }
 
 /**
@@ -44,6 +45,59 @@ export function prepareBoldPayment(input: {
 }
 
 /**
+ * Prepares the exact amount stored on an order. Client supplied totals are
+ * deliberately not accepted here: the order snapshot is the payment authority.
+ * The upsert makes retries of hash preparation safe and reuses one reference.
+ */
+export async function prepareBoldTransaction(orderCode: string) {
+  const { identityKey, secretKey } = getBoldConfig();
+  const order = await prisma.order.findUnique({
+    where: { code: orderCode },
+    include: { boldTransaction: true, shippingSnapshot: true },
+  });
+  if (!order) throw new Error("Pedido no encontrado.");
+  const country = order.shippingCountry.trim().toUpperCase();
+  if (!canOpenBold({ provider: "bold-sandbox", ready: true, identityKey, secretKey }, {
+    country: country === "COLOMBIA" ? "CO" : country,
+    currency: order.saleCurrency,
+    total: order.total,
+  }) || !order.shippingSnapshot?.chargeable) {
+    throw new Error("El pedido no cumple las condiciones de pago Bold.");
+  }
+  if (order.status !== "PENDING_PAYMENT") throw new Error("El pedido ya no está pendiente de pago.");
+  const sale = canonicalizeBoldSale({ orderId: order.code, amount: order.total, currency: "COP" });
+  const hash = computeBoldIntegritySignature(sale.orderId, sale.amount, sale.currency, secretKey);
+  const idempotencyKey = `bold:${sale.orderId}:${sale.amount}:${sale.currency}`;
+  const transaction = order.boldTransaction
+    ? (() => {
+        if (
+          order.boldTransaction.externalReference !== sale.orderId ||
+          order.boldTransaction.amount !== Number(sale.amount) ||
+          order.boldTransaction.currency !== sale.currency ||
+          order.boldTransaction.idempotencyKey !== idempotencyKey
+        ) {
+          throw new Error("La transacción Bold no coincide con el snapshot del pedido.");
+        }
+        return order.boldTransaction;
+      })()
+    : await prisma.boldTransaction.upsert({
+        where: { orderId: order.id },
+        create: {
+          orderId: order.id,
+          externalReference: sale.orderId,
+          amount: Number(sale.amount),
+          currency: sale.currency,
+          signatureHash: hash,
+          mode: "sandbox",
+          status: "PREPARED",
+          idempotencyKey,
+        },
+        update: { signatureHash: hash },
+      });
+  return { orderId: sale.orderId, amount: sale.amount, currency: sale.currency, hash, apiKey: identityKey, idempotencyKey, transactionId: transaction.id };
+}
+
+/**
  * Get the Bold identity key for the frontend.
  */
 export function getBoldPublicKey(): string {
@@ -58,7 +112,9 @@ export function getBoldPublicKey(): string {
 export function verifyBoldWebhookSignature(payload: string, signature: string): boolean {
   const { secretKey } = getBoldConfig();
   const expected = createHmac("sha256", secretKey).update(payload).digest("hex");
-  return signature === expected;
+  const received = signature.trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(received)) return false;
+  return timingSafeEqual(Buffer.from(received, "hex"), Buffer.from(expected, "hex"));
 }
 
 /**

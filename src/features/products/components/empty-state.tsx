@@ -14,6 +14,7 @@ export function EmptyState({
 
   return (
     <div
+      role="status"
       className={cn(
         "flex flex-col items-center justify-center py-20 text-center rounded-xl border border-dashed border-border bg-card",
         className,

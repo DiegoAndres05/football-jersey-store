@@ -31,6 +31,26 @@ const DELIVERY_MODE_OPTIONS = [
   { value: "BAJO_PEDIDO", label: "Bajo pedido" },
 ] as const;
 
+export function buildFilterHref(
+  pathname: string,
+  current: string,
+  key: string,
+  value: string,
+): string {
+  const params = new URLSearchParams(current);
+  if (value) params.set(key, value);
+  else params.delete(key);
+  if (key === "liga") params.delete("equipo");
+  params.set("page", "1");
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+export function countActiveProductFilters(params: URLSearchParams): number {
+  return ["liga", "equipo", "temporada", "version", "talla", "disponibilidad", "modalidad", "q"]
+    .filter((key) => Boolean(params.get(key))).length + (params.get("sort") && params.get("sort") !== "default" ? 1 : 0);
+}
+
 function Chip({
   active,
   onClick,
@@ -53,8 +73,9 @@ function Chip({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "rounded-md px-3 py-1.5 text-xs font-medium border transition-colors",
+        "min-h-10 rounded-md px-3 py-1.5 text-xs font-medium border transition-colors",
         "disabled:pointer-events-none disabled:opacity-50",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         square && "h-9 w-9 px-0 flex items-center justify-center",
         active
           ? "bg-foreground text-background border-foreground"
@@ -101,18 +122,8 @@ export function ProductFilters({
 
   const setParam = useCallback(
     (key: string, value: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (value) {
-        params.set(key, value);
-      } else {
-        params.delete(key);
-      }
-      if (key === "liga") {
-        params.delete("equipo");
-      }
-      params.set("page", "1");
       startTransition(() => {
-        router.push(`${pathname}?${params.toString()}`, { scroll: false });
+        router.push(buildFilterHref(pathname, searchParams.toString(), key, value), { scroll: false });
       });
     },
     [router, pathname, searchParams],
@@ -124,7 +135,7 @@ export function ProductFilters({
     });
   }, [router, pathname]);
 
-  const hasActiveFilters = Object.values(active).some((v) => v && v !== "default");
+  const hasActiveFilters = countActiveProductFilters(new URLSearchParams(searchParams.toString())) > 0;
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -165,12 +176,14 @@ export function ProductFilters({
 
       {/* Sort */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground mb-2 block">Ordenar</label>
+        <label htmlFor="catalog-sort" className="text-xs font-medium text-muted-foreground mb-2 block">Ordenar</label>
         <select
+          id="catalog-sort"
+          name="sort"
           value={active.sort}
           disabled={isPending}
           onChange={(e) => setParam("sort", e.target.value)}
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           {SORT_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -179,8 +192,8 @@ export function ProductFilters({
       </div>
 
       {/* Availability */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-2 block">Disponibilidad</label>
+      <fieldset>
+        <legend className="text-xs font-medium text-muted-foreground mb-2 block">Disponibilidad</legend>
         <div className="flex flex-wrap gap-1.5">
           {AVAILABILITY_OPTIONS.map((opt) => (
             <Chip
@@ -195,11 +208,11 @@ export function ProductFilters({
             </Chip>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {/* Delivery mode */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-2 block">Modalidad de entrega</label>
+      <fieldset>
+        <legend className="text-xs font-medium text-muted-foreground mb-2 block">Modalidad de entrega</legend>
         <div className="flex flex-wrap gap-1.5">
           {DELIVERY_MODE_OPTIONS.map((opt) => (
             <Chip
@@ -214,11 +227,11 @@ export function ProductFilters({
             </Chip>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {/* League */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-2 block">Liga</label>
+      <fieldset>
+        <legend className="text-xs font-medium text-muted-foreground mb-2 block">Liga</legend>
         <div className="flex flex-wrap gap-1.5">
           {leagues.map((l) => (
             <Chip
@@ -231,12 +244,12 @@ export function ProductFilters({
             </Chip>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {/* Team (cascada desde la liga) */}
       {active.league && teams.length > 0 && (
-        <div>
-          <label className="text-xs font-medium text-muted-foreground mb-2 block">Equipo</label>
+        <fieldset>
+          <legend className="text-xs font-medium text-muted-foreground mb-2 block">Equipo</legend>
           <div className="flex flex-wrap gap-1.5">
             {teams.map((t) => (
               <Chip
@@ -249,12 +262,12 @@ export function ProductFilters({
               </Chip>
             ))}
           </div>
-        </div>
+        </fieldset>
       )}
 
       {/* Season */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-2 block">Temporada</label>
+      <fieldset>
+        <legend className="text-xs font-medium text-muted-foreground mb-2 block">Temporada</legend>
         <div className="flex flex-wrap gap-1.5">
           {seasons.map((s) => (
             <Chip
@@ -267,11 +280,11 @@ export function ProductFilters({
             </Chip>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {/* Version */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-2 block">Versión</label>
+      <fieldset>
+        <legend className="text-xs font-medium text-muted-foreground mb-2 block">Versión</legend>
         <div className="flex flex-wrap gap-1.5">
           {versions.map((v) => (
             <Chip
@@ -284,11 +297,11 @@ export function ProductFilters({
             </Chip>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {/* Size */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-2 block">Talla</label>
+      <fieldset>
+        <legend className="text-xs font-medium text-muted-foreground mb-2 block">Talla</legend>
         <div className="flex flex-wrap gap-1.5">
           {sizes.map((s) => (
             <Chip
@@ -302,13 +315,13 @@ export function ProductFilters({
             </Chip>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {hasActiveFilters && (
         <button
           type="button"
           onClick={clearFilters}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex min-h-10 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
         >
           <X className="h-3.5 w-3.5" />
           Limpiar filtros

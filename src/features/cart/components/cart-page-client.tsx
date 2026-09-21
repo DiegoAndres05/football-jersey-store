@@ -79,7 +79,8 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
 
   if (isEmpty) {
     return (
-      <div className="container-page py-16">
+      <div className="container-page py-16" role="status" aria-label={mounted ? "Carrito vacío" : "Cargando carrito"}>
+        {!mounted && <span className="sr-only">Cargando carrito…</span>}
         <div className="flex flex-col items-center justify-center py-20 text-center rounded-xl border border-dashed border-border bg-card">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-muted-foreground">
             <ShoppingBag className="h-6 w-6" strokeWidth={1.5} />
@@ -155,6 +156,9 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
                           : `${item.customizationName} · ${item.customizationNumber}`}
                       </p>
                     )}
+                    {item.personalizationSurchargeCop ? (
+                      <p className="text-xs text-muted-foreground">Recargo por personalización: {formatMoney({ amountCop: item.personalizationSurchargeCop, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</p>
+                    ) : null}
                     <div className="mt-1">
                       <Badge
                         tone={item.deliveryMode === "BAJO_PEDIDO" ? "warning" : "default"}

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { productImageAlt } from "@/features/seo/domain/product-image-alt";
+import { ProductImage } from "@/shared/ui/product-image";
 
 type ImageData = {
   id: string;
@@ -32,27 +32,18 @@ export function ProductGallery({
     setSelectedIndex(index);
   }, []);
 
-  if (!images.length) {
-    return (
-      <div className="aspect-[3/4] rounded-xl bg-secondary flex items-center justify-center text-muted-foreground text-sm">
-        Sin imagen
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-3">
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-secondary">
-        {current && (
-          <Image
-            src={current.url}
-            alt={productImageAlt(current, product)}
-            fill
-            sizes="(max-width: 768px) 100vw, 50vw"
-            className="object-cover"
-            priority
-          />
-        )}
+        <ProductImage
+          src={current?.url}
+          alt={current ? productImageAlt(current, product) : product.name}
+          fill
+          sizes="(max-width: 768px) 100vw, 50vw"
+          className="object-cover"
+          priority
+          fallbackLabel="Sin imagen"
+        />
       </div>
 
       {images.length > 1 && (
@@ -70,12 +61,13 @@ export function ProductGallery({
                   : "border-border hover:border-muted-foreground/40",
               )}
             >
-              <Image
+              <ProductImage
                 src={img.url}
                 alt={productImageAlt(img, product)}
                 fill
                 sizes="64px"
                 className="object-cover"
+                fallbackLabel="Sin imagen"
               />
             </button>
           ))}

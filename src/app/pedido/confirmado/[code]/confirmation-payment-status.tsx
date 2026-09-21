@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, RotateCcw } from "lucide-react";
+import { forgetPaymentRecovery } from "@/features/payments/recovery";
 
 type ReconcileStatus = "PAID" | "REJECTED" | "PENDING" | "ERROR";
 
@@ -59,6 +60,7 @@ export function ConfirmationPaymentStatus({
     if (!mountedRef.current) return;
 
     if (status === "PAID") {
+      forgetPaymentRecovery();
       setMode("paid");
       router.refresh();
       return;
@@ -94,7 +96,7 @@ export function ConfirmationPaymentStatus({
       mountedRef.current = false;
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps — mount-only
+  }, [mode, reconcile]);
 
   // Manual retry after exhaustion
   const handleManualRetry = async () => {

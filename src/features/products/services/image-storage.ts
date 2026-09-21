@@ -1,4 +1,3 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
 import { supabaseServer, PRODUCT_IMAGES_BUCKET } from "@/lib/supabase/server";
 

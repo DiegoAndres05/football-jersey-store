@@ -14,6 +14,9 @@ import type { SaleCurrency } from "@/shared/currency/sale-currency";
 import { calculateCouponTotals } from "@/features/coupons/domain/discount";
 import { normalizeCouponCode } from "@/features/coupons/services/coupon-validation";
 import { availableCouponUses, reserveCoupon } from "@/features/coupons/repositories/coupon-repository";
+import { getLegalConfig } from "@/shared/config/legal";
+import { quoteShipping } from "@/features/checkout/shipping";
+import { normalizeCountry, validateConsents } from "@/features/checkout/validation";
 
 export type OrderLineInput = {
   variantId: string;
@@ -61,6 +64,19 @@ export async function createOrder(input: CreateOrderInput): Promise<
   if (input.lines.length === 0) {
     return { ok: false, error: "El carrito está vacío." };
   }
+  const destination = normalizeCountry(parsed.data.shippingCountry);
+  const shippingQuote = quoteShipping(destination, 0);
+  if (!shippingQuote.chargeable) {
+    return { ok: false, error: "Los destinos internacionales quedan pendientes de cotización y no pueden pagar en línea." };
+  }
+  const consentErrors = validateConsents({
+    TERMS: parsed.data.consentTerms,
+    PRIVACY: parsed.data.consentPrivacy,
+    DATA_PROCESSING: parsed.data.consentDataProcessing,
+  });
+  if (consentErrors.length > 0) return { ok: false, error: consentErrors.map((e) => e.message).join(" ") };
+  const legal = getLegalConfig();
+  if (!legal) return { ok: false, error: "El checkout no está disponible: falta configurar los documentos legales." };
 
   const variantIds = [...new Set(input.lines.map((l) => l.variantId))];
   const variants = await prisma.productVariant.findMany({
@@ -101,6 +117,8 @@ export async function createOrder(input: CreateOrderInput): Promise<
       versionName: variant.version.name,
       sizeName: variant.size.name,
       unitPrice,
+      baseUnitPrice: variant.salePrice,
+      personalizationSurcharge: surcharge,
       quantity: line.quantity,
       subtotal: lineSubtotal,
       customizationType: line.customizationType,
@@ -112,7 +130,8 @@ export async function createOrder(input: CreateOrderInput): Promise<
     });
   }
 
-  const fee = shippingFee(subtotal);
+  const quote = quoteShipping(destination, subtotal);
+  const fee = quote.fee;
   let discountAmount = 0;
   let couponSnapshot: { code: string; discountType: "PERCENTAGE" | "FIXED"; value: number; eligibleBase: number } | null = null;
   if (input.couponCode) {
@@ -221,6 +240,24 @@ export async function createOrder(input: CreateOrderInput): Promise<
           saleCurrency,
           exchangeRateCopPerUsd,
           items: { create: orderItems },
+          shippingSnapshot: {
+            create: {
+              country: quote.country,
+              shippingScope: quote.shippingScope,
+              currency: quote.currency,
+              freeThreshold: quote.freeThreshold,
+              fee: quote.fee,
+              ruleVersion: quote.ruleVersion,
+              chargeable: quote.chargeable,
+            },
+          },
+          legalConsents: {
+            create: [
+              { consentType: "TERMS", documentKey: legal.terms.documentKey, documentUrl: legal.terms.url, documentVersion: legal.terms.documentVersion, accepted: true, acceptedAt: new Date() },
+              { consentType: "PRIVACY", documentKey: legal.privacy.documentKey, documentUrl: legal.privacy.url, documentVersion: legal.privacy.documentVersion, accepted: true, acceptedAt: new Date() },
+              { consentType: "DATA_PROCESSING", documentKey: legal.dataProcessing.documentKey, documentUrl: legal.dataProcessing.url, documentVersion: legal.dataProcessing.documentVersion, accepted: true, acceptedAt: new Date() },
+            ],
+          },
           history: {
             create: {
               toStatus: "PENDING_PAYMENT",

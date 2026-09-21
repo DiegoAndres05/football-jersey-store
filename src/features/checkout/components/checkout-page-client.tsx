@@ -28,6 +28,10 @@ import {
 } from "@/features/checkout/schemas/checkout-schema";
 import { buildBoldCheckoutPayload } from "@/features/payments/domain/bold-checkout-attrs";
 import { validateCoupon } from "@/features/coupons/server/coupon-actions";
+import { CheckoutConsents } from "@/app/checkout/consents";
+import type { LegalConfig } from "@/shared/config/legal";
+import { validateConsents } from "@/features/checkout/validation";
+import { createPaymentIdempotencyKey, rememberPaymentRecovery } from "@/features/payments/recovery";
 
 const BOLD_SCRIPT_SRC = "https://checkout.bold.co/library/boldPaymentButton.js";
 const DESTINATION_COUNTRIES = [
@@ -96,7 +100,7 @@ function loadBoldCheckoutScript(): Promise<void> {
   });
 }
 
-export function CheckoutPageClient({ currencyContext }: { currencyContext?: CurrencyContext }) {
+export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyContext?: CurrencyContext; legalConfig?: LegalConfig | null }) {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
   const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
@@ -110,13 +114,16 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const formRef = useRef<CheckoutFormValues | null>(null);
+  const paymentKeyRef = useRef<string>("");
+  if (!paymentKeyRef.current) paymentKeyRef.current = createPaymentIdempotencyKey();
 
   useEffect(() => setMounted(true), []);
+  const cartItemsKey = items.map((item) => `${item.lineId}:${item.quantity}`).join("|");
   useEffect(() => {
     // A cart mutation invalidates any previously validated promotion.
     setCouponDiscount(0);
     setPayError("");
-  }, [subtotal, items.map((item) => `${item.lineId}:${item.quantity}`).join("|")]);
+  }, [subtotal, cartItemsKey]);
 
   useEffect(() => {
     if (!mounted || step !== "payment") return;
@@ -143,8 +150,8 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
     };
   }, [mounted, items.length]);
 
-  const { register, handleSubmit, watch, formState: { errors, isValid } } = useForm<CheckoutFormValues>({
-    resolver: zodResolver(checkoutFormSchema),
+  const { register, handleSubmit, setError, watch, formState: { errors, isValid } } = useForm<CheckoutFormValues>({
+    resolver: zodResolver(checkoutFormSchema) as any,
     mode: "onBlur",
     defaultValues: {
       fullName: "",
@@ -159,6 +166,9 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
       shippingCountry: SITE.country,
       shippingZipCode: "",
       notes: "",
+      consentTerms: false,
+      consentPrivacy: false,
+      consentDataProcessing: false,
     },
   });
 
@@ -206,12 +216,24 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
   }
 
   const onValid = (values: CheckoutFormValues) => {
+    const missing = validateConsents({ TERMS: values.consentTerms, PRIVACY: values.consentPrivacy, DATA_PROCESSING: values.consentDataProcessing });
+    if (missing.length > 0) {
+      for (const error of missing) {
+        const field = error.field === "TERMS" ? "consentTerms" : error.field === "PRIVACY" ? "consentPrivacy" : "consentDataProcessing";
+        setError(field, { type: "validate", message: error.message });
+      }
+      return;
+    }
     formRef.current = values;
     setStep("payment");
   };
 
   const payNow = async () => {
     if (paymentStatus !== "idle" || !formRef.current) return;
+    if (normalizeCountry(formRef.current.shippingCountry) !== normalizeCountry(SITE.country)) {
+      setPayError("Los destinos internacionales quedan pendientes de cotización; no se puede abrir el pago.");
+      return;
+    }
     setPaymentStatus("processing");
     setPayError("");
 
@@ -254,7 +276,7 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
         deliveryMode: i.deliveryMode,
       })),
       paymentMethod,
-      paymentReference: `BOLD-${Date.now()}`,
+      paymentReference: paymentKeyRef.current,
       saleCurrency: checkoutCurrencyForCountry(formRef.current.shippingCountry, currencyContext).currency,
       couponCode: couponCode.trim() || null,
     });
@@ -312,6 +334,7 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
 
       const checkout = new BoldCheckout(checkoutConfig);
       checkout.open();
+      rememberPaymentRecovery(result.code, useCartStore.getState().items);
       clearCart();
     } catch (err) {
       console.error("Bold checkout error:", err);
@@ -355,6 +378,10 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
                     {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
                   </div>
                 </div>
+              </section>
+
+              <section className="rounded-xl border border-border bg-card p-5">
+                <CheckoutConsents register={register} errors={errors} legal={legalConfig ?? null} />
               </section>
 
               <section className="rounded-xl border border-border bg-card p-5">
@@ -497,9 +524,12 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
               )}
 
               {paymentStatus === "idle" && (
-                <Button onClick={payNow} className="w-full sm:w-auto">
+                <Button onClick={payNow} disabled={normalizeCountry(destinationCountry) !== normalizeCountry(SITE.country)} className="w-full sm:w-auto">
                   Pagar {formatMoney({ amountCop: total, ...moneyContext })} <ShieldCheck className="h-4 w-4" />
                 </Button>
+              )}
+              {normalizeCountry(destinationCountry) !== normalizeCountry(SITE.country) && (
+                <p className="text-sm text-amber-700">Este destino está en cotización pendiente. No se abrirá Bold.</p>
               )}
             </div>
           )}

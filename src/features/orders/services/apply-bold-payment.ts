@@ -84,6 +84,15 @@ export async function applyBoldPayment(
         },
       });
 
+      await tx.boldTransaction.updateMany({
+        where: { orderId: order.id },
+        data: {
+          status: outcome,
+          verified: true,
+          updatedAt: new Date(),
+        },
+      });
+
       const usage = await tx.couponUsage.findFirst({
         where: { orderId: order.id, state: "RESERVED" },
       });

@@ -30,6 +30,7 @@ import { SHIPPING } from "@/shared/config/site";
 import { formatMoney } from "@/shared/money/format";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
 import { deriveProductDisplayPrice } from "../domain/product-price-display";
+import { validatePersonalization } from "@/features/products/personalization";
 
 type CustomType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
 
@@ -127,6 +128,10 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
   const availableModes = currentVariant
     ? getAvailableDeliveryModes(currentVariant.stock, currentVariant.allowsBackorder)
     : [];
+  const personalizationValidation = validatePersonalization(
+    { type: customType, name: customName, number: customNumber, playerId: customPlayerId },
+    { enabled: product.customizationsEnabled, officialPlayer: selectedPlayer ?? undefined },
+  );
 
   const immediateRemaining = currentVariant
     ? remainingImmediate(cartItems, currentVariant.id, currentVariant.stock ?? 0)
@@ -254,7 +259,11 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
                   deliveryMode={deliveryMode}
                   immediateStock={currentVariant.stock ?? 0}
                   remainingImmediate={immediateRemaining}
+                  disabled={!personalizationValidation.ok}
                 />
+                {!personalizationValidation.ok && (
+                  <p role="alert" className="text-sm text-destructive">{personalizationValidation.message}</p>
+                )}
               </>
             ) : (
               <div className="space-y-3">

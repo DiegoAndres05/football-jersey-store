@@ -372,3 +372,8 @@ Brand (→ string), Collection, ProductCollection, Promotion, PromotionProduct, 
 | Cross-context FKs | 2 | 8 | **0** (solo strings) |
 | Cascade delete en auditoría | Sí | Sí | **No** |
 | Código semántico duplicado | — | 3 casos | **0** |
+## 2026-09-21 — Spec 023 public store boundaries
+
+- Public routes and guest checkout remain compatible.
+- `/admin` is explicitly outside scope and was not modified.
+- Bold is enabled only through explicit `PAYMENT_PROVIDER=bold-sandbox`; secrets remain server-only.

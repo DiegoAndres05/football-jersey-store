@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import Image from "next/image";
 import { Heart } from "lucide-react";
 import type { ProductCardData } from "@/features/products/types/product-types";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
@@ -9,8 +8,9 @@ import { formatMoney } from "@/shared/money/format";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
 import { listingAvailabilityFromCardFlags } from "@/features/products/domain/listing-availability";
 import { cn } from "@/lib/utils";
+import { ProductImage } from "@/shared/ui/product-image";
 
-export function ProductCard({ product, priority, currencyContext }: { product: ProductCardData; priority?: boolean; currencyContext?: CurrencyContext }) {
+export function ProductCard({ product, priority, currencyContext, contextQuery }: { product: ProductCardData; priority?: boolean; currencyContext?: CurrencyContext; contextQuery?: string }) {
   const isOutlet = product.season.isRetro;
   const favorite = useFavoritesStore((state) => state.isFavorite(product.id));
   const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
@@ -30,17 +30,17 @@ export function ProductCard({ product, priority, currencyContext }: { product: P
 
   return (
     <Link
-      href={`/productos/${product.slug}`}
+      // Canonical route: href={`/productos/${product.slug}`}
+      href={`/productos/${product.slug}` + (contextQuery ? `?${contextQuery}` : "")}
       className={cn(
         "group flex flex-col rounded-xl border border-border bg-card overflow-hidden transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         isSoldOut && "opacity-70",
       )}
     >
       <div className={cn("relative aspect-[3/4] bg-secondary overflow-hidden", isSoldOut && "grayscale")}>
-        {product.primaryImage ? (
-          <Image
-            src={product.primaryImage.url}
-            alt={product.primaryImage.altText ?? product.name}
+        <ProductImage
+            src={product.primaryImage?.url}
+            alt={product.primaryImage?.altText ?? product.name}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className={cn(
@@ -48,12 +48,8 @@ export function ProductCard({ product, priority, currencyContext }: { product: P
               isSoldOut && "grayscale",
             )}
             priority={priority}
+            fallbackLabel="Sin imagen"
           />
-        ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            Sin imagen
-          </div>
-        )}
 
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           {isOutlet && (
@@ -91,7 +87,7 @@ export function ProductCard({ product, priority, currencyContext }: { product: P
         <div className="mt-auto pt-2">
           {isSoldOut ? (
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-destructive">
-              Agotado
+              Agotada
             </p>
           ) : isBackorderOnly ? (
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-warning">

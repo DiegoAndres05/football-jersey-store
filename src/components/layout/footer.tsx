@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MessageCircle, Mail } from "lucide-react";
 import { SITE, whatsappLink } from "@/shared/config/site";
+import { LegalLinks } from "@/shared/ui/legal-links";
 
 const FOOTER_LINKS = [
   {
@@ -95,6 +96,7 @@ export function Footer() {
             <span aria-hidden>·</span>
             <span>Productos de calidad</span>
           </div>
+          <LegalLinks className="text-xs text-muted-foreground" />
         </div>
       </div>
     </footer>

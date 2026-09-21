@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProductosLoading() {
   return (
-    <div className="container-page py-8">
+    <div className="container-page py-8" role="status" aria-label="Cargando catálogo">
       <Skeleton variant="text" className="h-4 w-32 mb-6" />
 
       <div className="flex gap-8">

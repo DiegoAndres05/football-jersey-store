@@ -20,6 +20,9 @@ export type CartItem = {
   sizeName: string;
   imageUrl: string;
   unitPrice: number;
+  baseUnitPriceCop?: number;
+  personalizationSurchargeCop?: number;
+  lineTotalCop?: number;
   quantity: number;
   customizationType: CustomizationType;
   customizationName: string;
@@ -82,7 +85,7 @@ export const useCartStore = create<CartState>()(
               ),
             };
           }
-          return { items: [...s.items, { ...draft, lineId, quantity: 1 }] };
+          return { items: [...s.items, { ...draft, lineId, quantity: 1, lineTotalCop: (draft.unitPrice ?? 0) }] };
         });
         return { ok: true };
       },
@@ -99,7 +102,7 @@ export const useCartStore = create<CartState>()(
           }
         }
         set({
-          items: items.map((i) => (i.lineId === lineId ? { ...i, quantity } : i)),
+          items: items.map((i) => (i.lineId === lineId ? { ...i, quantity, lineTotalCop: i.unitPrice * quantity } : i)),
         });
         return { ok: true };
       },

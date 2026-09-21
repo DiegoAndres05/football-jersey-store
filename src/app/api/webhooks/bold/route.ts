@@ -1,12 +1,26 @@
 import { NextResponse } from "next/server";
 import { applyBoldPayment } from "@/features/orders/services/apply-bold-payment";
 import { normalizeWebhookEventType } from "@/features/payments/domain/bold-payment-outcome";
+import { verifyBoldWebhookSignature } from "@/features/payments/services/bold-service";
+import { getOrderByCode } from "@/features/orders/repositories/order-repository";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
     const body = await request.text();
+    const signature =
+      request.headers.get("x-bold-signature") ??
+      request.headers.get("x-signature") ??
+      request.headers.get("x-bold-webhook-signature");
+    if (!signature) return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    try {
+      if (!verifyBoldWebhookSignature(body, signature)) {
+        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      }
+    } catch {
+      return NextResponse.json({ error: "Webhook unavailable" }, { status: 503 });
+    }
     const payload = JSON.parse(body);
 
     console.log("[Bold Webhook] Event received:", {
@@ -16,10 +30,21 @@ export async function POST(request: Request) {
     });
 
     const eventType = payload.type;
-    const referenceId = payload.data?.reference_id;
+    const data = payload.data ?? payload.payload ?? {};
+    const referenceId = data.reference_id ?? payload.reference_id;
 
     if (!referenceId) {
       console.warn("[Bold Webhook] Missing reference_id, ignoring.");
+      return NextResponse.json({ received: true });
+    }
+
+    const order = await getOrderByCode(String(referenceId));
+    if (!order) return NextResponse.json({ received: true });
+    const rawAmount = typeof data.amount === "object" ? data.amount?.total_amount : data.amount ?? data.total;
+    const amount = Number(rawAmount);
+    const currency = String(data.currency ?? (typeof data.amount === "object" ? data.amount?.currency : "") ?? "").toUpperCase();
+    if (!Number.isInteger(amount) || amount !== order.total || currency !== order.saleCurrency) {
+      console.warn("[Bold Webhook] Integrity mismatch; event ignored.");
       return NextResponse.json({ received: true });
     }
 

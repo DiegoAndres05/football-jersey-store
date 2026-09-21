@@ -7,10 +7,12 @@ export function ProductGrid({
   products,
   priority = false,
   currencyContext,
+  contextQuery,
 }: {
   products: ProductCardData[];
   priority?: boolean;
   currencyContext?: CurrencyContext;
+  contextQuery?: string;
 }) {
   if (products.length === 0) {
     return <EmptyState variant="catalog" />;
@@ -19,7 +21,7 @@ export function ProductGrid({
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
       {products.map((product, i) => (
-        <ProductCard key={product.id} product={product} priority={priority && i < 4} currencyContext={currencyContext} />
+        <ProductCard key={product.id} product={product} priority={priority && i < 4} currencyContext={currencyContext} contextQuery={contextQuery} />
       ))}
     </div>
   );

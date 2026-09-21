@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CheckoutPageClient } from "@/features/checkout/components/checkout-page-client";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
 import { NOINDEX_NOFOLLOW } from "@/features/seo/domain/robots-policy";
+import { getLegalConfig } from "@/shared/config/legal";
 
 export const metadata: Metadata = {
   title: "Pago",
@@ -11,5 +12,5 @@ export const metadata: Metadata = {
 
 export default async function CheckoutPage() {
   const currencyCtx = await getCurrencyContext();
-  return <CheckoutPageClient currencyContext={currencyCtx} />;
+  return <CheckoutPageClient currencyContext={currencyCtx} legalConfig={getLegalConfig()} />;
 }

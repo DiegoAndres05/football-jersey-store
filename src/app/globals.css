@@ -146,6 +146,7 @@
 
   * {
     border-color: hsl(var(--border));
+    box-sizing: border-box;
   }
 
   html, body {
@@ -154,6 +155,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-family: var(--font-sans);
+    overflow-x: hidden;
   }
 
   body {
@@ -224,5 +226,16 @@
   .focus-ring:focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
+  }
+
+  /* Keep controls usable with touch and keyboard at every public breakpoint. */
+  button, a, input, select, textarea, summary {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  @media (max-width: 639px) {
+    :root {
+      --container-padding: 1rem;
+    }
   }
 }
