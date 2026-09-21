@@ -16,10 +16,14 @@ import {
 } from "./http.ts";
 import { buildFkaTeamSearchUrl, parseFkaTeamSearchResponse } from "./search.ts";
 
-export const FKA_CDP_ENDPOINT = process.env.FKA_CDP_ENDPOINT ?? "http://127.0.0.1:9222";
+export const FKA_CDP_ENDPOINT = process.env.FKA_CDP_ENDPOINT?.trim() || null;
+const BROWSERBASE_API_KEY = process.env.FKA_BROWSERBASE_API_KEY?.trim() || null;
+const BROWSERBASE_PROJECT_ID = process.env.FKA_BROWSERBASE_PROJECT_ID?.trim() || null;
+const BROWSERBASE_API_URL = "https://api.browserbase.com/v1/sessions";
 const LOAD_TIMEOUT_MS = 40000;
 
 export type CdpTarget = { id: string; webSocketDebuggerUrl: string; url: string };
+type RemoteSession = { id: string; connectUrl: string };
 
 type CdpResponse = {
   id?: number;
@@ -78,20 +82,20 @@ class CdpSession {
   }
 }
 
-async function createTab(): Promise<CdpTarget> {
+async function createLocalTab(endpoint: string): Promise<CdpTarget> {
   let res: Response;
   try {
-    res = await fetch(`${FKA_CDP_ENDPOINT}/json/new?about:blank`, { method: "PUT" });
+    res = await fetch(`${endpoint}/json/new?about:blank`, { method: "PUT" });
   } catch (err) {
     throw new FkaProviderError(
       "FKA_NETWORK_ERROR",
       `No se pudo conectar con el navegador FKA/CDP: ${err instanceof Error ? err.message : "error de red"}`,
-      { url: FKA_CDP_ENDPOINT },
+      { url: endpoint },
     );
   }
   if (!res.ok) {
     throw new FkaProviderError("FKA_NETWORK_ERROR", "No se pudo abrir una pestaña en el navegador FKA/CDP.", {
-      url: `${FKA_CDP_ENDPOINT}/json/new?about:blank`,
+      url: `${endpoint}/json/new?about:blank`,
       status: res.status,
       statusText: res.statusText,
     });
@@ -99,11 +103,74 @@ async function createTab(): Promise<CdpTarget> {
   return (await res.json()) as CdpTarget;
 }
 
-async function closeTab(targetId: string): Promise<void> {
+async function closeLocalTab(endpoint: string, targetId: string): Promise<void> {
   try {
-    await fetch(`${FKA_CDP_ENDPOINT}/json/close/${targetId}`);
+    await fetch(`${endpoint}/json/close/${targetId}`);
   } catch {
     /* noop */
+  }
+}
+
+async function createBrowserbaseSession(): Promise<RemoteSession> {
+  if (!BROWSERBASE_API_KEY) {
+    throw new FkaProviderError(
+      "FKA_NETWORK_ERROR",
+      "No hay un navegador FKA configurado. Configura FKA_CDP_ENDPOINT o FKA_BROWSERBASE_API_KEY.",
+    );
+  }
+  let res: Response;
+  try {
+    res = await fetch(BROWSERBASE_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${BROWSERBASE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...(BROWSERBASE_PROJECT_ID ? { projectId: BROWSERBASE_PROJECT_ID } : {}),
+        timeout: 300,
+        browserSettings: {
+          recordSession: false,
+          logSession: false,
+          allowedDomains: ["footballkitarchive.com"],
+        },
+      }),
+    });
+  } catch (err) {
+    throw new FkaProviderError(
+      "FKA_NETWORK_ERROR",
+      `No se pudo conectar con el proveedor del navegador FKA: ${err instanceof Error ? err.message : "error de red"}`,
+      { url: BROWSERBASE_API_URL },
+    );
+  }
+  if (!res.ok) {
+    throw new FkaProviderError("FKA_NETWORK_ERROR", "No se pudo crear la sesión del navegador FKA.", {
+      url: BROWSERBASE_API_URL,
+      status: res.status,
+      statusText: res.statusText,
+    });
+  }
+  const session = (await res.json()) as Partial<RemoteSession>;
+  if (!session.id || !session.connectUrl) {
+    throw new FkaProviderError("FKA_NETWORK_ERROR", "El proveedor del navegador FKA devolvió una sesión inválida.", {
+      url: BROWSERBASE_API_URL,
+    });
+  }
+  return { id: session.id, connectUrl: session.connectUrl };
+}
+
+async function closeBrowserbaseSession(id: string): Promise<void> {
+  if (!BROWSERBASE_API_KEY) return;
+  try {
+    await fetch(`${BROWSERBASE_API_URL}/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${BROWSERBASE_API_KEY}` },
+    });
+  } catch (err) {
+    console.warn("[FKA] No se pudo cerrar la sesión remota del navegador", {
+      sessionId: id,
+      error: err instanceof Error ? err.message : "error desconocido",
+    });
   }
 }
 
@@ -201,23 +268,40 @@ const PAGE_STATE_EXPRESSION = `(() => {
 export class FkaFetcher {
   private target: CdpTarget | null = null;
   private session: CdpSession | null = null;
+  private localEndpoint: string | null = null;
+  private remoteSessionId: string | null = null;
 
   private constructor() {}
 
   static async connect(): Promise<FkaFetcher> {
     const fetcher = new FkaFetcher();
-    fetcher.target = await createTab();
-    const ws = new WebSocket(fetcher.target.webSocketDebuggerUrl);
-    await new Promise<void>((resolve, reject) => {
-      ws.onopen = () => resolve();
-      ws.onerror = () => reject(new FkaProviderError("FKA_NETWORK_ERROR", "No se pudo conectar con el navegador FKA/CDP."));
-    });
-    fetcher.session = new CdpSession(ws);
-    await fetcher.session.send("Page.enable");
-    await fetcher.session.send("Runtime.enable");
-    await fetcher.session.send("Page.navigate", { url: FKA_BASE_URL });
-    await fetcher.waitForContent(FKA_BASE_URL);
-    return fetcher;
+    try {
+      let webSocketUrl: string;
+      if (FKA_CDP_ENDPOINT) {
+        fetcher.localEndpoint = FKA_CDP_ENDPOINT;
+        fetcher.target = await createLocalTab(FKA_CDP_ENDPOINT);
+        webSocketUrl = fetcher.target.webSocketDebuggerUrl;
+      } else {
+        const remote = await createBrowserbaseSession();
+        fetcher.remoteSessionId = remote.id;
+        webSocketUrl = remote.connectUrl;
+      }
+      const ws = new WebSocket(webSocketUrl);
+      await new Promise<void>((resolve, reject) => {
+        ws.onopen = () => resolve();
+        ws.onerror = () =>
+          reject(new FkaProviderError("FKA_NETWORK_ERROR", "No se pudo conectar con el navegador FKA/CDP remoto."));
+      });
+      fetcher.session = new CdpSession(ws);
+      await fetcher.session.send("Page.enable");
+      await fetcher.session.send("Runtime.enable");
+      await fetcher.session.send("Page.navigate", { url: FKA_BASE_URL });
+      await fetcher.waitForContent(FKA_BASE_URL);
+      return fetcher;
+    } catch (err) {
+      await fetcher.close();
+      throw err;
+    }
   }
 
   async fetchPage(url: string): Promise<FetchedPage> {
@@ -309,15 +393,18 @@ export class FkaFetcher {
   }
 
   async close(): Promise<void> {
-    if (this.target) {
+    if (this.localEndpoint && this.target) {
       const targetId = this.target.id;
       this.session?.close();
-      await closeTab(targetId);
+      await closeLocalTab(this.localEndpoint, targetId);
     } else {
       this.session?.close();
     }
+    if (this.remoteSessionId) await closeBrowserbaseSession(this.remoteSessionId);
     this.target = null;
     this.session = null;
+    this.localEndpoint = null;
+    this.remoteSessionId = null;
   }
 
   private async waitForContent(url: string): Promise<string> {
