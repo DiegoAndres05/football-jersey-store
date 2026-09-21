@@ -15,6 +15,17 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum CouponUsageState {
+  RESERVED
+  CONFIRMED
+  RELEASED
+}
+
 // PostgreSQL (Supabase) para producción.
 // DATABASE_URL = conexión pooled (PgBouncer, puerto 6543) para la app.
 // DIRECT_URL   = conexión directa (puerto 5432) para Prisma Migrate.
@@ -82,47 +93,47 @@ model Season {
 }
 
 model Version {
-  id        String         @id @default(cuid())
-  slug      String         @unique
-  name      String
-  priceAdjustment Int      @default(0)
-  variants  ProductVariant[]
+  id              String           @id @default(cuid())
+  slug            String           @unique
+  name            String
+  priceAdjustment Int              @default(0)
+  variants        ProductVariant[]
 }
 
 model Size {
-  id       String         @id @default(cuid())
-  code     String         @unique
+  id       String           @id @default(cuid())
+  code     String           @unique
   name     String
-  position Int            @default(0)
+  position Int              @default(0)
   variants ProductVariant[]
 }
 
 model Product {
-  id              String         @id @default(cuid())
-  slug            String         @unique
-  name            String
-  shortName       String?
-  description     String?
-  kitType         String  // LOCAL | VISITANTE | TERCERA | ENTRENAMIENTO | ESPECIAL
-  brand           String?
-  isFeatured      Boolean        @default(false)
-  isActive        Boolean        @default(true)
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  shortName   String?
+  description String?
+  kitType     String // LOCAL | VISITANTE | TERCERA | ENTRENAMIENTO | ESPECIAL
+  brand       String?
+  isFeatured  Boolean @default(false)
+  isActive    Boolean @default(true)
 
-  customizationsEnabled  Boolean  @default(true)
-  customizationSurcharge Int      @default(0)
-  hasPlayerPrint         Boolean  @default(false)
+  customizationsEnabled  Boolean @default(true)
+  customizationSurcharge Int     @default(0)
+  hasPlayerPrint         Boolean @default(false)
 
-  teamId          String
-  team            Team           @relation(fields: [teamId], references: [id])
-  seasonId        String
-  season          Season         @relation(fields: [seasonId], references: [id])
+  teamId   String
+  team     Team   @relation(fields: [teamId], references: [id])
+  seasonId String
+  season   Season @relation(fields: [seasonId], references: [id])
 
-  images          ProductImage[]
-  variants        ProductVariant[]
+  images           ProductImage[]
+  variants         ProductVariant[]
   supplierProducts SupplierProduct[]
 
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([teamId])
   @@index([seasonId])
@@ -131,13 +142,13 @@ model Product {
 }
 
 model ProductImage {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   url       String
   altText   String?
-  order     Int      @default(0)
-  isPrimary Boolean  @default(false)
+  order     Int     @default(0)
+  isPrimary Boolean @default(false)
 
   // Imágenes gestionadas en Supabase Storage (FASE 2):
   // storagePath = ruta del archivo (products/{productId}/...). Cuando es
@@ -150,30 +161,30 @@ model ProductImage {
 }
 
 model ProductVariant {
-  id              String           @id @default(cuid())
-  productId       String
-  product         Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
-  versionId       String
-  version         Version          @relation(fields: [versionId], references: [id])
-  sizeId          String
-  size            Size             @relation(fields: [sizeId], references: [id])
-  sku             String           @unique
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  versionId String
+  version   Version @relation(fields: [versionId], references: [id])
+  sizeId    String
+  size      Size    @relation(fields: [sizeId], references: [id])
+  sku       String  @unique
 
-  costPrice       Int
-  salePrice       Int
-  compareAtPrice  Int?
+  costPrice      Int
+  salePrice      Int
+  compareAtPrice Int?
 
-  lowStockAt      Int?
-  weight          Int              @default(400)
+  lowStockAt Int?
+  weight     Int  @default(400)
 
   // Modalidad de entrega (MVP):
   // INMEDIATA se deriva del stock del ledger (stock > 0).
   // allowsBackorder=true permite vender la variante como BAJO_PEDIDO
   // aunque no haya stock físico inmediato.
-  allowsBackorder Boolean          @default(true)
+  allowsBackorder Boolean @default(true)
 
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([productId, versionId, sizeId])
   @@index([sku])
@@ -189,17 +200,17 @@ model ProductVariant {
 // ADJUSTMENT usa adjustmentDirection para indicar incremento o decremento.
 
 model InventoryMovement {
-  id                  String       @id @default(cuid())
+  id                  String  @id @default(cuid())
   variantId           String
-  type                String  // IN | OUT | SALE | RESERVATION | RETURN | ADJUSTMENT | CANCELLATION
+  type                String // IN | OUT | SALE | RESERVATION | RETURN | ADJUSTMENT | CANCELLATION
   quantity            Int
-  adjustmentDirection String?      // "INCREMENT" | "DECREMENT" — solo para ADJUSTMENT
+  adjustmentDirection String? // "INCREMENT" | "DECREMENT" — solo para ADJUSTMENT
 
-  reference           String?      // código de orden, PO, etc.
-  reason              String?
-  orderReference      String?      // Order.code (sin FK — referencia débil cross-context)
-  userReference       String?      // User.email o Customer.email (sin FK)
-  createdAt           DateTime     @default(now())
+  reference      String? // código de orden, PO, etc.
+  reason         String?
+  orderReference String? // Order.code (sin FK — referencia débil cross-context)
+  userReference  String? // User.email o Customer.email (sin FK)
+  createdAt      DateTime @default(now())
 
   @@index([variantId])
   @@index([orderReference])
@@ -211,21 +222,21 @@ model InventoryMovement {
 // =========================================================================
 
 model Supplier {
-  id            String          @id @default(cuid())
-  slug          String          @unique
+  id            String            @id @default(cuid())
+  slug          String            @unique
   name          String
   contactName   String?
   email         String?
   phone         String?
   country       String?
-  leadTimeDays  Int             @default(15)
+  leadTimeDays  Int               @default(15)
   purchaseNotes String?
-  priority      Int             @default(0)
-  isActive      Boolean         @default(true)
+  priority      Int               @default(0)
+  isActive      Boolean           @default(true)
   products      SupplierProduct[]
   orders        SupplierOrder[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 }
 
 model SupplierProduct {
@@ -245,17 +256,17 @@ model SupplierProduct {
 }
 
 model SupplierOrder {
-  id            String             @id @default(cuid())
-  code          String             @unique
+  id            String              @id @default(cuid())
+  code          String              @unique
   supplierId    String
-  supplier      Supplier           @relation(fields: [supplierId], references: [id])
-  status        String  @default("PENDING")  // PENDING | SENT | CONFIRMED | SHIPPED | RECEIVED | CANCELLED
-  totalCost     Int                @default(0)
+  supplier      Supplier            @relation(fields: [supplierId], references: [id])
+  status        String              @default("PENDING") // PENDING | SENT | CONFIRMED | SHIPPED | RECEIVED | CANCELLED
+  totalCost     Int                 @default(0)
   trackingNotes String?
   orderedAt     DateTime?
   receivedAt    DateTime?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
   items         SupplierOrderItem[]
 }
 
@@ -274,14 +285,14 @@ model SupplierOrderItem {
 // =========================================================================
 
 model Customer {
-  id        String    @id @default(cuid())
-  email     String?
-  name      String?
-  phone     String?
-  notes     String?
+  id    String  @id @default(cuid())
+  email String?
+  name  String?
+  phone String?
+  notes String?
 
-  userId    String?   @unique
-  user      User?     @relation(fields: [userId], references: [id])
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
 
   addresses Address[]
   orders    Order[]
@@ -292,9 +303,9 @@ model Customer {
 }
 
 model Address {
-  id         String    @id @default(cuid())
+  id         String   @id @default(cuid())
   customerId String
-  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   fullName   String
   phone      String
   line1      String
@@ -302,10 +313,10 @@ model Address {
   city       String
   state      String
   zipCode    String?
-  country    String    @default("Colombia")
-  isDefault  Boolean   @default(false)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  country    String   @default("Colombia")
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([customerId])
 }
@@ -315,18 +326,18 @@ model Address {
 // =========================================================================
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String  @id @default(cuid())
+  email        String  @unique
   name         String?
   phone        String?
-  role         String  @default("CUSTOMER")  // CUSTOMER | ADMIN | SUPER_ADMIN
-  isActive     Boolean   @default(true)
+  role         String  @default("CUSTOMER") // CUSTOMER | ADMIN | SUPER_ADMIN
+  isActive     Boolean @default(true)
   passwordHash String?
 
-  customer  Customer?
+  customer Customer?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // =========================================================================
@@ -334,24 +345,31 @@ model User {
 // =========================================================================
 
 model Order {
-  id              String              @id @default(cuid())
-  code            String              @unique
-  status          String  @default("PENDING_PAYMENT")  // PENDING_PAYMENT | PAID | VALIDATING | RESERVED | SUPPLIER_REQUESTED | IN_TRANSIT | PREPARING | SHIPPED | DELIVERED | COMPLETED | CANCELLED | REFUNDED | RETURNED | PAYMENT_FAILED
+  id     String @id @default(cuid())
+  code   String @unique
+  status String @default("PENDING_PAYMENT") // PENDING_PAYMENT | PAID | VALIDATING | RESERVED | SUPPLIER_REQUESTED | IN_TRANSIT | PREPARING | SHIPPED | DELIVERED | COMPLETED | CANCELLED | REFUNDED | RETURNED | PAYMENT_FAILED
 
-  customerId      String?
-  customer        Customer?           @relation(fields: [customerId], references: [id])
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
 
-  customerName    String
-  customerEmail   String
-  customerPhone   String
+  customerName  String
+  customerEmail String
+  customerPhone String
 
-  subtotal        Int
-  personalizationFee Int              @default(0)
-  shippingFee     Int                 @default(0)
-  discountAmount  Int                 @default(0)
-  total           Int
+  subtotal                   Int
+  personalizationFee         Int           @default(0)
+  shippingFee                Int           @default(0)
+  discountAmount             Int           @default(0)
+  total                      Int
+  couponCodeSnapshot         String?
+  couponDiscountTypeSnapshot DiscountType?
+  couponValueSnapshot        Int?
+  couponEligibleBase         Int?
+  couponDiscountAmount       Int?
+  couponAppliedAt            DateTime?
+  couponUsageId              String?       @unique
 
-  shippingMethod  String              @default("Nacional")
+  shippingMethod   String  @default("Nacional")
   shippingFullName String
   shippingPhone    String
   shippingLine1    String
@@ -359,44 +377,78 @@ model Order {
   shippingCity     String
   shippingState    String
   shippingZipCode  String?
-  shippingCountry  String             @default("Colombia")
+  shippingCountry  String  @default("Colombia")
 
   notes           String?
   trackingNumber  String?
   trackingCarrier String?
 
-  paymentMethod   String  @default("CARD")  // CARD | PSE | NEQUI | DAVIPLATA
-  paymentRef      String?
-  paidAt          DateTime?
+  paymentMethod String    @default("CARD") // CARD | PSE | NEQUI | DAVIPLATA
+  paymentRef    String?
+  paidAt        DateTime?
 
-  saleCurrency       String  @default("COP")  // COP | USD
-  exchangeRateCopPerUsd Int?                  // tasa congelada al confirmar
+  saleCurrency          String @default("COP") // COP | USD
+  exchangeRateCopPerUsd Int? // tasa congelada al confirmar
 
-  items           OrderItem[]
-  history         OrderStatusHistory[]
+  items                OrderItem[]
+  history              OrderStatusHistory[]
   notificationAttempts NotificationAttempt[]
+  couponUsages         CouponUsage[]         @relation("OrderUsageHistory")
 
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([customerEmail])
   @@index([customerId])
 }
 
+model Coupon {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  discountType DiscountType
+  value        Int
+  startsAt     DateTime
+  endsAt       DateTime?
+  maxUses      Int?
+  isActive     Boolean       @default(true)
+  usages       CouponUsage[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([isActive, startsAt, endsAt])
+}
+
+model CouponUsage {
+  id            String           @id @default(cuid())
+  couponId      String
+  coupon        Coupon           @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  orderId       String
+  order         Order            @relation("OrderUsageHistory", fields: [orderId], references: [id], onDelete: Restrict)
+  state         CouponUsageState @default(RESERVED)
+  reservedAt    DateTime         @default(now())
+  expiresAt     DateTime
+  confirmedAt   DateTime?
+  releasedAt    DateTime?
+  releaseReason String?
+
+  @@unique([couponId, orderId])
+  @@index([couponId, state, expiresAt])
+}
+
 model NotificationAttempt {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   orderId        String
-  order          Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Restrict)
   channel        String
   eventKey       String
-  idempotencyKey String   @unique
+  idempotencyKey String    @unique
   status         String
-  attemptCount   Int      @default(0)
+  attemptCount   Int       @default(0)
   providerRef    String?
   errorSummary   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   lastAttemptAt  DateTime?
   sentAt         DateTime?
 
@@ -404,46 +456,46 @@ model NotificationAttempt {
 }
 
 model OrderItem {
-  id              String             @id @default(cuid())
-  orderId         String
-  order           Order              @relation(fields: [orderId], references: [id])
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
 
-  productId       String?
-  variantId       String?
+  productId String?
+  variantId String?
 
-  productName     String
-  teamName        String
-  versionName     String
-  sizeName        String
-  unitPrice       Int
-  quantity        Int
-  subtotal        Int
+  productName String
+  teamName    String
+  versionName String
+  sizeName    String
+  unitPrice   Int
+  quantity    Int
+  subtotal    Int
 
-  customizationType  String  @default("NONE")  // NONE | CUSTOM | OFFICIAL_PLAYER
-  customizationName  String?
+  customizationType   String  @default("NONE") // NONE | CUSTOM | OFFICIAL_PLAYER
+  customizationName   String?
   customizationNumber String?
-  officialPlayer     String?
+  officialPlayer      String?
 
-  deliveryMode     String  @default("INMEDIATA")  // INMEDIATA | BAJO_PEDIDO (snapshot del pedido)
+  deliveryMode String @default("INMEDIATA") // INMEDIATA | BAJO_PEDIDO (snapshot del pedido)
 
-  sourceType      String  @default("LOCAL")  // LOCAL | SUPPLIER
-  supplierId      String?
+  sourceType String  @default("LOCAL") // LOCAL | SUPPLIER
+  supplierId String?
 
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([orderId])
 }
 
 model OrderStatusHistory {
-  id          String       @id @default(cuid())
-  orderId     String
-  order       Order        @relation(fields: [orderId], references: [id])
-  fromStatus  String?  // OrderStatus as string
-  toStatus    String  // OrderStatus as string
-  note        String?
-  createdBy   String?
-  createdAt   DateTime     @default(now())
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id])
+  fromStatus String? // OrderStatus as string
+  toStatus   String // OrderStatus as string
+  note       String?
+  createdBy  String?
+  createdAt  DateTime @default(now())
 
   @@index([orderId])
 }

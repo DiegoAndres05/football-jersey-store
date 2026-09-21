@@ -27,6 +27,7 @@ import {
   type PaymentMethod,
 } from "@/features/checkout/schemas/checkout-schema";
 import { buildBoldCheckoutPayload } from "@/features/payments/domain/bold-checkout-attrs";
+import { validateCoupon } from "@/features/coupons/server/coupon-actions";
 
 const BOLD_SCRIPT_SRC = "https://checkout.bold.co/library/boldPaymentButton.js";
 const DESTINATION_COUNTRIES = [
@@ -106,9 +107,16 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
   const [payError, setPayError] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
   const formRef = useRef<CheckoutFormValues | null>(null);
 
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    // A cart mutation invalidates any previously validated promotion.
+    setCouponDiscount(0);
+    setPayError("");
+  }, [subtotal, items.map((item) => `${item.lineId}:${item.quantity}`).join("|")]);
 
   useEffect(() => {
     if (!mounted || step !== "payment") return;
@@ -223,6 +231,17 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
       setPaymentStatus("idle");
       return;
     }
+    if (couponCode.trim()) {
+      const couponResult = await validateCoupon({ code: couponCode, lines: lines.map((i) => ({ variantId: i.variantId, quantity: i.quantity, customizationType: i.customizationType })) });
+      if (!couponResult.ok) {
+        setPayError(couponResult.message);
+        setCouponCode("");
+        setCouponDiscount(0);
+        setPaymentStatus("idle");
+        return;
+      }
+      setCouponDiscount(couponResult.discountAmount);
+    }
 
     const result = await submitOrder({
       form: formRef.current,
@@ -237,10 +256,15 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
       paymentMethod,
       paymentReference: `BOLD-${Date.now()}`,
       saleCurrency: checkoutCurrencyForCountry(formRef.current.shippingCountry, currencyContext).currency,
+      couponCode: couponCode.trim() || null,
     });
 
     if (!result.ok) {
       setPayError(result.error);
+      if (couponCode.trim()) {
+        setCouponCode("");
+        setCouponDiscount(0);
+      }
       setPaymentStatus("failed");
       return;
     }
@@ -484,6 +508,11 @@ export function CheckoutPageClient({ currencyContext }: { currencyContext?: Curr
         {/* Summary */}
         <aside className="rounded-xl border border-border bg-card p-5 lg:sticky lg:top-24 space-y-4">
           <h2 className="font-display text-lg font-bold uppercase tracking-tight">Resumen</h2>
+          <div className="mt-3 flex gap-2">
+            <Input aria-label="Código de cupón" value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="Cupón" />
+            <Button type="button" variant="outline" onClick={() => setPayError("")}>Aplicar</Button>
+          </div>
+          {couponDiscount > 0 && <p className="mt-2 text-sm text-green-700">Descuento: -{formatMoney({ amountCop: couponDiscount, currency: checkoutCurrency.currency, copPerUsd: checkoutCurrency.copPerUsd ?? undefined })} <button type="button" className="ml-2 underline" onClick={() => { setCouponCode(""); setCouponDiscount(0); setPayError(""); }}>Quitar cupón</button></p>}
           <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
             {items.map((item) => (
               <div key={item.lineId} className="flex gap-3">

@@ -8,6 +8,11 @@ export const BIG_LEAGUE_SLUGS = [
 
 export type BigLeagueSlug = (typeof BIG_LEAGUE_SLUGS)[number];
 
+export type LeagueLogo = {
+  src: string | null;
+  fallbackLabel: string;
+};
+
 const LEAGUE_LOGO_SRC: Record<BigLeagueSlug, string> = {
   "premier-league": "/leagues/premier_league.png",
   "la-liga": "/leagues/la_liga.png",
@@ -29,6 +34,14 @@ export function leagueLogoSrc(slug: string): string | null {
     return LEAGUE_LOGO_SRC[slug as BigLeagueSlug];
   }
   return null;
+}
+
+export function leagueLogo(slug: string, leagueName?: string): LeagueLogo {
+  const name = leagueName?.trim() || "esta liga";
+  return {
+    src: leagueLogoSrc(slug),
+    fallbackLabel: `Logo no disponible para ${name}`,
+  };
 }
 
 export function leagueMonogram(slug: string, fallbackName?: string): string {

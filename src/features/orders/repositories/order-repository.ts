@@ -11,6 +11,9 @@ import { planInventoryMovements } from "./inventory-plan";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
 import { toUsdCents } from "@/shared/money/convert";
 import type { SaleCurrency } from "@/shared/currency/sale-currency";
+import { calculateCouponTotals } from "@/features/coupons/domain/discount";
+import { normalizeCouponCode } from "@/features/coupons/services/coupon-validation";
+import { availableCouponUses, reserveCoupon } from "@/features/coupons/repositories/coupon-repository";
 
 export type OrderLineInput = {
   variantId: string;
@@ -27,6 +30,7 @@ export type CreateOrderInput = {
   paymentMethod: PaymentMethod;
   paymentReference: string;
   saleCurrency?: SaleCurrency;
+  couponCode?: string | null;
 };
 
 function orderCode(): string {
@@ -109,7 +113,18 @@ export async function createOrder(input: CreateOrderInput): Promise<
   }
 
   const fee = shippingFee(subtotal);
-  const total = subtotal + fee;
+  let discountAmount = 0;
+  let couponSnapshot: { code: string; discountType: "PERCENTAGE" | "FIXED"; value: number; eligibleBase: number } | null = null;
+  if (input.couponCode) {
+    const coupon = await prisma.coupon.findUnique({ where: { code: normalizeCouponCode(input.couponCode) }, include: { usages: true } });
+    const now = new Date();
+    if (!coupon || !coupon.isActive || now < coupon.startsAt || (coupon.endsAt && now > coupon.endsAt) || !availableCouponUses(coupon)) {
+      return { ok: false, error: "El cupón ya no está disponible; puedes continuar sin cupón." };
+    }
+    couponSnapshot = { code: coupon.code, discountType: coupon.discountType, value: coupon.value, eligibleBase: subtotal };
+    discountAmount = calculateCouponTotals(subtotal, fee, coupon.discountType, coupon.value).discountAmount;
+  }
+  const total = subtotal + fee - discountAmount;
   const f = parsed.data;
   const code = orderCode();
 
@@ -183,7 +198,14 @@ export async function createOrder(input: CreateOrderInput): Promise<
           subtotal,
           personalizationFee,
           shippingFee: fee,
+          discountAmount,
           total,
+          couponCodeSnapshot: couponSnapshot?.code ?? null,
+          couponDiscountTypeSnapshot: couponSnapshot?.discountType ?? null,
+          couponValueSnapshot: couponSnapshot?.value ?? null,
+          couponEligibleBase: couponSnapshot?.eligibleBase ?? null,
+          couponDiscountAmount: couponSnapshot ? discountAmount : null,
+          couponAppliedAt: couponSnapshot ? new Date() : null,
           shippingMethod: "Nacional",
           shippingFullName: f.shippingFullName,
           shippingPhone: f.shippingPhone,
@@ -209,6 +231,14 @@ export async function createOrder(input: CreateOrderInput): Promise<
         },
       });
 
+      if (couponSnapshot) {
+        const coupon = await tx.coupon.findUnique({ where: { code: couponSnapshot.code }, include: { usages: true } });
+        if (!coupon || !coupon.isActive || !availableCouponUses(coupon)) throw new Error("COUPON_UNAVAILABLE");
+        const usage = await reserveCoupon(tx, coupon.id, created.id);
+        if (!usage) throw new Error("COUPON_UNAVAILABLE");
+        await tx.order.update({ where: { id: created.id }, data: { couponUsageId: usage.id } });
+      }
+
       await tx.inventoryMovement.createMany({
         data: plan.movements.map((m) => ({
           variantId: m.variantId,
@@ -229,10 +259,13 @@ export async function createOrder(input: CreateOrderInput): Promise<
     return { ok: true, code: order.code, total: order.total, paymentAmount, saleCurrency };
   } catch (err) {
     const noStock = err instanceof Error && err.message.startsWith("NO_STOCK:");
+    const couponUnavailable = err instanceof Error && err.message === "COUPON_UNAVAILABLE";
     if (!noStock) console.error("createOrder failed:", err);
     return {
       ok: false,
-      error: noStock && err instanceof Error
+      error: couponUnavailable
+        ? "El cupón ya no está disponible; puedes continuar sin cupón."
+        : noStock && err instanceof Error
         ? err.message.slice("NO_STOCK:".length)
         : "No pudimos crear tu pedido. Intenta de nuevo.",
     };

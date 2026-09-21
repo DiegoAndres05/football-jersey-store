@@ -22,5 +22,23 @@ export async function listAdminOrders(deliveryMode?: "INMEDIATA" | "BAJO_PEDIDO"
 }
 
 export async function getAdminOrder(orderId: string) {
-  return prisma.order.findUnique({ where: { id: orderId }, include: { items: true, history: { orderBy: { createdAt: "desc" } }, notificationAttempts: true } });
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: true, history: { orderBy: { createdAt: "desc" } }, notificationAttempts: true },
+  });
+  if (!order) return null;
+  // Deliberately project snapshots from Order; never join the mutable Coupon row.
+  return {
+    ...order,
+    couponSnapshot: order.couponCodeSnapshot
+      ? {
+          code: order.couponCodeSnapshot,
+          discountType: order.couponDiscountTypeSnapshot,
+          value: order.couponValueSnapshot,
+          eligibleBase: order.couponEligibleBase,
+          discountAmount: order.couponDiscountAmount ?? order.discountAmount,
+          appliedAt: order.couponAppliedAt,
+        }
+      : null,
+  };
 }

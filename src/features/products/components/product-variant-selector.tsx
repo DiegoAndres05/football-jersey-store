@@ -26,7 +26,7 @@ export function ProductVariantSelector({
   onVersionChange: (slug: string) => void;
   onSizeChange: (code: string) => void;
   getVariantAvailability: (versionSlug: string, sizeCode: string) => "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK";
-  getVariantPrice: (versionSlug: string) => { salePrice: number; compareAtPrice: number | null };
+  getVariantPrice: (versionSlug: string) => { salePrice: number | null; compareAtPrice: number | null };
   currencyContext?: CurrencyContext;
 }) {
   return (
@@ -50,9 +50,11 @@ export function ProductVariantSelector({
                 )}
               >
                 <span>{v.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {formatMoney({ amountCop: price.salePrice, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}
-                </span>
+                {price.salePrice !== null && (
+                  <span className="text-xs text-muted-foreground">
+                    {formatMoney({ amountCop: price.salePrice, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}
+                  </span>
+                )}
               </button>
             );
           })}

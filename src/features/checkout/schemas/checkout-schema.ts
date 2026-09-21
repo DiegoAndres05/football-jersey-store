@@ -38,3 +38,35 @@ export const checkoutFormSchema = z.object({
 export type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;
 
 export type PaymentMethod = "CARD" | "PSE" | "NEQUI";
+
+/** Client input for the cart; prices are deliberately absent and are always
+ * loaded from ProductVariant during order creation. */
+export const checkoutLineSchema = z.object({
+  variantId: z.string().min(1),
+  quantity: z.number().int().min(1).max(100),
+  customizationType: z.enum(["NONE", "CUSTOM", "OFFICIAL_PLAYER"]),
+  customizationName: z.string().max(80).default(""),
+  customizationNumber: z.string().max(20).default(""),
+  deliveryMode: z.enum(["INMEDIATA", "BAJO_PEDIDO"]),
+});
+
+export const checkoutCartSchema = z.object({
+  lines: z.array(checkoutLineSchema).min(1).max(100),
+  saleCurrency: z.enum(["COP", "USD"]).default("COP"),
+  couponCode: z.string().trim().max(32).nullable().optional(),
+});
+
+/** Server-produced values used by payment and rendering. */
+export const checkoutTotalsSchema = z.object({
+  subtotal: z.number().int().nonnegative(),
+  personalizationFee: z.number().int().nonnegative(),
+  shippingFee: z.number().int().nonnegative(),
+  discountAmount: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  paymentAmount: z.number().int().nonnegative(),
+  saleCurrency: z.enum(["COP", "USD"]),
+});
+
+export type CheckoutLine = z.infer<typeof checkoutLineSchema>;
+export type CheckoutCart = z.infer<typeof checkoutCartSchema>;
+export type CheckoutTotals = z.infer<typeof checkoutTotalsSchema>;

@@ -7,6 +7,14 @@ export const adminOrderFilterSchema = z.object({ deliveryMode: adminDeliveryMode
 export type AdminOrderFilter = z.infer<typeof adminOrderFilterSchema>;
 export type AdminDeliveryMode = DeliveryMode;
 export type DeliverySummary = { hasImmediate: boolean; hasBackorder: boolean; isMixed: boolean };
+export type AdminCouponSnapshot = {
+  code: string;
+  discountType: "PERCENTAGE" | "FIXED" | null;
+  value: number | null;
+  eligibleBase: number | null;
+  discountAmount: number;
+  appliedAt: Date | null;
+};
 export type RetryResult =
   | { status: "SENT"; providerMessageRef?: string }
   | { status: "FAILED"; errorCode: string; errorMessage: string }

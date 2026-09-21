@@ -1,74 +1,73 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { LayoutDashboard, Package, ImageIcon, Trophy, Shield, Truck, Calendar, Ruler, Layers, Download, ExternalLink, LogOut, Settings } from "lucide-react";
+import { ExternalLink, LogOut } from "lucide-react";
 import { getSessionUser } from "@/features/auth/server/session";
 import { logoutAction } from "@/features/auth/server/actions";
+import { AdminNavigation } from "./admin-navigation";
+import { AdminBreadcrumbs } from "./admin-breadcrumbs";
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "Flashsport Admin",
   robots: { index: false, follow: false },
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
-  if (!user) redirect("/admin/login");
+  if (!user) {
+    const { redirect } = await import("next/navigation");
+    redirect("/admin/login");
+  }
+
+  const userEmail = user?.email ?? "";
 
   const navItems = [
-    { href: "/admin", label: "Panel", icon: LayoutDashboard },
-    { href: "/admin/inventario", label: "Inventario", icon: Package },
-    { href: "/admin/pedidos", label: "Pedidos", icon: Package },
-    { href: "/admin/productos", label: "Productos", icon: ImageIcon },
-    { href: "/admin/ligas", label: "Ligas", icon: Trophy },
-    { href: "/admin/equipos", label: "Equipos", icon: Shield },
-    { href: "/admin/proveedores", label: "Proveedores", icon: Truck },
-    { href: "/admin/temporadas", label: "Temporadas", icon: Calendar },
-    { href: "/admin/tallas", label: "Tallas", icon: Ruler },
-    { href: "/admin/versiones", label: "Versiones", icon: Layers },
-    { href: "/admin/importar", label: "Importar", icon: Download },
-    { href: "/admin/ajustes", label: "Ajustes", icon: Settings },
+    { href: "/admin", label: "Panel", exact: true },
+    { href: "/admin/inventario", label: "Inventario" },
+    { href: "/admin/pedidos", label: "Pedidos" },
+    { href: "/admin/cupones", label: "Cupones" },
+    { href: "/admin/productos", label: "Productos" },
+    { href: "/admin/ligas", label: "Ligas" },
+    { href: "/admin/equipos", label: "Equipos" },
+    { href: "/admin/proveedores", label: "Proveedores" },
+    { href: "/admin/temporadas", label: "Temporadas" },
+    { href: "/admin/tallas", label: "Tallas" },
+    { href: "/admin/versiones", label: "Versiones" },
+    { href: "/admin/importar", label: "Importar" },
+    { href: "/admin/ajustes", label: "Ajustes" },
   ];
 
   return (
     <div className="min-h-screen bg-secondary/30">
+      <a href="#admin-main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[1000] focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm">
+        Saltar al contenido
+      </a>
       <div className="container-page py-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
-          <div>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground">Flashsport Admin</p>
-            <h1 className="font-display text-xl font-bold uppercase tracking-tight">Administración</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
+        <header className="border-b border-border pb-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Flashsport Admin</p>
+              <h1 className="font-display text-xl font-bold uppercase tracking-tight">Administración</h1>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href="/" className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:border-muted-foreground/40 transition-colors">
+                Ver tienda <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+              <form action={logoutAction}>
+                <button type="submit" className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:border-destructive/40 hover:text-destructive transition-colors">
+                  Salir <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </form>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:border-muted-foreground/40 transition-colors"
-            >
-              Ver tienda <ExternalLink className="h-3.5 w-3.5" />
-            </Link>
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:border-destructive/40 hover:text-destructive transition-colors"
-              >
-                Salir <LogOut className="h-3.5 w-3.5" />
-              </button>
-            </form>
-          </div>
+        </header>
+
+        <div className="mt-5">
+          <AdminNavigation items={navItems} userEmail={userEmail} />
         </div>
 
-        <nav className="flex gap-1 mt-4 mb-6">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-            >
-              <item.icon className="h-4 w-4" /> {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        {children}
+        <main id="admin-main-content" className="pt-6">
+          <AdminBreadcrumbs />
+          {children}
+        </main>
       </div>
     </div>
   );

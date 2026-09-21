@@ -10,6 +10,8 @@ import {
 } from "@/features/catalog/server/catalog-actions";
 import { VariantDeleteButton } from "@/features/catalog/components/variant-delete-button";
 import { getVersions, getSizes } from "@/features/catalog/server/reference-cache";
+import { formatPrice } from "@/lib/utils";
+import { stockStatusLabel } from "../../../admin-ui-formatters";
 
 export const metadata: Metadata = {
   title: "Variantes · Flashsport Admin",
@@ -112,6 +114,7 @@ export default async function AdminProductVariantsPage({
                 const stock = stockByVariant.get(v.id) ?? 0;
                 const movementCount = movementCountByVariant.get(v.id) ?? 0;
                 const low = v.lowStockAt !== null && stock <= v.lowStockAt;
+                const status = stock <= 0 ? "AGOTADO" : low ? "STOCK_BAJO" : v.allowsBackorder ? "BAJO_PEDIDO" : "DISPONIBLE";
                 return (
                   <tr key={v.id} className="border-b border-border last:border-b-0 align-top">
                     <td className="px-4 py-3 font-medium">{v.size.name}</td>
@@ -121,6 +124,8 @@ export default async function AdminProductVariantsPage({
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`tabular-nums font-semibold ${low ? "text-destructive" : ""}`}>{stock}</span>
+                      <span className="block text-xs font-medium">{stockStatusLabel(status)}</span>
+                      <span className="block text-xs text-muted-foreground">{formatPrice(v.salePrice)}</span>
                       {v.lowStockAt !== null && (
                         <span className="block text-xs text-muted-foreground">alerta ≤ {v.lowStockAt}</span>
                       )}

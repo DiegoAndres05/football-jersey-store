@@ -17,6 +17,7 @@ import { ProductVariantSelector } from "./product-variant-selector";
 import { ProductCustomization } from "./product-customization";
 import { ProductPrice } from "./product-price";
 import { ProductDeliveryMode } from "./product-delivery-mode";
+import { ProductAvailability } from "./product-availability";
 import { AddToCartButton } from "./add-to-cart-button";
 import type { ProductDetailData, VariantWithStock } from "@/features/products/types/product-types";
 import { SizeGuideDialog } from "./size-guide-dialog";
@@ -28,6 +29,7 @@ import { toast } from "@/components/ui/toast";
 import { SHIPPING } from "@/shared/config/site";
 import { formatMoney } from "@/shared/money/format";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
+import { deriveProductDisplayPrice } from "../domain/product-price-display";
 
 type CustomType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
 
@@ -57,6 +59,11 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
   }, [product.variants]);
 
   const currentVariant = variantMap.get(`${selectedVersion}_${selectedSize}`);
+  const priceDisplay = deriveProductDisplayPrice({
+    availability: product.availability,
+    currentPrice: currentVariant?.salePrice,
+    lastValidProductPrice: product.lastValidProductPrice,
+  });
 
   const getVariantAvailability = useCallback(
     (versionSlug: string, sizeCode: string): "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK" => {
@@ -67,13 +74,23 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
   );
 
   const getVariantPrice = useCallback(
-    (versionSlug: string): { salePrice: number; compareAtPrice: number | null } => {
+    (versionSlug: string): { salePrice: number | null; compareAtPrice: number | null } => {
       const sizeCode = selectedSize;
       const v = variantMap.get(`${versionSlug}_${sizeCode}`);
-      if (v) return { salePrice: v.salePrice, compareAtPrice: v.compareAtPrice };
+      if (v) {
+        return {
+          salePrice: v.salePrice > 0 ? v.salePrice : null,
+          compareAtPrice: v.compareAtPrice,
+        };
+      }
       const anyV = product.variants.find((pv) => pv.version.slug === versionSlug);
-      if (anyV) return { salePrice: anyV.salePrice, compareAtPrice: anyV.compareAtPrice };
-      return { salePrice: 0, compareAtPrice: null };
+      if (anyV) {
+        return {
+          salePrice: anyV.salePrice > 0 ? anyV.salePrice : null,
+          compareAtPrice: anyV.compareAtPrice,
+        };
+      }
+      return { salePrice: null, compareAtPrice: null };
     },
     [variantMap, selectedSize, product.variants],
   );
@@ -163,14 +180,17 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
           </div>
 
           {/* Price */}
-          {currentVariant && (
+          {priceDisplay.showPrice && priceDisplay.displayPrice !== null && (
             <ProductPrice
-              salePrice={currentVariant.salePrice + surcharge}
-              compareAtPrice={currentVariant.compareAtPrice
+              salePrice={priceDisplay.displayPrice + surcharge}
+              compareAtPrice={currentVariant?.compareAtPrice
                 ? currentVariant.compareAtPrice + surcharge
                 : null}
               currencyContext={currencyContext}
             />
+          )}
+          {product.availability === "OUT_OF_STOCK" && (
+            <ProductAvailability availability="OUT_OF_STOCK" stock={0} />
           )}
 
           <Separator />

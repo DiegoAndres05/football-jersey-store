@@ -22,6 +22,10 @@ export type ProductCardData = {
   availableSizes: string[];
   versionNames: string[];
   canBackorder: boolean;
+  lastValidProductPrice: number | null;
+  displayPrice: number | null;
+  showPrice: boolean;
+  statusLabel: "En stock" | "Bajo pedido" | "Agotado";
 };
 
 export type Availability = "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK";
@@ -77,6 +81,11 @@ export type ProductDetailData = {
   players: PlayerData[];
   images: (Pick<ProductImage, "id" | "url" | "altText" | "order" | "isPrimary">)[];
   variants: VariantWithStock[];
+  availability: Availability;
+  lastValidProductPrice: number | null;
+  displayPrice: number | null;
+  showPrice: boolean;
+  statusLabel: "En stock" | "Bajo pedido" | "Agotado";
 };
 
 export type PlayerData = {

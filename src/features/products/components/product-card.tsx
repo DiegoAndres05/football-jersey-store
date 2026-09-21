@@ -91,7 +91,7 @@ export function ProductCard({ product, priority, currencyContext }: { product: P
         <div className="mt-auto pt-2">
           {isSoldOut ? (
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-destructive">
-              Agotada
+              Agotado
             </p>
           ) : isBackorderOnly ? (
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-warning">
@@ -103,15 +103,17 @@ export function ProductCard({ product, priority, currencyContext }: { product: P
             </p>
           ) : null}
 
+          {product.showPrice && product.displayPrice !== null && (
           <div className="flex items-baseline gap-1.5 mt-1">
-            <span className="text-sm text-muted-foreground">Desde</span>
-            <span className="text-base font-bold">{formatPrice(product.minPrice)}</span>
-            {product.maxPrice > product.minPrice && (
+            {!isSoldOut && <span className="text-sm text-muted-foreground">Desde</span>}
+            <span className="text-base font-bold">{formatPrice(product.displayPrice)}</span>
+            {!isSoldOut && product.maxPrice > product.minPrice && (
               <span className="text-xs text-muted-foreground">
                 hasta {formatPrice(product.maxPrice)}
               </span>
             )}
           </div>
+          )}
         </div>
       </div>
     </Link>

@@ -13,6 +13,7 @@ import type {
   Availability,
   SortOption,
 } from "../types/product-types";
+import { deriveProductDisplayPrice } from "../domain/product-price-display";
 
 const productCardSelect = {
   id: true,
@@ -165,7 +166,18 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailData 
     (a, b) => parseInt(a.number, 10) - parseInt(b.number, 10),
   );
 
-  return { ...product, players, variants: variantsWithStock };
+  const availability = availabilityFromVariantInfos(variantsWithStock.map((v) => ({
+    stock: v.stock ?? 0,
+    allowsBackorder: v.allowsBackorder,
+    sizeCode: v.size.code,
+    sizePosition: v.size.position,
+    versionName: v.version.name,
+    versionAdjustment: v.version.priceAdjustment,
+  })));
+  const lastValidProductPrice = Math.max(0, ...product.variants.map((v) => v.salePrice).filter((p) => p > 0));
+  const priceDisplay = deriveProductDisplayPrice({ availability, currentPrice: lastValidProductPrice, lastValidProductPrice });
+
+  return { ...product, players, variants: variantsWithStock, lastValidProductPrice, ...priceDisplay };
 }
 
 export async function getRelatedProducts(
@@ -378,6 +390,13 @@ async function mapProductCards(
           .map((i) => i.versionName),
       ),
     ];
+    const availability = availabilityFromVariantInfos(infos);
+    const lastValidProductPrice = range.max > 0 ? range.max : null;
+    const priceDisplay = deriveProductDisplayPrice({
+      availability,
+      currentPrice: range.min > 0 ? range.min : null,
+      lastValidProductPrice,
+    });
     return {
       id: p.id,
       slug: p.slug,
@@ -391,10 +410,11 @@ async function mapProductCards(
       primaryImage: p.images[0] ?? null,
       minPrice: range.min,
       maxPrice: range.max,
-      availability: availabilityFromVariantInfos(infos),
       availableSizes,
       versionNames,
       canBackorder: infos.some((info) => info.allowsBackorder),
+      lastValidProductPrice,
+      ...priceDisplay,
     } satisfies ProductCardData;
   });
 }

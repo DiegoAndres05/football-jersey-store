@@ -84,6 +84,18 @@ export async function applyBoldPayment(
         },
       });
 
+      const usage = await tx.couponUsage.findFirst({
+        where: { orderId: order.id, state: "RESERVED" },
+      });
+      if (usage) {
+        await tx.couponUsage.update({
+          where: { id: usage.id },
+          data: outcome === "APPROVED"
+            ? { state: "CONFIRMED", confirmedAt: new Date() }
+            : { state: "RELEASED", releasedAt: new Date(), releaseReason: "Pago rechazado" },
+        });
+      }
+
       await tx.orderStatusHistory.create({
         data: {
           orderId: order.id,

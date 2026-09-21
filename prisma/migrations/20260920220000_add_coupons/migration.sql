@@ -1,0 +1,12 @@
+CREATE TYPE "DiscountType" AS ENUM ('PERCENTAGE', 'FIXED');
+CREATE TYPE "CouponUsageState" AS ENUM ('RESERVED', 'CONFIRMED', 'RELEASED');
+CREATE TABLE "Coupon" ("id" TEXT NOT NULL, "code" TEXT NOT NULL, "discountType" "DiscountType" NOT NULL, "value" INTEGER NOT NULL, "startsAt" TIMESTAMP(3) NOT NULL, "endsAt" TIMESTAMP(3), "maxUses" INTEGER, "isActive" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "Coupon_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "CouponUsage" ("id" TEXT NOT NULL, "couponId" TEXT NOT NULL, "orderId" TEXT NOT NULL, "state" "CouponUsageState" NOT NULL DEFAULT 'RESERVED', "reservedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "expiresAt" TIMESTAMP(3) NOT NULL, "confirmedAt" TIMESTAMP(3), "releasedAt" TIMESTAMP(3), "releaseReason" TEXT, CONSTRAINT "CouponUsage_pkey" PRIMARY KEY ("id"));
+ALTER TABLE "Order" ADD COLUMN "couponCodeSnapshot" TEXT, ADD COLUMN "couponDiscountTypeSnapshot" "DiscountType", ADD COLUMN "couponValueSnapshot" INTEGER, ADD COLUMN "couponEligibleBase" INTEGER, ADD COLUMN "couponDiscountAmount" INTEGER, ADD COLUMN "couponAppliedAt" TIMESTAMP(3), ADD COLUMN "couponUsageId" TEXT;
+CREATE UNIQUE INDEX "Coupon_code_key" ON "Coupon"("code");
+CREATE UNIQUE INDEX "CouponUsage_couponId_orderId_key" ON "CouponUsage"("couponId", "orderId");
+CREATE UNIQUE INDEX "Order_couponUsageId_key" ON "Order"("couponUsageId");
+CREATE INDEX "Coupon_isActive_startsAt_endsAt_idx" ON "Coupon"("isActive", "startsAt", "endsAt");
+CREATE INDEX "CouponUsage_couponId_state_expiresAt_idx" ON "CouponUsage"("couponId", "state", "expiresAt");
+ALTER TABLE "CouponUsage" ADD CONSTRAINT "CouponUsage_couponId_fkey" FOREIGN KEY ("couponId") REFERENCES "Coupon"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CouponUsage" ADD CONSTRAINT "CouponUsage_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

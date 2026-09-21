@@ -17,6 +17,8 @@ import {
   remainingImmediate,
 } from "@/features/cart/domain/immediate-quantity";
 import { toast } from "@/components/ui/toast";
+import { validateCoupon } from "@/features/coupons/server/coupon-actions";
+import { shippingFee } from "@/shared/config/site";
 
 export function CartPageClient({ currencyContext }: { currencyContext?: CurrencyContext }) {
   const items = useCartStore((s) => s.items);
@@ -27,13 +29,21 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
   const reconcileWithStock = useCartStore((s) => s.reconcileWithStock);
 
   const [mounted, setMounted] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponMessage, setCouponMessage] = useState("");
   const [stockByVariant, setStockByVariant] = useState<Map<string, number> | null>(null);
+  const shipping = shippingFee(subtotal);
   const variantKey = useMemo(
     () => [...new Set(items.map((item) => item.variantId))].sort().join(","),
     [items],
   );
 
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setCouponDiscount(0);
+    setCouponMessage("");
+  }, [variantKey, subtotal]);
 
   useEffect(() => {
     if (!mounted || variantKey.length === 0) {
@@ -57,6 +67,12 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
   }, [mounted, variantKey, reconcileWithStock]);
 
   const isEmpty = !mounted || items.length === 0;
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) { setCouponDiscount(0); setCouponMessage("Escribe un código de cupón válido."); return; }
+    const result = await validateCoupon({ code: couponCode, lines: items.map((item) => ({ variantId: item.variantId, quantity: item.quantity, customizationType: item.customizationType })) });
+    if (result.ok) { setCouponDiscount(result.discountAmount); setCouponMessage(result.message); }
+    else { setCouponDiscount(0); setCouponMessage(result.message); }
+  };
 
   const freeShippingThreshold = 200000;
   const remaining = Math.max(0, freeShippingThreshold - subtotal);
@@ -237,6 +253,15 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
               </dd>
             </div>
           </dl>
+          <div className="mt-4">
+            <label htmlFor="coupon-code" className="text-sm font-medium">Cupón de descuento</label>
+            <div className="mt-1 flex gap-2">
+              <input id="coupon-code" value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="CÓDIGO" className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Button type="button" variant="outline" onClick={() => void applyCoupon()}>Aplicar</Button>
+            </div>
+            {couponMessage && <p className="mt-1 text-xs text-muted-foreground">{couponMessage}</p>}
+          </div>
+          {couponDiscount > 0 && <div className="mt-2 flex justify-between text-sm"><span className="text-muted-foreground">Descuento</span><span className="font-medium text-green-700">-{formatMoney({ amountCop: couponDiscount, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span></div>}
 
           {remaining > 0 ? (
             <p className="mt-3 rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
@@ -253,7 +278,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
 
           <div className="flex justify-between items-baseline">
             <span className="text-sm font-medium">Total</span>
-            <span className="text-2xl font-bold tabular-nums transition-colors duration-200 motion-reduce:transition-none">{formatMoney({ amountCop: subtotal, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span>
+            <span className="text-2xl font-bold tabular-nums transition-colors duration-200 motion-reduce:transition-none">{formatMoney({ amountCop: subtotal + shipping - couponDiscount, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span>
           </div>
 
           <Button className="w-full mt-4" asChild>

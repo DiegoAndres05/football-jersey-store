@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ArrowRight,
   BadgeCheck,
@@ -17,6 +16,7 @@ import {
 } from "@/features/products/repositories/product-repository";
 import {
   BIG_LEAGUE_SLUGS,
+  leagueLogo,
   leagueLogoSrc,
   leagueMonogram,
 } from "@/features/products/domain/league-logos";
@@ -28,6 +28,7 @@ import { getHomepageCarouselSlides } from "@/features/products/repositories/home
 import { FeaturedCoverflowCarousel } from "@/features/products/components/featured-coverflow-carousel";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE } from "@/features/seo/domain/robots-policy";
+import { LeagueCard } from "@/components/home/league-card";
 
 export const metadata: Metadata = {
   title: "Flashsport — Camisetas de fútbol",
@@ -38,6 +39,7 @@ export const metadata: Metadata = {
 };
 
 const BIG_LEAGUES = BIG_LEAGUE_SLUGS;
+const LEAGUE_CARD_VISUAL_CLASS = "h-11 w-11";
 
 const TRUST_ITEMS = [
   { icon: Truck, label: "Envíos a todo el país" },
@@ -144,41 +146,23 @@ export default async function HomePage() {
 
         <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
           {bigLeagues.map((league) => {
-            const logoSrc = leagueLogoSrc(league.slug);
+            const liga = league.name;
+            const logo = leagueLogo(league.slug, league.name);
+            const logoSrc = logo.src ?? leagueLogoSrc(league.slug);
+            const fallbackMonogram = leagueMonogram(league.slug, league.name);
             return (
-              <Link
+              <LeagueCard
                 key={league.slug}
-                href={`/ligas/${league.slug}`}
-                className="group flex flex-col rounded-xl border border-border bg-card p-5 transition-all hover:border-foreground/40 hover:shadow-md"
-              >
-                <span className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg p-0.104 transition-colors group-hover:bg-foreground/5">
-                  {logoSrc ? (
-                    <Image
-                      src={logoSrc}
-                      alt={leagueLogoAlt(league.name)}
-                      width={44}
-                      height={44}
-                      className="h-full w-full object-contain"
-                    />
-                  ) : (
-                    <span className="font-display text-sm font-bold uppercase tracking-tight group-hover:text-foreground">
-                      {leagueMonogram(league.slug, league.name)}
-                    </span>
-                  )}
-                </span>
-                <span className="mt-4 font-display text-lg font-bold uppercase leading-tight tracking-tight">
-                  {league.name}
-                </span>
-                <span className="mt-1 text-xs text-muted-foreground">
-                  {league.productCount > 0
-                    ? `${league.productCount} producto${league.productCount !== 1 ? "s" : ""}`
-                    : "Próximamente"}
-                </span>
-                <span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground transition-colors group-hover:text-foreground">
-                  Ver liga
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                </span>
-              </Link>
+                liga={liga}
+                slug={league.slug}
+                name={liga}
+                productCount={league.productCount}
+                logoSrc={logoSrc}
+                logoAlt={leagueLogoAlt(league.name)}
+                fallbackLabel={`${logo.fallbackLabel} (${fallbackMonogram})`}
+                visualClassName={LEAGUE_CARD_VISUAL_CLASS}
+                imageClassName="h-full w-full object-contain"
+              />
             );
           })}
         </div>
