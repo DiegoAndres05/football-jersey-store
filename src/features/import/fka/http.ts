@@ -2,9 +2,13 @@ export const FKA_BASE_URL = "https://www.footballkitarchive.com";
 
 const REFERER = `${FKA_BASE_URL}/`;
 const TIMEOUT_MS = 20000;
+const DEFAULT_MAX_RETRIES = 1;
+const DEFAULT_RETRY_DELAY_MS = 250;
 
 export const FKA_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+export type FkaRequestKind = "document" | "xhr";
 
 export type FkaProviderErrorCode =
   | "FKA_ACCESS_DENIED"
@@ -23,6 +27,8 @@ export type FkaErrorDetails = {
   finalUrl?: string;
   responseHeaders?: Record<string, string>;
   bodyPreview?: string;
+  /** Short, safe phrase safe to show in the admin UI. Never a URL, header, or secret. */
+  reason?: string;
 };
 
 export class FkaProviderError extends Error {
@@ -44,27 +50,33 @@ export class FkaBlockedError extends FkaProviderError {
   }
 }
 
+const USER_MESSAGES: Record<FkaProviderErrorCode, string> = {
+  FKA_ACCESS_DENIED: "Football Kit Archive rechazó la consulta.",
+  FKA_NOT_FOUND: "Football Kit Archive no encontró el recurso solicitado.",
+  FKA_RATE_LIMITED: "Football Kit Archive limitó temporalmente las solicitudes. Intenta de nuevo en unos minutos.",
+  FKA_TEMPORARY_ERROR: "Football Kit Archive respondió con un error temporal. Intenta de nuevo más tarde.",
+  FKA_TIMEOUT: "Football Kit Archive no respondió a tiempo. Intenta de nuevo más tarde.",
+  FKA_INVALID_RESPONSE: "Football Kit Archive respondió con un formato inesperado.",
+  FKA_NETWORK_ERROR: "No se pudo conectar con Football Kit Archive.",
+};
+
 export function fkaErrorUserMessage(err: unknown): string {
   if (!(err instanceof FkaProviderError)) {
     return err instanceof Error ? err.message : "Error inesperado al consultar Football Kit Archive.";
   }
+  return withSafeDiagnostic(USER_MESSAGES[err.code], err);
+}
 
-  switch (err.code) {
-    case "FKA_ACCESS_DENIED":
-      return "Football Kit Archive rechazó la consulta. Abre Chrome/Brave con CDP local y verifica que FKA cargue correctamente en ese navegador.";
-    case "FKA_NOT_FOUND":
-      return "Football Kit Archive no encontró el recurso solicitado.";
-    case "FKA_RATE_LIMITED":
-      return "Football Kit Archive limitó temporalmente las solicitudes. Intenta de nuevo en unos minutos.";
-    case "FKA_TEMPORARY_ERROR":
-      return "Football Kit Archive respondió con un error temporal. Intenta de nuevo más tarde.";
-    case "FKA_TIMEOUT":
-      return "Football Kit Archive no respondió a tiempo. Intenta de nuevo más tarde.";
-    case "FKA_INVALID_RESPONSE":
-      return "Football Kit Archive respondió con un formato inesperado.";
-    case "FKA_NETWORK_ERROR":
-      return "No se pudo conectar con Football Kit Archive.";
+function withSafeDiagnostic(base: string, err: FkaProviderError): string {
+  const parts: string[] = [];
+  if (typeof err.details.status === "number") parts.push(`HTTP ${err.details.status}`);
+  if (err.code === "FKA_ACCESS_DENIED" && err.details.bodyPreview && isCloudflareChallenge(err.details.bodyPreview)) {
+    parts.push("verificación Cloudflare");
   }
+  if (err.code === "FKA_NETWORK_ERROR") parts.push(err.details.reason ?? "error de red");
+  if (err.code === "FKA_TIMEOUT") parts.push("tiempo de espera agotado");
+  if (parts.length === 0) return base;
+  return `${base.replace(/\.$/, "")} (${parts.join(", ")}).`;
 }
 
 export function isCloudflareChallenge(html: string): boolean {
@@ -76,6 +88,54 @@ export function isCloudflareChallenge(html: string): boolean {
 
 export function normalizeFkaBodyPreview(text: string): string {
   return text.slice(0, 500).replace(/\s+/g, " ").trim();
+}
+
+export function fkaRequestHeaders(kind: FkaRequestKind = "xhr"): Record<string, string> {
+  const common = {
+    "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+    Referer: REFERER,
+    "User-Agent": FKA_USER_AGENT,
+  };
+  if (kind === "document") {
+    return {
+      ...common,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Upgrade-Insecure-Requests": "1",
+    };
+  }
+  return {
+    ...common,
+    Accept: "application/json, text/javascript, */*; q=0.01",
+    "X-Requested-With": "XMLHttpRequest",
+  };
+}
+
+const NETWORK_REASONS: Record<string, string> = {
+  ECONNREFUSED: "conexión rechazada",
+  ENOTFOUND: "host no resuelto",
+  EAI_AGAIN: "host no resuelto",
+  ECONNRESET: "conexión cerrada",
+  ETIMEDOUT: "tiempo de conexión agotado",
+  UND_ERR_CONNECT_TIMEOUT: "tiempo de conexión agotado",
+  UND_ERR_SOCKET: "conexión cerrada",
+};
+
+export function safeNetworkReason(err: unknown): string {
+  const code = readSystemCode(err);
+  if (code && NETWORK_REASONS[code]) return NETWORK_REASONS[code];
+  return "error de red";
+}
+
+function readSystemCode(err: unknown): string | undefined {
+  const seen = new Set<unknown>();
+  let current: unknown = err;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === "string" && code.length > 0 && code.length < 64 && /^[A-Z0-9_]+$/.test(code)) return code;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return undefined;
 }
 
 function safeHeaderSnapshot(headers: Headers): Record<string, string> {
@@ -116,15 +176,26 @@ function logFkaHttpError(error: FkaProviderError): void {
     finalUrl: error.details.finalUrl,
     responseHeaders: error.details.responseHeaders,
     bodyPreview: error.details.bodyPreview,
+    reason: error.details.reason,
   });
 }
 
-export async function fetchFkaText(
+function isRetryableFkaError(err: FkaProviderError): boolean {
+  return (
+    err.code === "FKA_ACCESS_DENIED" ||
+    err.code === "FKA_RATE_LIMITED" ||
+    err.code === "FKA_TEMPORARY_ERROR" ||
+    err.code === "FKA_NETWORK_ERROR"
+  );
+}
+
+async function fetchFkaTextOnce(
   url: string,
   options: {
     timeoutMs?: number;
     fetchImpl?: typeof fetch;
-  } = {},
+    kind?: FkaRequestKind;
+  },
 ): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? TIMEOUT_MS);
@@ -133,17 +204,11 @@ export async function fetchFkaText(
     const res = await fetchImpl(url, {
       signal: controller.signal,
       redirect: "follow",
-      headers: {
-        Accept: "application/json, text/javascript, */*; q=0.01",
-        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-        Referer: REFERER,
-        "User-Agent": FKA_USER_AGENT,
-        "X-Requested-With": "XMLHttpRequest",
-      },
+      headers: fkaRequestHeaders(options.kind ?? "xhr"),
     });
     const text = await res.text();
     if (!res.ok) {
-      const details = {
+      throw new FkaProviderError(codeFromStatus(res.status), messageFromStatus(res.status, isCloudflareChallenge(text)), {
         url,
         status: res.status,
         statusText: res.statusText,
@@ -151,14 +216,7 @@ export async function fetchFkaText(
         finalUrl: res.url,
         responseHeaders: safeHeaderSnapshot(res.headers),
         bodyPreview: normalizeFkaBodyPreview(text),
-      };
-      const err = new FkaProviderError(
-        codeFromStatus(res.status),
-        messageFromStatus(res.status, isCloudflareChallenge(text)),
-        details,
-      );
-      logFkaHttpError(err);
-      throw err;
+      });
     }
     return text;
   } catch (err) {
@@ -166,12 +224,42 @@ export async function fetchFkaText(
     if (controller.signal.aborted) {
       throw new FkaProviderError("FKA_TIMEOUT", "Football Kit Archive no respondió a tiempo.", { url });
     }
-    throw new FkaProviderError(
-      "FKA_NETWORK_ERROR",
-      `No se pudo conectar con Football Kit Archive: ${err instanceof Error ? err.message : "error de red"}`,
-      { url },
-    );
+    const reason = safeNetworkReason(err);
+    throw new FkaProviderError("FKA_NETWORK_ERROR", "No se pudo conectar con Football Kit Archive.", { url, reason });
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function fetchFkaText(
+  url: string,
+  options: {
+    timeoutMs?: number;
+    fetchImpl?: typeof fetch;
+    kind?: FkaRequestKind;
+    maxRetries?: number;
+    retryDelayMs?: number;
+  } = {},
+): Promise<string> {
+  const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+  const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+  let kind = options.kind ?? "xhr";
+  let lastError: FkaProviderError | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fetchFkaTextOnce(url, { ...options, kind });
+    } catch (err) {
+      if (!(err instanceof FkaProviderError)) throw err;
+      lastError = err;
+      if (!isRetryableFkaError(err) || attempt === maxRetries) {
+        logFkaHttpError(err);
+        throw err;
+      }
+      if (err.code === "FKA_ACCESS_DENIED") kind = kind === "xhr" ? "document" : "xhr";
+      if (retryDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    }
+  }
+
+  throw lastError ?? new FkaProviderError("FKA_NETWORK_ERROR", "No se pudo conectar con Football Kit Archive.", { url, reason: "error de red" });
 }

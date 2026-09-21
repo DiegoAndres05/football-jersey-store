@@ -2,6 +2,7 @@ import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import {
   fetchFkaText,
+  fkaErrorUserMessage,
   FkaProviderError,
   FKA_USER_AGENT,
 } from "../src/features/import/fka/http.ts";
@@ -155,5 +156,103 @@ describe("FKA search parser", () => {
       () => parseFkaTeamSearchResponse("<!doctype html><title>Just a moment...</title>", "Real Madrid", buildFkaTeamSearchUrl("Real Madrid")),
       (err) => err instanceof FkaProviderError && err.code === "FKA_INVALID_RESPONSE",
     );
+  });
+});
+
+describe("FKA HTTP retries and admin-facing errors", () => {
+  it("retries a 403 once with document headers and returns the next successful body", async () => {
+    let calls = 0;
+    const fetchImpl = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      calls += 1;
+      const headers = new Headers(init?.headers);
+      if (calls === 1) {
+        assert.equal(headers.get("x-requested-with"), "XMLHttpRequest");
+        return response("<title>Just a moment...</title>", 403, { server: "cloudflare", "cf-ray": "secret-ray" });
+      }
+      assert.equal(headers.get("x-requested-with"), null);
+      assert.match(headers.get("accept") ?? "", /text\/html/);
+      return response("<html>catalog</html>", 200);
+    }) as typeof fetch;
+
+    const body = await fetchFkaText("https://www.footballkitarchive.com/es/real-madrid-camisetas-t16/", {
+      fetchImpl,
+      retryDelayMs: 0,
+    });
+
+    assert.equal(body, "<html>catalog</html>");
+    assert.equal(calls, 2);
+  });
+
+  it("does not retry a 404", async () => {
+    let calls = 0;
+    const fetchImpl = (async () => {
+      calls += 1;
+      return response("missing", 404);
+    }) as typeof fetch;
+
+    await assertFkaError(
+      fetchFkaText("https://www.footballkitarchive.com/missing", { fetchImpl, retryDelayMs: 0 }),
+      "FKA_NOT_FOUND",
+      404,
+    );
+    assert.equal(calls, 1);
+  });
+
+  it("surfaces HTTP 403 and Cloudflare without the URL or ray id", async () => {
+    const warn = mock.method(console, "warn", () => undefined);
+    try {
+      await fetchFkaText("https://www.footballkitarchive.com/es/real-madrid-camisetas-t16/", {
+        fetchImpl: failingFetch(403, "<!doctype html><title>Just a moment...</title><p>cf-ray should stay in logs</p>"),
+        maxRetries: 0,
+      });
+      assert.fail("expected FKA error");
+    } catch (err) {
+      const message = fkaErrorUserMessage(err);
+      assert.match(message, /HTTP 403/);
+      assert.match(message, /verificación Cloudflare/);
+      assert.equal(message.includes("footballkitarchive.com"), false);
+      assert.equal(message.includes("cf-ray"), false);
+      assert.equal(message.includes("secret"), false);
+    } finally {
+      warn.mock.restore();
+    }
+  });
+
+  it("surfaces timeout without a raw exception", async () => {
+    const fetchImpl = ((_url: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      })) as typeof fetch;
+
+    try {
+      await fetchFkaText("https://www.footballkitarchive.com/es/", { fetchImpl, timeoutMs: 1, maxRetries: 0 });
+      assert.fail("expected timeout");
+    } catch (err) {
+      const message = fkaErrorUserMessage(err);
+      assert.match(message, /no respondió a tiempo/);
+      assert.match(message, /tiempo de espera agotado/);
+      assert.equal(message.includes("AbortError"), false);
+    }
+  });
+
+  it("surfaces a refused connection without the address", async () => {
+    const fetchImpl = (async () => {
+      const cause = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:9222"), { code: "ECONNREFUSED" });
+      throw new TypeError("fetch failed", { cause });
+    }) as typeof fetch;
+
+    try {
+      await fetchFkaText("https://www.footballkitarchive.com/es/api/search.php?filter=Real", {
+        fetchImpl,
+        maxRetries: 0,
+      });
+      assert.fail("expected network error");
+    } catch (err) {
+      const message = fkaErrorUserMessage(err);
+      assert.match(message, /No se pudo conectar con Football Kit Archive \(conexión rechazada\)/);
+      assert.equal(message.includes("127.0.0.1"), false);
+      assert.equal(message.includes("9222"), false);
+      assert.equal(message.includes("footballkitarchive.com"), false);
+    }
   });
 });
