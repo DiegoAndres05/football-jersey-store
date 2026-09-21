@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { FkaImportForm } from "@/features/import/components/fka-import-form";
 
+export const maxDuration = 300;
+
 export const metadata: Metadata = {
   title: "Importar · Flashsport Admin",
   robots: { index: false, follow: false },

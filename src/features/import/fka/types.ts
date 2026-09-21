@@ -29,7 +29,7 @@ export type ImportPreviewItem = {
   seasonMatch: { found: boolean; name: string | null };
   message: string | null;
   /**
-   * Miniatura para el preview: data URL descargada por HTTPS desde FKA.
+   * Miniatura para el preview: data URL descargada por el navegador CDP (misma sesión).
    * Opcional: si no se descargó, la UI cae al imageUrl original de FKA.
    */
   previewImage?: string | null;

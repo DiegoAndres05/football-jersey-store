@@ -52,8 +52,7 @@ function makeSupabaseImageGateway(download: ImageDownloader): ImageGateway {
 }
 
 /**
- * downloadImage: transport de descarga de imagen. En producción la action
- * inyecta la descarga HTTPS de FKA; el default directo queda como fallback testeable.
+ * downloadImage: la action inyecta `fetcher.downloadImage` (CDP, misma sesión).
  */
 export function importFkaKitsAsDraftsWithRealDeps(
   kits: FkaKit[],

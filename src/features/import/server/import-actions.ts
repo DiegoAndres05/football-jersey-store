@@ -27,6 +27,8 @@ import {
 } from "./import-logic";
 import type { MissingTeamContext } from "./import-logic";
 
+export const maxDuration = 300;
+
 const searchSchema = z.object({
   teams: z.array(z.string().trim().min(1)).min(1, "Escribe al menos un equipo.").max(10),
   season: z.string().trim().regex(/^(\d{4}|\d{2})-\d{2}$/, "Temporada inválida (ej: 2026-27)."),
@@ -38,9 +40,7 @@ export type FkaPreviewResult =
   | { ok: false; error: string };
 
 /**
- * La miniatura de preview se descarga por HTTPS desde FKA.
- * imageUrl se conserva intacto para que el flujo de importación
- * descargue la misma imagen original.
+ * Miniatura de preview vía la misma sesión CDP del fetcher (no fetch directo a FKA).
  */
 async function withPreviewImage(
   fetcher: FkaFetcher,

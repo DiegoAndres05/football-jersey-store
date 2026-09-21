@@ -54,7 +54,7 @@ export function FkaImportForm() {
             Previsualización · Football Kit Archive
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            La búsqueda es de solo lectura: no escribe nada en la base de datos.
+            La búsqueda usa el navegador CDP (Brave local o Chromium remoto). No escribe en la base de datos.
           </p>
         </div>
 
