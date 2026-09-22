@@ -34,7 +34,7 @@ export function Footer() {
               {SITE.brand}
             </Link>
             <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground">
-              Camisetas de fútbol · Edición 25/26
+              Camisetas de fútbol... ¡Bienvenidos al mundo del fútbol!
             </p>
             <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-sm">
               {SITE.tagline} Camisetas de calidad con envío a toda Colombia y
