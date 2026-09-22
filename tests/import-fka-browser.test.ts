@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { describeFkaBrowserMode, openFkaBrowser } from "../src/features/import/fka/browser-provider.ts";
-import { FkaProviderError } from "../src/features/import/fka/http.ts";
+import { FkaProviderError, fkaErrorUserMessage } from "../src/features/import/fka/http.ts";
 import { normalizeImageContentType } from "../src/features/import/fka/page-html.ts";
 
 describe("FKA browser provider", () => {
@@ -31,10 +31,11 @@ describe("FKA browser provider", () => {
   });
 
   it("creates a Browserbase session and closes it", async () => {
-    const calls: { url: string; method?: string }[] = [];
+    const calls: { url: string; method?: string; apiKey?: string | null }[] = [];
     const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      calls.push({ url, method: init?.method });
+      const headers = new Headers(init?.headers);
+      calls.push({ url, method: init?.method, apiKey: headers.get("X-BB-API-Key") });
       if (init?.method === "POST") {
         return new Response(JSON.stringify({ id: "sess_1", connectUrl: "wss://connect.browserbase.com/sess_1" }), {
           status: 200,
@@ -53,8 +54,22 @@ describe("FKA browser provider", () => {
     assert.equal(handle.webSocketUrl, "wss://connect.browserbase.com/sess_1");
     await handle.close();
     assert.equal(calls[0]?.method, "POST");
+    assert.equal(calls[0]?.apiKey, "bb_key");
     assert.equal(calls[1]?.method, "DELETE");
+    assert.equal(calls[1]?.apiKey, "bb_key");
     assert.match(calls[1]?.url ?? "", /sess_1/);
+  });
+
+  it("ignores localhost CDP in production and uses Browserbase", () => {
+    assert.equal(
+      describeFkaBrowserMode({
+        endpoint: "http://127.0.0.1:9222",
+        token: "bb_key",
+        browserbaseProjectId: "proj",
+        nodeEnv: "production",
+      }),
+      "browserbase",
+    );
   });
 
   it("fails closed when Browserbase credentials are missing", async () => {
@@ -62,6 +77,21 @@ describe("FKA browser provider", () => {
       openFkaBrowser({}),
       (err) => {
         assert.ok(err instanceof FkaProviderError);
+        return true;
+      },
+    );
+  });
+
+  it("surfaces Browserbase 401 as a credential error, not FKA", async () => {
+    const fetchImpl = (async () => new Response("unauthorized", { status: 401 })) as typeof fetch;
+    await assert.rejects(
+      openFkaBrowser({ token: "bad", browserbaseProjectId: "proj", fetchImpl }),
+      (err) => {
+        assert.ok(err instanceof FkaProviderError);
+        assert.equal(err.details.status, 401);
+        const message = fkaErrorUserMessage(err);
+        assert.match(message, /navegador remoto rechazó las credenciales/);
+        assert.equal(message.includes("Football Kit Archive"), false);
         return true;
       },
     );

@@ -12,6 +12,7 @@ export type FkaBrowserEnv = {
   endpoint?: string | null;
   token?: string | null;
   browserbaseProjectId?: string | null;
+  nodeEnv?: string | null;
   fetchImpl?: typeof fetch;
 };
 
@@ -20,20 +21,27 @@ const BROWSERBASE_API_URL = "https://api.browserbase.com/v1/sessions";
 export function readFkaBrowserEnv(): FkaBrowserEnv {
   return {
     endpoint: emptyToNull(process.env.FKA_CDP_ENDPOINT),
-    token: emptyToNull(process.env.FKA_CDP_TOKEN) ?? emptyToNull(process.env.FKA_BROWSERBASE_API_KEY),
-    browserbaseProjectId: emptyToNull(process.env.FKA_BROWSERBASE_PROJECT_ID),
+    token:
+      emptyToNull(process.env.FKA_CDP_TOKEN) ??
+      emptyToNull(process.env.FKA_BROWSERBASE_API_KEY) ??
+      emptyToNull(process.env.BROWSERBASE_API_KEY),
+    browserbaseProjectId:
+      emptyToNull(process.env.FKA_BROWSERBASE_PROJECT_ID) ?? emptyToNull(process.env.BROWSERBASE_PROJECT_ID),
+    nodeEnv: emptyToNull(process.env.NODE_ENV),
   };
 }
 
 function emptyToNull(value: string | undefined): string | null {
-  const trimmed = value?.trim();
+  const trimmed = value?.trim().replace(/^['"]|['"]$/g, "");
   return trimmed ? trimmed : null;
 }
 
 export function describeFkaBrowserMode(env: FkaBrowserEnv = readFkaBrowserEnv()): "local-devtools" | "websocket" | "browserbase" {
   const endpoint = env.endpoint ?? "";
   if (/^wss?:\/\//i.test(endpoint)) return "websocket";
-  if (/^https?:\/\//i.test(endpoint) && !/browserbase\.com/i.test(endpoint)) return "local-devtools";
+  const isHttpDevtools = /^https?:\/\//i.test(endpoint) && !/browserbase\.com/i.test(endpoint);
+  const isLoopback = /\/\/(127\.0\.0\.1|localhost|\[::1\])(:|\/|$)/i.test(endpoint);
+  if (isHttpDevtools && !(isLoopback && env.nodeEnv === "production")) return "local-devtools";
   return "browserbase";
 }
 
@@ -105,12 +113,14 @@ async function openBrowserbaseSession(env: FkaBrowserEnv): Promise<FkaBrowserHan
     throw new FkaProviderError(
       "FKA_NETWORK_ERROR",
       "No hay un navegador FKA configurado. Define FKA_CDP_ENDPOINT (CDP local o wss) o FKA_CDP_TOKEN + FKA_BROWSERBASE_PROJECT_ID.",
+      { reason: "navegador remoto" },
     );
   }
   if (!env.browserbaseProjectId) {
     throw new FkaProviderError(
       "FKA_NETWORK_ERROR",
       "Falta FKA_BROWSERBASE_PROJECT_ID para el navegador remoto.",
+      { reason: "navegador remoto" },
     );
   }
   const fetchImpl = env.fetchImpl ?? fetch;
@@ -119,7 +129,7 @@ async function openBrowserbaseSession(env: FkaBrowserEnv): Promise<FkaBrowserHan
     res = await fetchImpl(BROWSERBASE_API_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${env.token}`,
+        "X-BB-API-Key": env.token,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -139,10 +149,15 @@ async function openBrowserbaseSession(env: FkaBrowserEnv): Promise<FkaBrowserHan
     );
   }
   if (!res.ok) {
-    throw new FkaProviderError("FKA_NETWORK_ERROR", "No se pudo crear la sesión del navegador FKA.", {
+    const message =
+      res.status === 401 || res.status === 403
+        ? "El navegador remoto rechazó las credenciales. Revisa FKA_CDP_TOKEN (API key de Browserbase) y FKA_BROWSERBASE_PROJECT_ID."
+        : "No se pudo crear la sesión del navegador remoto.";
+    throw new FkaProviderError("FKA_NETWORK_ERROR", message, {
       url: BROWSERBASE_API_URL,
       status: res.status,
       statusText: res.statusText,
+      reason: "navegador remoto",
     });
   }
   const session = (await res.json()) as { id?: string; connectUrl?: string };
@@ -160,7 +175,7 @@ async function openBrowserbaseSession(env: FkaBrowserEnv): Promise<FkaBrowserHan
       try {
         await fetchImpl(`${BROWSERBASE_API_URL}/${encodeURIComponent(sessionId)}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { "X-BB-API-Key": token },
         });
       } catch (err) {
         console.warn("[FKA] No se pudo cerrar la sesión remota del navegador", {

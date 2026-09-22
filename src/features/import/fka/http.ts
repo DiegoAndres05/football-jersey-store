@@ -68,15 +68,18 @@ export function fkaErrorUserMessage(err: unknown): string {
 }
 
 function withSafeDiagnostic(base: string, err: FkaProviderError): string {
+  const heading = err.details.reason === "navegador remoto" ? err.message : base;
   const parts: string[] = [];
   if (typeof err.details.status === "number") parts.push(`HTTP ${err.details.status}`);
   if (err.code === "FKA_ACCESS_DENIED" && err.details.bodyPreview && isCloudflareChallenge(err.details.bodyPreview)) {
     parts.push("verificación Cloudflare");
   }
-  if (err.code === "FKA_NETWORK_ERROR") parts.push(err.details.reason ?? "error de red");
+  if (err.code === "FKA_NETWORK_ERROR" && err.details.reason !== "navegador remoto") {
+    parts.push(err.details.reason ?? "error de red");
+  }
   if (err.code === "FKA_TIMEOUT") parts.push("tiempo de espera agotado");
-  if (parts.length === 0) return base;
-  return `${base.replace(/\.$/, "")} (${parts.join(", ")}).`;
+  if (parts.length === 0) return heading;
+  return `${heading.replace(/\.$/, "")} (${parts.join(", ")}).`;
 }
 
 export function isCloudflareChallenge(html: string): boolean {
