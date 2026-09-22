@@ -37,6 +37,18 @@ test("validación de URL FKA: rechaza dominios externos", () => {
   assert.throws(() => assertAllowedFkaImageUrl("http://www.footballkitarchive.com/cdn/a.jpg"), FkaImageError);
   assert.throws(() => assertAllowedFkaImageUrl("ftp://www.footballkitarchive.com/cdn/a.jpg"), FkaImageError);
   assert.throws(() => assertAllowedFkaImageUrl("not-a-url"), FkaImageError);
+  assert.throws(
+    () => assertAllowedFkaImageUrl("https://evilfootballkitarchive.com/cdn/a.jpg"),
+    FkaImageError,
+  );
+  assert.throws(
+    () => assertAllowedFkaImageUrl("https://footballkitarchive.com.evil.com/cdn/a.jpg"),
+    FkaImageError,
+  );
+  assert.throws(() => assertAllowedFkaImageUrl("https://127.0.0.1/cdn/a.jpg"), FkaImageError);
+  assert.throws(() => assertAllowedFkaImageUrl("https://169.254.169.254/latest"), FkaImageError);
+  assert.throws(() => assertAllowedFkaImageUrl("https://192.168.1.10/cdn/a.jpg"), FkaImageError);
+  assert.throws(() => assertAllowedFkaImageUrl("https://[::1]/cdn/a.jpg"), FkaImageError);
 });
 
 test("fkaImageExtension: mapea MIME a extensión y rechaza otros", () => {
@@ -59,6 +71,10 @@ function stubFetch(handler: (url: string, init?: RequestInit) => Response | Prom
 
 function okResponse(body: Uint8Array, contentType: string): Response {
   return new Response(body as BodyInit, { status: 200, headers: { "content-type": contentType } });
+}
+
+function redirectResponse(location: string, status = 302): Response {
+  return new Response(null, { status, headers: { location } });
 }
 
 test("descarga de imagen: válida y devuelve buffer/contentType/extension", async () => {
@@ -125,6 +141,82 @@ test("descarga de imagen: rechaza dominio externo incluso en fetch", async () =>
   const restore = stubFetch(() => okResponse(Buffer.from([1]), "image/jpeg"));
   try {
     await assert.rejects(downloadFkaImage("https://evil.com/cdn/a.jpg"), /origen de la imagen no está permitido/);
+  } finally {
+    restore();
+  }
+});
+
+test("redirects: sigue una redirección legítima entre hosts FKA", async () => {
+  const requests: string[] = [];
+  const restore = stubFetch((url) => {
+    requests.push(url);
+    if (requests.length === 1) {
+      return redirectResponse("https://cdn.footballkitarchive.com/cdn/2026/06/11/hash/a.jpg");
+    }
+    return okResponse(Buffer.from([1, 2, 3]), "image/jpeg");
+  });
+  try {
+    const result = await downloadFkaImage("https://www.footballkitarchive.com/cdn/a.jpg");
+    assert.equal(result.extension, "jpg");
+    assert.deepEqual(requests, [
+      "https://www.footballkitarchive.com/cdn/a.jpg",
+      "https://cdn.footballkitarchive.com/cdn/2026/06/11/hash/a.jpg",
+    ]);
+  } finally {
+    restore();
+  }
+});
+
+test("redirects: rechaza destinos externos, locales, metadata y RFC1918", async () => {
+  for (const location of [
+    "https://evil.example.com/image.jpg",
+    "http://127.0.0.1:3000/",
+    "http://169.254.169.254/",
+    "http://192.168.1.10/",
+  ]) {
+    const restore = stubFetch(() => redirectResponse(location));
+    try {
+      await assert.rejects(
+        downloadFkaImage("https://www.footballkitarchive.com/cdn/a.jpg"),
+        /origen|HTTPS|destino/i,
+      );
+    } finally {
+      restore();
+    }
+  }
+});
+
+test("redirects: valida cada salto antes de solicitar el siguiente", async () => {
+  let requests = 0;
+  const restore = stubFetch(() => {
+    requests++;
+    return requests === 1
+      ? redirectResponse("https://cdn.footballkitarchive.com/cdn/allowed.jpg")
+      : redirectResponse("https://evil.example.com/image.jpg");
+  });
+  try {
+    await assert.rejects(
+      downloadFkaImage("https://www.footballkitarchive.com/cdn/a.jpg"),
+      /origen|destino/i,
+    );
+    assert.equal(requests, 2);
+  } finally {
+    restore();
+  }
+});
+
+test("redirects: rechaza más de cinco saltos", async () => {
+  let requests = 0;
+  const restore = stubFetch(() => {
+    requests++;
+    return redirectResponse(`https://cdn.footballkitarchive.com/cdn/${requests}.jpg`);
+  });
+  try {
+    await assert.rejects(
+      downloadFkaImage("https://www.footballkitarchive.com/cdn/a.jpg"),
+      /límite de redirecciones/i,
+    );
+    assert.equal(requests, 6);
   } finally {
     restore();
   }
