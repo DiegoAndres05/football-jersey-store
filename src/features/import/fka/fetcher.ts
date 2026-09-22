@@ -34,6 +34,7 @@ export class FkaFetcher {
   private session: CdpSession | null = null;
   private browser: FkaBrowserHandle | null = null;
   private cdpSessionId: string | null = null;
+  requestId: string = "";
 
   private constructor() {}
 
@@ -96,12 +97,22 @@ export class FkaFetcher {
 
   async searchTeam(query: string): Promise<TeamCandidate | null> {
     if (!this.session) throw new Error("Fetcher no conectado.");
+    console.log(`[FKA-DEBUG][${this.requestId}] searchTeam START input="${query}"`);
     const direct = await this.searchTeamOnce(query);
-    if (direct) return direct;
+    if (direct) {
+      console.log(`[FKA-DEBUG][${this.requestId}] searchTeam FINAL input="${query}" result="${direct.name}"`);
+      return direct;
+    }
     const compact = query.replace(/\b(fc|cf|club|the|de|del|a\.c\.|ac|as)\b/gi, " ").replace(/\s+/g, " ").trim();
     if (compact && compact.toLowerCase() !== query.toLowerCase()) {
-      return this.searchTeamOnce(compact);
+      console.log(`[FKA-DEBUG][${this.requestId}] searchTeam compact query="${compact}"`);
+      const compactResult = await this.searchTeamOnce(compact);
+      if (compactResult) {
+        console.log(`[FKA-DEBUG][${this.requestId}] searchTeam FINAL input="${query}" result="${compactResult.name}" (via compact="${compact}")`);
+        return compactResult;
+      }
     }
+    console.log(`[FKA-DEBUG][${this.requestId}] searchTeam FINAL input="${query}" result=NULL`);
     return null;
   }
 
@@ -272,8 +283,13 @@ export class FkaFetcher {
   private async searchTeamOnce(query: string): Promise<TeamCandidate | null> {
     const searchUrl = buildFkaTeamSearchUrl(query);
     const body = await this.searchRaw(query);
-    if (!body) return null;
-    return parseFkaTeamSearchResponse(body, query, searchUrl);
+    if (!body) {
+      console.log(`[FKA-DEBUG][${this.requestId}] searchTeamOnce query="${query}" bodyLen=0 result=NULL`);
+      return null;
+    }
+    const result = parseFkaTeamSearchResponse(body, query, searchUrl);
+    console.log(`[FKA-DEBUG][${this.requestId}] searchTeamOnce query="${query}" bodyLen=${body.length} parsedTeams=${result ? 1 : 0} firstTeam="${result?.name ?? "null"}" bestMatch="${result?.name ?? "null"}"`);
+    return result;
   }
 }
 

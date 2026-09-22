@@ -64,6 +64,8 @@ function withTeamContext<T extends Omit<FkaKit, "source">>(kit: T, context: FkaT
 }
 
 export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<FkaPreviewResult> {
+  const requestId = Math.random().toString(36).slice(2, 8);
+  console.log(`[FKA-DEBUG][${requestId}] searchFkaPreviewAction START teams="${input.teams.join(',')}" season="${input.season}"`);
   const admin = await getSessionUser();
   if (!admin) return { ok: false, error: "No autorizado." };
 
@@ -87,10 +89,13 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
       FkaFetcher.connect(),
     ]);
     fetcher = connectedFetcher;
+    fetcher.requestId = requestId;
     const items: ImportPreviewItem[] = [];
     for (const teamName of parsed.data.teams) {
       const team = await fetcher.searchTeam(teamName);
+      console.log(`[FKA-DEBUG][${requestId}] importAction teamName="${teamName}" team="${team ? team.name : "NULL"}" teamUrl="${team ? team.url : "null"}"`);
       if (!team) {
+        console.log(`[FKA-DEBUG][${requestId}] notFound teamName="${teamName}" teamIsNull=true season="${parsed.data.season}"`);
         items.push({
           kit: {
             source: "football-kit-archive",
@@ -235,9 +240,10 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
             continue;
           }
 
-          const { kit, previewImage } = await withPreviewImage(fetcher, withTeamContext(parsedKit, fkaTeamContext));
-          const resolution = resolveImport(kit, teams, seasons, products);
-          items.push({
+const { kit, previewImage } = await withPreviewImage(fetcher, withTeamContext(parsedKit, fkaTeamContext));
+           const resolution = resolveImport(kit, teams, seasons, products);
+           console.log(`[FKA-DEBUG][${requestId}] resolveImport kitTeam="${kit.team}" kitSeason="${kit.season}" teamFound=${resolution.teamFound} seasonFound=${resolution.seasonFound} status="${resolution.status}"`);
+           items.push({
             kit: { ...kit, source: "football-kit-archive" },
             previewImage,
             status: resolution.status,
@@ -277,6 +283,7 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
       }
     }
 
+    console.log(`[FKA-DEBUG][${requestId}] summary items=${items.length} notFoundTeams=${items.filter(i => !i.teamMatch.found).length} notFoundSeasons=${items.filter(i => !i.seasonMatch.found).length}`);
     return { ok: true, items };
   } catch (err) {
     return { ok: false, error: fkaErrorUserMessage(err) };
