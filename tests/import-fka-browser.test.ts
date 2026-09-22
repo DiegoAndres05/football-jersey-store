@@ -85,6 +85,33 @@ describe("FKA browser provider", () => {
     );
   });
 
+  it("retries a 403 stealth payload and succeeds with a basic session", async () => {
+    let posts = 0;
+    const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        posts += 1;
+        const body = JSON.parse(String(init.body)) as { proxies?: boolean; projectId?: string };
+        if (body.proxies || body.projectId) {
+          return new Response("forbidden", { status: 403 });
+        }
+        return new Response(JSON.stringify({ id: "sess_ok", connectUrl: "wss://connect.browserbase.com/ok" }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(null, { status: 204 });
+    }) as typeof fetch;
+
+    const handle = await openFkaBrowser({
+      token: "bb_key",
+      browserbaseProjectId: "wrong-proj",
+      fetchImpl,
+    });
+    assert.equal(handle.webSocketUrl, "wss://connect.browserbase.com/ok");
+    assert.ok(posts >= 2);
+    await handle.close();
+  });
+
   it("surfaces Browserbase 401 as a credential error, not FKA", async () => {
     const fetchImpl = (async () => new Response("unauthorized", { status: 401 })) as typeof fetch;
     await assert.rejects(
@@ -93,7 +120,7 @@ describe("FKA browser provider", () => {
         assert.ok(err instanceof FkaProviderError);
         assert.equal(err.details.status, 401);
         const message = fkaErrorUserMessage(err);
-        assert.match(message, /navegador remoto rechazó las credenciales/);
+        assert.match(message, /navegador remoto rechazó la API key/);
         assert.equal(message.includes("Football Kit Archive"), false);
         return true;
       },

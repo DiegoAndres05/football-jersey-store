@@ -135,7 +135,7 @@ async function openBrowserbaseSession(env: FkaBrowserEnv): Promise<FkaBrowserHan
         },
         body: JSON.stringify(payload),
       });
-      if (res.ok || (res.status !== 400 && res.status !== 422)) break;
+      if (res.ok || !shouldRetryBrowserbasePayload(res.status)) break;
     }
   } catch (err) {
     throw new FkaProviderError(
@@ -147,9 +147,11 @@ async function openBrowserbaseSession(env: FkaBrowserEnv): Promise<FkaBrowserHan
   if (!res || !res.ok) {
     const status = res?.status;
     const message =
-      status === 401 || status === 403
-        ? "El navegador remoto rechazó las credenciales. Revisa FKA_CDP_TOKEN (API key de Browserbase) y FKA_BROWSERBASE_PROJECT_ID."
-        : "No se pudo crear la sesión del navegador remoto.";
+      status === 401
+        ? "El navegador remoto rechazó la API key. Revisa FKA_CDP_TOKEN (API key de Browserbase)."
+        : status === 403
+          ? "El navegador remoto no permite esta sesión (HTTP 403). Revisa que FKA_BROWSERBASE_PROJECT_ID sea el del mismo proyecto que la API key, o que el plan permita crear sesiones."
+          : "No se pudo crear la sesión del navegador remoto.";
     throw new FkaProviderError("FKA_NETWORK_ERROR", message, {
       url: BROWSERBASE_API_URL,
       status,
@@ -184,6 +186,10 @@ async function openBrowserbaseSession(env: FkaBrowserEnv): Promise<FkaBrowserHan
   };
 }
 
+function shouldRetryBrowserbasePayload(status: number): boolean {
+  return status === 400 || status === 402 || status === 403 || status === 422;
+}
+
 function browserbaseSessionPayloads(projectId: string): Record<string, unknown>[] {
   const baseSettings = { recordSession: false, logSession: false, solveCaptchas: true };
   return [
@@ -203,6 +209,13 @@ function browserbaseSessionPayloads(projectId: string): Record<string, unknown>[
       projectId,
       timeout: 300,
       browserSettings: baseSettings,
+    },
+    {
+      projectId,
+      timeout: 300,
+    },
+    {
+      timeout: 300,
     },
   ];
 }
