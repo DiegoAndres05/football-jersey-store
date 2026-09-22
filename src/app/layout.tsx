@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SITE } from "@/shared/config/site";
+import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import "./globals.css";
 
@@ -72,7 +73,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationJsonLd) }}
         />
       </head>
       <body className="min-h-screen flex flex-col bg-background text-foreground antialiased">

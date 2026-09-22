@@ -5,6 +5,7 @@ import { getLeagues, getTeamsByLeague } from "@/features/products/repositories/p
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE } from "@/features/seo/domain/robots-policy";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
+import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
 
 export const metadata: Metadata = {
   title: "Ligas",
@@ -29,7 +30,7 @@ export default async function LigasPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
     <div className="container-page py-8 md:py-12 max-w-5xl">
       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8">

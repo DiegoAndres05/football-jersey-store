@@ -9,6 +9,7 @@ import { getCurrencyContext } from "@/shared/money/server-helpers";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { buildProductJsonLd } from "@/features/seo/domain/product-json-ld";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
+import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -91,11 +92,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
       <ProductDetailClient product={product} currencyContext={currencyCtx} />

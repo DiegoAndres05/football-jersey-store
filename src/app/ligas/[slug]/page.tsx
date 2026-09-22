@@ -6,6 +6,7 @@ import { getCurrencyContext } from "@/shared/money/server-helpers";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { getProducts } from "@/features/products/repositories/product-repository";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
+import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -60,7 +61,7 @@ export default async function LeagueDetailPage({ params }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
       <div className="container-page py-8 md:py-12">
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">

@@ -22,6 +22,7 @@ import { getCurrencyContext } from "@/shared/money/server-helpers";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE, NOINDEX_FOLLOW } from "@/features/seo/domain/robots-policy";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
+import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
 import { decideCatalogIndexation } from "@/features/seo/domain/catalog-indexation";
 
 const siteUrl = resolvePublicOrigin();
@@ -104,7 +105,7 @@ export default async function ProductosPage({ searchParams }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
     <div className="container-page py-8 md:py-12">
       {/* Breadcrumb */}
