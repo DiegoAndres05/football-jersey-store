@@ -27,8 +27,6 @@ import {
 } from "./import-logic";
 import type { MissingTeamContext } from "./import-logic";
 
-export const maxDuration = 300;
-
 const searchSchema = z.object({
   teams: z.array(z.string().trim().min(1)).min(1, "Escribe al menos un equipo.").max(10),
   season: z.string().trim().regex(/^(\d{4}|\d{2})-\d{2}$/, "Temporada inválida (ej: 2026-27)."),
