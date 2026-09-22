@@ -131,11 +131,11 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
 
       if (kitLinks.length === 0) {
         const teamId = parseTeamIdFromUrl(teamPage.url) ?? parseTeamIdFromUrl(team.url);
-        seasonLink =
+        const resolvedSeason =
           findSeasonLink(teamPage.anchors, teamId, parsed.data.season) ??
           buildSeasonUrl(teamPage.url, teamId, parsed.data.season) ??
           buildSeasonUrl(team.url, teamId, parsed.data.season);
-        if (!seasonLink) {
+        if (!resolvedSeason) {
           items.push({
             kit: {
               source: "football-kit-archive",
@@ -156,6 +156,7 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
           });
           continue;
         }
+        seasonLink = resolvedSeason;
 
         const seasonPage = await fetcher.fetchPage(seasonLink);
         const seasonContext = extractTeamContext(seasonPage);
