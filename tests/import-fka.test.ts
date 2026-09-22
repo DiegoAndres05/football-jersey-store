@@ -12,6 +12,7 @@ import {
   bestTeamMatch,
 } from "../src/features/import/fka/normalizer.ts";
 import {
+  buildSeasonUrl,
   extractKitLinks,
   extractTeamContext,
   findSeasonLink,
@@ -127,10 +128,25 @@ test("parseSeasonFromUrl: extrae temporada de la URL", () => {
 test("findSeasonLink: localiza el enlace de temporada en la página del equipo", () => {
   const anchors = [
     { text: "2025-26", href: "https://www.footballkitarchive.com/es/real-madrid-camisetas-2025-26-t16/", className: "" },
-    { text: "2026-27", href: "https://www.footballkitarchive.com/es/real-madrid-camisetas-2026-27-t16/", className: "" },
+    { text: "2026-27", href: "https://www.footballkitarchive.com/es/real-madrid-camisetas-2026-27-t16/?ref=1", className: "" },
   ];
-  assert.equal(findSeasonLink(anchors, "t16", "2026-27"), anchors[1].href);
+  assert.equal(
+    findSeasonLink(anchors, "t16", "2026-27"),
+    "https://www.footballkitarchive.com/es/real-madrid-camisetas-2026-27-t16/",
+  );
   assert.equal(findSeasonLink(anchors, "t16", "2030-31"), null);
+});
+
+test("buildSeasonUrl: arma la URL canónica aunque no haya anclas", () => {
+  assert.equal(
+    buildSeasonUrl("https://www.footballkitarchive.com/es/real-madrid-camisetas-t16/", "t16", "2026-27"),
+    "https://www.footballkitarchive.com/es/real-madrid-camisetas-2026-27-t16/",
+  );
+  assert.equal(
+    buildSeasonUrl("https://www.footballkitarchive.com/es/fc-barcelona-camisetas-t20", "t20", "26-27"),
+    "https://www.footballkitarchive.com/es/fc-barcelona-camisetas-2026-27-t20/",
+  );
+  assert.equal(buildSeasonUrl("https://www.footballkitarchive.com/es/", "t16", "2026-27"), null);
 });
 
 test("extractTeamContext: obtiene país y liga desde breadcrumb de season page", () => {

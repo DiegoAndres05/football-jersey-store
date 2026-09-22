@@ -39,8 +39,19 @@ export function findSeasonLink(anchors: FetchedPage["anchors"], teamId: string, 
   const normalized = normalizeSeason(season);
   if (!normalized) return null;
   const target = `camisetas-${normalized}-${teamId}`;
-  const found = anchors.find((a) => a.href.includes(target));
-  return found ? found.href : null;
+  const found = anchors.find((a) => a.href.split(/[?#]/)[0].includes(target));
+  return found ? found.href.split(/[?#]/)[0] : null;
+}
+
+/** Construye la URL canónica de temporada a partir de la ficha histórica del equipo. */
+export function buildSeasonUrl(teamHistoryUrl: string, teamId: string, season: string): string | null {
+  const normalized = normalizeSeason(season);
+  if (!normalized) return null;
+  const clean = teamHistoryUrl.split(/[?#]/)[0].replace(/\/?$/, "/");
+  if (!new RegExp(`camisetas-${teamId}/?$`).test(clean)) return null;
+  if (/camisetas-\d{4}-\d{2}-t\d+\/$/.test(clean)) return clean;
+  const next = clean.replace(/camisetas-t\d+\/$/, `camisetas-${normalized}-${teamId}/`);
+  return next === clean ? null : next;
 }
 
 const NON_JERSEY_WORDS =

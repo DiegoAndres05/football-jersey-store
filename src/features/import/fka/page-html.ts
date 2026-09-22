@@ -31,6 +31,55 @@ function parseBreadcrumbs(html: string, base: string): FetchedPage["breadcrumbs"
   return parseAnchors(block, base).map((anchor) => ({ text: anchor.text, href: anchor.href }));
 }
 
+/** Snapshot compacto en el navegador: evita serializar outerHTML (CDP lo trunca). */
+export const FKA_PAGE_SNAPSHOT_EXPRESSION = `(() => {
+  const abs = (href) => {
+    try { return new URL(href, location.href).href; } catch { return href; }
+  };
+  const body = document.body ? document.body.innerText : "";
+  const title = document.title || "";
+  const headHtml = (document.documentElement ? document.documentElement.outerHTML : "").slice(0, 2500);
+  const isChallenge = /Un momento|Just a moment|Verificación de seguridad|Checking your browser|cf-challenge|challenge-platform/i.test(
+    title + " " + body.slice(0, 500) + " " + headHtml,
+  );
+  try { window.scrollTo(0, document.body ? document.body.scrollHeight : 0); } catch (_) {}
+  const anchors = [...document.querySelectorAll("a[href]")].slice(0, 2500).map((a) => ({
+    text: (a.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 240),
+    href: abs(a.getAttribute("href") || ""),
+    className: String(a.className || ""),
+  }));
+  const crumbRoot = document.querySelector("[class*='breadcrumb']");
+  const breadcrumbs = [...(crumbRoot ? crumbRoot.querySelectorAll("a[href]") : [])].map((a) => ({
+    text: (a.textContent || "").replace(/\\s+/g, " ").trim(),
+    href: abs(a.getAttribute("href") || ""),
+  }));
+  const rows = [...document.querySelectorAll("tr")].map((tr) =>
+    (tr.innerText || "").replace(/\\s+/g, " ").trim(),
+  ).filter(Boolean).slice(0, 80);
+  const images = [...document.querySelectorAll("img")].slice(0, 80).map((img) => ({
+    src: img.getAttribute("src") || "",
+    dataSrc: img.getAttribute("data-src"),
+  }));
+  const metaImages = [...document.querySelectorAll("meta[property='og:image'], meta[name='twitter:image']")].map((meta) => ({
+    property: meta.getAttribute("property"),
+    name: meta.getAttribute("name"),
+    content: meta.getAttribute("content") || "",
+  }));
+  const hasSeasonLinks = anchors.some((a) => /camisetas-\\d{4}-\\d{2}-t\\d+/i.test(a.href));
+  const hasKitLinks = anchors.some((a) => /kit/i.test(a.className) || /-\\d{4}-\\d{2}-\\d+\\/?$/i.test(a.href.split(/[?#]/)[0]));
+  return {
+    ready: document.readyState,
+    title,
+    url: location.href,
+    isChallenge,
+    bodyLength: body.length,
+    bodyPreview: body.slice(0, 400),
+    hasSeasonLinks,
+    hasKitLinks,
+    page: { url: location.href, title, anchors, breadcrumbs, rows, images, metaImages },
+  };
+})()`;
+
 export function resolveFkaUrl(href: string, base: string = FKA_BASE_URL): string {
   if (href.startsWith("http://") || href.startsWith("https://")) return href;
   if (href.startsWith("/")) return `${FKA_BASE_URL}${href}`;

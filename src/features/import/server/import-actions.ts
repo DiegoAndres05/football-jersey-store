@@ -6,6 +6,7 @@ import { getSessionUser } from "@/features/auth/server/session";
 import { FkaFetcher } from "../fka/fetcher";
 import { fkaErrorUserMessage } from "../fka/http";
 import {
+  buildSeasonUrl,
   extractTeamContext,
   extractKitLinks,
   findSeasonLink,
@@ -136,7 +137,10 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
         continue;
       }
 
-      const seasonLink = findSeasonLink(teamPage.anchors, teamId, parsed.data.season);
+      const seasonLink =
+        findSeasonLink(teamPage.anchors, teamId, parsed.data.season) ??
+        buildSeasonUrl(teamPage.url, teamId, parsed.data.season) ??
+        buildSeasonUrl(team.url, teamId, parsed.data.season);
       if (!seasonLink) {
         items.push({
           kit: {

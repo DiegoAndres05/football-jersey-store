@@ -1,4 +1,4 @@
-import type { FetchedPage, TeamCandidate } from "./parser.ts";
+import { parseTeamIdFromUrl, type FetchedPage, type TeamCandidate } from "./parser.ts";
 import {
   assertAllowedFkaImageUrl,
   fkaImageExtension,
@@ -9,20 +9,22 @@ import { FKA_BASE_URL, FkaBlockedError, FkaProviderError, isCloudflareChallenge,
 import { buildFkaTeamSearchUrl, parseFkaTeamSearchResponse } from "./search.ts";
 import { openFkaBrowser, readFkaBrowserEnv, type FkaBrowserEnv, type FkaBrowserHandle } from "./browser-provider.ts";
 import { CdpSession, openCdpWebSocket } from "./cdp-session.ts";
-import { normalizeImageContentType, parseFetchedPage, resolveFkaUrl } from "./page-html.ts";
+import { FKA_PAGE_SNAPSHOT_EXPRESSION, normalizeImageContentType, resolveFkaUrl } from "./page-html.ts";
 
 const LOAD_TIMEOUT_MS = 40000;
 const CLOUDFLARE_WAIT_MS = 120000;
 
-const PAGE_STATE_EXPRESSION = `(() => {
-  const body = document.body ? document.body.innerText : "";
-  const html = document.documentElement ? document.documentElement.outerHTML : "";
-  const title = document.title || "";
-  const isChallenge = /Un momento|Just a moment|Verificación de seguridad|Checking your browser|cf-challenge|challenge-platform/i.test(
-    title + " " + body.slice(0, 500) + " " + html.slice(0, 2000),
-  );
-  return { ready: document.readyState, body, html, title, url: location.href, isChallenge };
-})()`;
+type FkaPageSnapshot = {
+  ready: string;
+  title: string;
+  url: string;
+  isChallenge: boolean;
+  bodyLength: number;
+  bodyPreview: string;
+  hasSeasonLinks: boolean;
+  hasKitLinks: boolean;
+  page: FetchedPage;
+};
 
 export class FkaFetcher {
   private session: CdpSession | null = null;
@@ -41,7 +43,7 @@ export class FkaFetcher {
       await fetcher.session.send("Page.enable", {}, fetcher.cdpSessionId);
       await fetcher.session.send("Runtime.enable", {}, fetcher.cdpSessionId);
       await fetcher.session.send("Page.navigate", { url: FKA_BASE_URL }, fetcher.cdpSessionId);
-      await fetcher.waitForContent(FKA_BASE_URL);
+      await fetcher.waitForFetchedPage(FKA_BASE_URL);
       return fetcher;
     } catch (err) {
       await fetcher.close();
@@ -54,8 +56,7 @@ export class FkaFetcher {
     if (!this.session) throw new FkaBlockedError("Navegador FKA/CDP no inicializado.", { url: resolved });
     try {
       await this.session.send("Page.navigate", { url: resolved }, this.cdpSessionId);
-      const html = await this.waitForContent(resolved);
-      return parseFetchedPage(html, resolved);
+      return this.waitForFetchedPage(resolved);
     } catch (err) {
       if (err instanceof FkaProviderError) throw err;
       throw new FkaBlockedError(
@@ -123,33 +124,46 @@ export class FkaFetcher {
     await browser?.close();
   }
 
-  private async waitForContent(url: string): Promise<string> {
+  private async waitForFetchedPage(url: string): Promise<FetchedPage> {
     if (!this.session) throw new Error("Fetcher no conectado.");
     const started = Date.now();
     const deadline = started + LOAD_TIMEOUT_MS + CLOUDFLARE_WAIT_MS;
+    const wantsSeasonLinks = /camisetas-t\d+\/?$/.test(url) && !/camisetas-\d{4}-\d{2}-t\d+/.test(url);
+    const wantsKitLinks = /camisetas-\d{4}-\d{2}-t\d+\/?$/.test(url);
+    let contentStarted: number | null = null;
     while (Date.now() < deadline) {
-      const state = await this.session.evaluate<{
-        ready: string;
-        body: string;
-        html: string;
-        title: string;
-        url: string;
-        isChallenge: boolean;
-      }>(PAGE_STATE_EXPRESSION, false, this.cdpSessionId);
-      const challenged = state.isChallenge || isCloudflareChallenge(`${state.title} ${state.body} ${state.html}`);
+      const state = await this.session.evaluate<FkaPageSnapshot>(
+        FKA_PAGE_SNAPSHOT_EXPRESSION,
+        false,
+        this.cdpSessionId,
+      );
+      if (!state) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
+      const challenged =
+        state.isChallenge || isCloudflareChallenge(`${state.title} ${state.bodyPreview}`);
       if (challenged) {
+        contentStarted = null;
         if (Date.now() - started >= CLOUDFLARE_WAIT_MS) {
           throw new FkaBlockedError("Football Kit Archive respondió con verificación Cloudflare.", {
             url,
             finalUrl: state.url,
-            bodyPreview: normalizeFkaBodyPreview(`${state.title} ${state.body}`),
+            bodyPreview: normalizeFkaBodyPreview(`${state.title} ${state.bodyPreview}`),
           });
         }
         await new Promise((resolve) => setTimeout(resolve, 2000));
         continue;
       }
-      if (state.ready === "complete" && state.body.length > 300) return state.html;
-      if (Date.now() - started >= LOAD_TIMEOUT_MS && !challenged) {
+      if (contentStarted === null) contentStarted = Date.now();
+      const timedOutLoad = Date.now() - contentStarted >= LOAD_TIMEOUT_MS;
+      const catalogReady = !wantsSeasonLinks || state.hasSeasonLinks || timedOutLoad;
+      const kitsReady = !wantsKitLinks || state.hasKitLinks || timedOutLoad;
+      if (state.ready === "complete" && state.bodyLength > 300 && catalogReady && kitsReady) {
+        const pageUrl = parseTeamIdFromUrl(state.page.url) ? state.page.url : url;
+        return { ...state.page, url: pageUrl };
+      }
+      if (timedOutLoad && !challenged) {
         throw new FkaProviderError("FKA_TIMEOUT", "Tiempo de espera agotado al cargar una página de FKA.", { url });
       }
       await new Promise((resolve) => setTimeout(resolve, 1000));
