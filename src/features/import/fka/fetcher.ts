@@ -9,21 +9,24 @@ import { FKA_BASE_URL, FkaBlockedError, FkaProviderError, isCloudflareChallenge,
 import { buildFkaTeamSearchUrl, parseFkaTeamSearchResponse } from "./search.ts";
 import { openFkaBrowser, readFkaBrowserEnv, type FkaBrowserEnv, type FkaBrowserHandle } from "./browser-provider.ts";
 import { CdpSession, openCdpWebSocket } from "./cdp-session.ts";
-import { FKA_PAGE_SNAPSHOT_EXPRESSION, normalizeImageContentType, resolveFkaUrl } from "./page-html.ts";
+import {
+  FKA_PAGE_EXTRACT_EXPRESSION,
+  FKA_PAGE_READY_EXPRESSION,
+  normalizeImageContentType,
+  resolveFkaUrl,
+} from "./page-html.ts";
 
-const LOAD_TIMEOUT_MS = 40000;
+const CONTENT_WAIT_MS = 12000;
 const CLOUDFLARE_WAIT_MS = 120000;
 
-type FkaPageSnapshot = {
+type FkaPageReady = {
   ready: string;
   title: string;
   url: string;
   isChallenge: boolean;
-  bodyLength: number;
-  bodyPreview: string;
+  childCount: number;
   hasSeasonLinks: boolean;
   hasKitLinks: boolean;
-  page: FetchedPage;
 };
 
 export class FkaFetcher {
@@ -127,48 +130,78 @@ export class FkaFetcher {
   private async waitForFetchedPage(url: string): Promise<FetchedPage> {
     if (!this.session) throw new Error("Fetcher no conectado.");
     const started = Date.now();
-    const deadline = started + LOAD_TIMEOUT_MS + CLOUDFLARE_WAIT_MS;
+    const deadline = started + CONTENT_WAIT_MS + CLOUDFLARE_WAIT_MS;
     const wantsSeasonLinks = /camisetas-t\d+\/?$/.test(url) && !/camisetas-\d{4}-\d{2}-t\d+/.test(url);
     const wantsKitLinks = /camisetas-\d{4}-\d{2}-t\d+\/?$/.test(url);
     let contentStarted: number | null = null;
+    let lastReady: FkaPageReady | null = null;
+
     while (Date.now() < deadline) {
-      const state = await this.session.evaluate<FkaPageSnapshot>(
-        FKA_PAGE_SNAPSHOT_EXPRESSION,
-        false,
-        this.cdpSessionId,
-      );
+      let state: FkaPageReady | null = null;
+      try {
+        state = await this.session.evaluate<FkaPageReady>(
+          FKA_PAGE_READY_EXPRESSION,
+          false,
+          this.cdpSessionId,
+        );
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
       if (!state) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         continue;
       }
-      const challenged =
-        state.isChallenge || isCloudflareChallenge(`${state.title} ${state.bodyPreview}`);
+      lastReady = state;
+      const challenged = state.isChallenge || isCloudflareChallenge(state.title);
       if (challenged) {
         contentStarted = null;
         if (Date.now() - started >= CLOUDFLARE_WAIT_MS) {
           throw new FkaBlockedError("Football Kit Archive respondió con verificación Cloudflare.", {
             url,
             finalUrl: state.url,
-            bodyPreview: normalizeFkaBodyPreview(`${state.title} ${state.bodyPreview}`),
+            bodyPreview: normalizeFkaBodyPreview(state.title),
           });
         }
         await new Promise((resolve) => setTimeout(resolve, 2000));
         continue;
       }
+
       if (contentStarted === null) contentStarted = Date.now();
-      const timedOutLoad = Date.now() - contentStarted >= LOAD_TIMEOUT_MS;
-      const catalogReady = !wantsSeasonLinks || state.hasSeasonLinks || timedOutLoad;
-      const kitsReady = !wantsKitLinks || state.hasKitLinks || timedOutLoad;
-      if (state.ready === "complete" && state.bodyLength > 300 && catalogReady && kitsReady) {
-        const pageUrl = parseTeamIdFromUrl(state.page.url) ? state.page.url : url;
-        return { ...state.page, url: pageUrl };
+      const waited = Date.now() - contentStarted;
+      const catalogReady = !wantsSeasonLinks || state.hasSeasonLinks;
+      const kitsReady = !wantsKitLinks || state.hasKitLinks;
+      const hasDom = state.childCount > 0 || state.ready === "complete" || state.ready === "interactive";
+      const giveUpWaiting = waited >= CONTENT_WAIT_MS;
+
+      if (hasDom && ((catalogReady && kitsReady) || giveUpWaiting)) {
+        return this.extractFetchedPage(url);
       }
-      if (timedOutLoad && !challenged) {
-        throw new FkaProviderError("FKA_TIMEOUT", "Tiempo de espera agotado al cargar una página de FKA.", { url });
-      }
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    }
+
+    if (lastReady && !lastReady.isChallenge && !isCloudflareChallenge(lastReady.title)) {
+      return this.extractFetchedPage(url);
     }
     throw new FkaProviderError("FKA_TIMEOUT", "Tiempo de espera agotado al cargar una página de FKA.", { url });
+  }
+
+  private async extractFetchedPage(fallbackUrl: string): Promise<FetchedPage> {
+    if (!this.session) throw new Error("Fetcher no conectado.");
+    try {
+      const page = await this.session.evaluate<FetchedPage>(
+        FKA_PAGE_EXTRACT_EXPRESSION,
+        false,
+        this.cdpSessionId,
+      );
+      if (!page) {
+        return emptyFetchedPage(fallbackUrl);
+      }
+      const pageUrl = parseTeamIdFromUrl(page.url) ? page.url : fallbackUrl;
+      return { ...page, url: pageUrl, anchors: page.anchors ?? [], rows: page.rows ?? [], images: page.images ?? [] };
+    } catch {
+      return emptyFetchedPage(fallbackUrl);
+    }
   }
 
   private async searchTeamOnce(query: string): Promise<TeamCandidate | null> {
@@ -201,6 +234,10 @@ export class FkaFetcher {
       url: searchUrl,
     });
   }
+}
+
+function emptyFetchedPage(url: string): FetchedPage {
+  return { url, title: "", anchors: [], breadcrumbs: [], rows: [], images: [], metaImages: [] };
 }
 
 async function attachPageSession(session: CdpSession, transport: FkaBrowserHandle["transport"]): Promise<string | null> {
