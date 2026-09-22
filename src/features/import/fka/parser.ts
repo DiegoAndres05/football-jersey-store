@@ -57,6 +57,10 @@ export function buildSeasonUrl(teamHistoryUrl: string, teamId: string, season: s
 const NON_JERSEY_WORDS =
   /calentamiento|himno|chandal|pista|abrigo|chaqueta|campera|portero|guante|bufanda|pelota|botas|shorts|medias|sudader|parka|anorak/i;
 
+function isKitClass(className: string): boolean {
+  return /(^|\s)kit(\s|$)/i.test(className);
+}
+
 export function extractKitLinks(
   anchors: FetchedPage["anchors"],
   season: string,
@@ -66,16 +70,19 @@ export function extractKitLinks(
   const seen = new Set<string>();
   const links: { title: string; url: string; type: FkaKitType }[] = [];
   for (const a of anchors) {
-    if (!/^kit(\s|$)/.test(a.className)) continue;
-    if (!a.href.includes(`-${normalized}-`)) continue;
-    const type = mapKitType(a.text);
+    const href = a.href.split(/[?#]/)[0];
+    if (!isKitClass(a.className) && !isKitDetailPage(href)) continue;
+    if (!href.includes(`-${normalized}-`)) continue;
+    const title = a.text.replace(/\s+/g, " ").trim();
+    const blob = `${title} ${href}`;
+    if (NON_JERSEY_WORDS.test(blob)) continue;
+    const type = mapKitType(title) ?? mapKitType(href.replace(/[-/_]/g, " "));
     if (!type) continue;
-    if (NON_JERSEY_WORDS.test(a.text)) continue;
-    if (seen.has(a.href)) continue;
-    seen.add(a.href);
+    if (seen.has(href)) continue;
+    seen.add(href);
     links.push({
-      title: a.text.replace(/\s+/g, " ").trim(),
-      url: a.href,
+      title: title || href,
+      url: href,
       type,
     });
   }

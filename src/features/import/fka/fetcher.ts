@@ -17,6 +17,7 @@ import {
 } from "./page-html.ts";
 
 const CONTENT_WAIT_MS = 12000;
+const KIT_WAIT_MS = 20000;
 const CLOUDFLARE_WAIT_MS = 120000;
 
 type FkaPageReady = {
@@ -130,7 +131,7 @@ export class FkaFetcher {
   private async waitForFetchedPage(url: string): Promise<FetchedPage> {
     if (!this.session) throw new Error("Fetcher no conectado.");
     const started = Date.now();
-    const deadline = started + CONTENT_WAIT_MS + CLOUDFLARE_WAIT_MS;
+    const deadline = started + KIT_WAIT_MS + CLOUDFLARE_WAIT_MS;
     const wantsSeasonLinks = /camisetas-t\d+\/?$/.test(url) && !/camisetas-\d{4}-\d{2}-t\d+/.test(url);
     const wantsKitLinks = /camisetas-\d{4}-\d{2}-t\d+\/?$/.test(url);
     let contentStarted: number | null = null;
@@ -172,7 +173,7 @@ export class FkaFetcher {
       const catalogReady = !wantsSeasonLinks || state.hasSeasonLinks;
       const kitsReady = !wantsKitLinks || state.hasKitLinks;
       const hasDom = state.childCount > 0 || state.ready === "complete" || state.ready === "interactive";
-      const giveUpWaiting = waited >= CONTENT_WAIT_MS;
+      const giveUpWaiting = waited >= (wantsKitLinks ? KIT_WAIT_MS : CONTENT_WAIT_MS);
 
       if (hasDom && ((catalogReady && kitsReady) || giveUpWaiting)) {
         return this.extractFetchedPage(url);

@@ -10,8 +10,11 @@ const TYPE_ALIASES: Record<string, FkaKitType> = {
 
 const TYPE_WORDS: { word: string; type: FkaKitType }[] = [
   { word: "visitante", type: "VISITANTE" },
+  { word: "away", type: "VISITANTE" },
   { word: "tercera", type: "TERCERA" },
+  { word: "third", type: "TERCERA" },
   { word: "local", type: "LOCAL" },
+  { word: "home", type: "LOCAL" },
 ];
 
 export function mapKitType(raw: string): FkaKitType | null {

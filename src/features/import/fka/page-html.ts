@@ -36,6 +36,7 @@ export const FKA_PAGE_READY_EXPRESSION = `(() => {
   const title = document.title || "";
   const isChallenge = /Un momento|Just a moment|Verificación de seguridad|Checking your browser|cf-challenge|challenge-platform/i.test(title)
     || !!document.querySelector("#challenge-running, iframe[src*='challenges.cloudflare'], .cf-turnstile");
+  try { window.scrollTo(0, document.body ? document.body.scrollHeight : 0); } catch (_) {}
   return {
     ready: document.readyState,
     title,
@@ -43,28 +44,39 @@ export const FKA_PAGE_READY_EXPRESSION = `(() => {
     isChallenge,
     childCount: document.body ? document.body.childElementCount : 0,
     hasSeasonLinks: !!document.querySelector('a[href*="camisetas-20"]'),
-    hasKitLinks: !!document.querySelector('a[class^="kit"], a[class*=" kit"]'),
+    hasKitLinks: !!document.querySelector('a[href*="camiseta-"], a[class^="kit"], a[class*=" kit"], [class*="kit"] a[href]'),
   };
 })()`;
 
 /** Extrae solo anclas de catálogo (temporada / kit), no el HTML entero. */
 export const FKA_PAGE_EXTRACT_EXPRESSION = `(() => {
+  try { window.scrollTo(0, document.body ? document.body.scrollHeight : 0); } catch (_) {}
   const abs = (href) => {
     try { return new URL(href, location.href).href; } catch { return href; }
   };
-  const useful = (href, className) =>
-    /camisetas/i.test(href) || /^kit(\\s|$)/i.test(className) || /-\\d{4}-\\d{2}-\\d+/.test(href);
-  const anchors = [];
+  const classOf = (a) => {
+    const own = a.getAttribute("class") || "";
+    const parent = a.closest("[class*='kit']");
+    const inherited = parent ? parent.getAttribute("class") || "" : "";
+    return (own + " " + inherited).trim();
+  };
+  const kitAnchors = [];
+  const other = [];
   for (const a of document.querySelectorAll("a[href]")) {
     const href = a.getAttribute("href") || "";
-    const className = String(a.className || "");
-    if (!useful(href, className)) continue;
-    anchors.push({
+    const className = classOf(a);
+    const path = href.split(/[?#]/)[0];
+    const isKit = /(^|\\s)kit(\\s|$)/i.test(className) || /camiseta/i.test(href) || /-\\d{4}-\\d{2}-\\d+\\/?$/.test(path);
+    const isSeason = /camisetas/i.test(href);
+    if (!isKit && !isSeason) continue;
+    const item = {
       text: (a.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 180),
       href: abs(href),
       className,
-    });
-    if (anchors.length >= 400) break;
+    };
+    if (isKit) kitAnchors.push(item);
+    else other.push(item);
+    if (kitAnchors.length >= 80 && other.length >= 200) break;
   }
   const crumbRoot = document.querySelector("[class*='breadcrumb']");
   const breadcrumbs = [...(crumbRoot ? crumbRoot.querySelectorAll("a[href]") : [])].slice(0, 12).map((a) => ({
@@ -86,7 +98,7 @@ export const FKA_PAGE_EXTRACT_EXPRESSION = `(() => {
   return {
     url: location.href,
     title: document.title || "",
-    anchors,
+    anchors: kitAnchors.concat(other),
     breadcrumbs,
     rows,
     images,

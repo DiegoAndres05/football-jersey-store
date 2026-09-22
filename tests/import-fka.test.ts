@@ -200,6 +200,25 @@ test("extractKitLinks: filtra enlaces class=kit de la temporada", () => {
   assert.equal(links[2].type, "TERCERA");
 });
 
+test("extractKitLinks: acepta fichas sin class=kit si la URL es de camiseta", () => {
+  const anchors = [
+    {
+      text: "",
+      href: "https://www.footballkitarchive.com/es/camiseta-local-real-madrid-2026-27-439615/",
+      className: "card-wrap",
+    },
+    {
+      text: "Away",
+      href: "https://www.footballkitarchive.com/es/camiseta-visitante-real-madrid-2026-27-440291/",
+      className: "",
+    },
+  ];
+  const links = extractKitLinks(anchors, "2026-27");
+  assert.equal(links.length, 2);
+  assert.equal(links[0].type, "LOCAL");
+  assert.equal(links[1].type, "VISITANTE");
+});
+
 test("extractKitLinks: deduplica URLs repetidas", () => {
   const anchors = [
     { text: "Real Madrid 2026-27 Local", href: "https://www.footballkitarchive.com/es/camiseta-local-real-madrid-2026-27-439615/", className: "kit" },
