@@ -1,4 +1,4 @@
-import { parseTeamIdFromUrl, type FetchedPage, type TeamCandidate } from "./parser.ts";
+import { isKitDetailPage, isSeasonPage, isTeamHistoryPage, parseTeamIdFromUrl, type FetchedPage, type TeamCandidate } from "./parser.ts";
 import {
   assertAllowedFkaImageUrl,
   fkaImageExtension,
@@ -132,8 +132,10 @@ export class FkaFetcher {
     if (!this.session) throw new Error("Fetcher no conectado.");
     const started = Date.now();
     const deadline = started + KIT_WAIT_MS + CLOUDFLARE_WAIT_MS;
-    const wantsSeasonLinks = /camisetas-t\d+\/?$/.test(url) && !/camisetas-\d{4}-\d{2}-t\d+/.test(url);
-    const wantsKitLinks = /camisetas-\d{4}-\d{2}-t\d+\/?$/.test(url);
+    const wantsSeasonLinks =
+      (/camisetas-t\d+\/?$/.test(url) && !/camisetas-\d{4}-\d{2}-t\d+/.test(url)) ||
+      (/\/[^/]+-kits\/?$/.test(url) && !/\d{4}-\d{2}-kits\/?$/.test(url));
+    const wantsKitLinks = /camisetas-\d{4}-\d{2}-t\d+\/?$/.test(url) || /-\d{4}-\d{2}-kits\/?$/.test(url);
     let contentStarted: number | null = null;
     let lastReady: FkaPageReady | null = null;
 
@@ -198,7 +200,10 @@ export class FkaFetcher {
       if (!page) {
         return emptyFetchedPage(fallbackUrl);
       }
-      const pageUrl = parseTeamIdFromUrl(page.url) ? page.url : fallbackUrl;
+        const pageUrl =
+        isSeasonPage(page.url) || isKitDetailPage(page.url) || isTeamHistoryPage(page.url) || parseTeamIdFromUrl(page.url)
+          ? page.url
+          : fallbackUrl;
       return { ...page, url: pageUrl, anchors: page.anchors ?? [], rows: page.rows ?? [], images: page.images ?? [] };
     } catch {
       return emptyFetchedPage(fallbackUrl);

@@ -43,8 +43,8 @@ export const FKA_PAGE_READY_EXPRESSION = `(() => {
     url: location.href,
     isChallenge,
     childCount: document.body ? document.body.childElementCount : 0,
-    hasSeasonLinks: !!document.querySelector('a[href*="camisetas-20"]'),
-    hasKitLinks: !!document.querySelector('a[href*="camiseta-"], a[class^="kit"], a[class*=" kit"], [class*="kit"] a[href]'),
+    hasSeasonLinks: !!document.querySelector('a[href*="camisetas-20"], a[href*="-20"][href*="-kits"]'),
+    hasKitLinks: !!document.querySelector('a[href*="home-kit"], a[href*="away-kit"], a[href*="third-kit"], a[href*="camiseta-"], a[class^="kit"], a[class*=" kit"], [class*="kit"] a[href]'),
   };
 })()`;
 
@@ -66,8 +66,8 @@ export const FKA_PAGE_EXTRACT_EXPRESSION = `(() => {
     const href = a.getAttribute("href") || "";
     const className = classOf(a);
     const path = href.split(/[?#]/)[0];
-    const isKit = /(^|\\s)kit(\\s|$)/i.test(className) || /camiseta/i.test(href) || /-\\d{4}-\\d{2}-\\d+\\/?$/.test(path);
-    const isSeason = /camisetas/i.test(href);
+    const isKit = /(^|\\s)kit(\\s|$)/i.test(className) || /camiseta/i.test(href) || /(home|away|third)-kit/i.test(href) || /-\\d{4}-\\d{2}-\\d+\\/?$/.test(path);
+    const isSeason = /camisetas/i.test(href) || /-\\d{4}-\\d{2}-kits/i.test(href);
     if (!isKit && !isSeason) continue;
     const item = {
       text: (a.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 180),

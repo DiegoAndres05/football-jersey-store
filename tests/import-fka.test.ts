@@ -16,6 +16,8 @@ import {
   extractKitLinks,
   extractTeamContext,
   findSeasonLink,
+  isKitDetailPage,
+  isSeasonPage,
   parseKitDetail,
   parseSeasonFromUrl,
   parseTeamIdFromUrl,
@@ -123,6 +125,19 @@ test("parseSeasonFromUrl: extrae temporada de la URL", () => {
     parseSeasonFromUrl("https://www.footballkitarchive.com/es/real-madrid-camisetas-2026-27-t16/"),
     "2026-27",
   );
+  assert.equal(parseSeasonFromUrl("https://www.footballkitarchive.com/es/real-madrid-2026-27-kits/"), "2026-27");
+  assert.equal(
+    parseSeasonFromUrl("https://www.footballkitarchive.com/es/real-madrid-2026-27-home-kit/320888/"),
+    "2026-27",
+  );
+});
+
+test("isSeasonPage / isKitDetailPage: slugs actuales de FKA", () => {
+  assert.equal(isSeasonPage("https://www.footballkitarchive.com/es/real-madrid-2026-27-kits/"), true);
+  assert.equal(isSeasonPage("https://www.footballkitarchive.com/es/real-madrid-kits/"), false);
+  assert.equal(isKitDetailPage("https://www.footballkitarchive.com/es/real-madrid-2026-27-home-kit/"), true);
+  assert.equal(isKitDetailPage("https://www.footballkitarchive.com/es/real-madrid-2026-27-third-kit/99/"), true);
+  assert.equal(isKitDetailPage("https://www.footballkitarchive.com/es/real-madrid-2026-27-kits/"), false);
 });
 
 test("findSeasonLink: localiza el enlace de temporada en la página del equipo", () => {
@@ -135,6 +150,14 @@ test("findSeasonLink: localiza el enlace de temporada en la página del equipo",
     "https://www.footballkitarchive.com/es/real-madrid-camisetas-2026-27-t16/",
   );
   assert.equal(findSeasonLink(anchors, "t16", "2030-31"), null);
+  assert.equal(
+    findSeasonLink(
+      [{ text: "2026-27", href: "https://www.footballkitarchive.com/es/real-madrid-2026-27-kits/", className: "" }],
+      null,
+      "2026-27",
+    ),
+    "https://www.footballkitarchive.com/es/real-madrid-2026-27-kits/",
+  );
 });
 
 test("buildSeasonUrl: arma la URL canónica aunque no haya anclas", () => {
@@ -145,6 +168,10 @@ test("buildSeasonUrl: arma la URL canónica aunque no haya anclas", () => {
   assert.equal(
     buildSeasonUrl("https://www.footballkitarchive.com/es/fc-barcelona-camisetas-t20", "t20", "26-27"),
     "https://www.footballkitarchive.com/es/fc-barcelona-camisetas-2026-27-t20/",
+  );
+  assert.equal(
+    buildSeasonUrl("https://www.footballkitarchive.com/es/real-madrid-kits/", null, "2026-27"),
+    "https://www.footballkitarchive.com/es/real-madrid-2026-27-kits/",
   );
   assert.equal(buildSeasonUrl("https://www.footballkitarchive.com/es/", "t16", "2026-27"), null);
 });
@@ -212,11 +239,23 @@ test("extractKitLinks: acepta fichas sin class=kit si la URL es de camiseta", ()
       href: "https://www.footballkitarchive.com/es/camiseta-visitante-real-madrid-2026-27-440291/",
       className: "",
     },
+    {
+      text: "Real Madrid 2026-27 Local",
+      href: "https://www.footballkitarchive.com/es/real-madrid-2026-27-home-kit/320888/",
+      className: "",
+    },
+    {
+      text: "Visitante",
+      href: "https://www.footballkitarchive.com/es/real-madrid-2026-27-away-kit/",
+      className: "",
+    },
   ];
   const links = extractKitLinks(anchors, "2026-27");
-  assert.equal(links.length, 2);
+  assert.equal(links.length, 4);
   assert.equal(links[0].type, "LOCAL");
   assert.equal(links[1].type, "VISITANTE");
+  assert.equal(links[2].type, "LOCAL");
+  assert.equal(links[3].type, "VISITANTE");
 });
 
 test("extractKitLinks: deduplica URLs repetidas", () => {

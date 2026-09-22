@@ -114,29 +114,7 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
 
       const teamPage = await fetcher.fetchPage(team.url);
       const teamContext = extractTeamContext(teamPage);
-      const teamId = parseTeamIdFromUrl(teamPage.url);
-      if (!teamId) {
-        items.push({
-          kit: {
-            source: "football-kit-archive",
-            title: `${team.name} ${parsed.data.season}`,
-            team: team.name,
-            season: parsed.data.season,
-            type: parsed.data.types[0],
-            leagueName: teamContext.leagueName,
-            leagueUrl: teamContext.leagueUrl,
-            country: teamContext.country,
-            imageUrl: null,
-            sourceUrl: team.url,
-          },
-          status: "ERROR",
-          teamMatch: { found: false, name: team.name },
-          seasonMatch: { found: false, name: parsed.data.season },
-          message: `No se pudo identificar la página histórica de "${team.name}".`,
-        });
-        continue;
-      }
-
+      const teamId = parseTeamIdFromUrl(teamPage.url) ?? parseTeamIdFromUrl(team.url);
       const seasonLink =
         findSeasonLink(teamPage.anchors, teamId, parsed.data.season) ??
         buildSeasonUrl(teamPage.url, teamId, parsed.data.season) ??
