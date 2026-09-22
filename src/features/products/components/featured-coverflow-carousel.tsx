@@ -36,12 +36,10 @@ function SlideCaption({ item }: { item: HomepageCarouselSlide }) {
 
 function SlideFace({
   item,
-  priority,
   tiltEnabled = false,
   showCta = false,
 }: {
   item: HomepageCarouselSlide;
-  priority?: boolean;
   tiltEnabled?: boolean;
   showCta?: boolean;
 }) {
@@ -99,7 +97,7 @@ function SlideFace({
         fill
         sizes="(max-width: 1024px) 90vw, 28rem"
         className="object-cover"
-        priority={priority}
+        loading="lazy"
       />
       {showCta && (
         <>
@@ -242,7 +240,7 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
           onTouchEnd={handleTouchEnd}
         >
           <article className="relative mx-auto aspect-[3/4] w-full max-w-sm">
-            <SlideFace item={current} priority tiltEnabled={false} showCta />
+            <SlideFace item={current} tiltEnabled={false} showCta />
           </article>
           <SlideCaption item={current} />
         </div>
@@ -288,7 +286,6 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
                 >
                   <SlideFace
                     item={item}
-                    priority={isActive}
                     tiltEnabled={isActive && desktopTiltAllowed}
                     showCta={isActive}
                   />

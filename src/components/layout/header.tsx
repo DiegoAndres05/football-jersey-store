@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Menu, X, Search, ShoppingBag, User, Heart, History } from "lucide-react";
+import { Menu, X, Search, User, Heart, History } from "lucide-react";
+import { CartIcon } from "@/components/ui/cart-icon";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useCartStore } from "@/shared/stores/cart-store";
 import { SITE } from "@/shared/config/site";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
+import { MobileCartFab } from "@/features/cart/components/mobile-cart-fab";
 
 export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
   const router = useRouter();
@@ -70,7 +72,7 @@ export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
     <>
       <header
         className={cn(
-          "sticky top-0 z-[var(--z-navbar)] transition-all duration-200",
+          "fixed top-0 inset-x-0 w-full z-[var(--z-navbar)] transition-all duration-200",
           isScrolled
             ? "bg-background/85 backdrop-blur-xl border-b border-border shadow-sm"
             : "bg-background border-b border-border",
@@ -199,6 +201,9 @@ export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
           </div>
         )}
       </header>
+      <div aria-hidden="true" className="h-16 md:h-[4.5rem]" />
+
+      <MobileCartFab isMobileMenuOpen={isMobileOpen} />
 
       <div
         className={cn(
@@ -262,7 +267,7 @@ function CartBadge() {
   return (
     <Link href="/carrito" className="relative">
       <Button variant="ghost" size="icon" aria-label="Carrito">
-        <ShoppingBag className="h-5 w-5" />
+        <CartIcon className="h-5 w-5" />
         {count > 0 && (
           <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
             {count > 99 ? "99+" : count}

@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Minus, Plus, Trash2, ArrowRight, ShoppingBag } from "lucide-react";
+import { Minus, Plus, Trash2, ArrowRight } from "lucide-react";
+import { CartIcon } from "@/components/ui/cart-icon";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +84,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
         {!mounted && <span className="sr-only">Cargando carrito…</span>}
         <div className="flex flex-col items-center justify-center py-20 text-center rounded-xl border border-dashed border-border bg-card">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-            <ShoppingBag className="h-6 w-6" strokeWidth={1.5} />
+            <CartIcon className="h-6 w-6" />
           </div>
           <h2 className="mt-5 font-display text-2xl font-bold uppercase tracking-tight">
             Tu carrito está vacío

@@ -24,11 +24,11 @@ import { leagueLogoAlt } from "@/features/seo/domain/product-image-alt";
 import { whatsappLink } from "@/shared/config/site";
 import { HeroProduct } from "@/components/home/hero-product";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
-import { getHomepageCarouselSlides } from "@/features/products/repositories/homepage-carousel-repository";
-import { FeaturedCoverflowCarousel } from "@/features/products/components/featured-coverflow-carousel";
+import { FeaturedHomepageSection } from "@/components/home/featured-homepage-section";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE } from "@/features/seo/domain/robots-policy";
 import { LeagueCard } from "@/components/home/league-card";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "Flashsport — Camisetas de fútbol",
@@ -49,11 +49,10 @@ const TRUST_ITEMS = [
 ] as const;
 
 export default async function HomePage() {
-  const [featured, leagues, currencyCtx, coverflowSlides] = await Promise.all([
+  const [featured, leagues, currencyCtx] = await Promise.all([
     getFeaturedProducts(8),
     getLeagues(),
     getCurrencyContext(),
-    getHomepageCarouselSlides(),
   ]);
 
   const heroProduct = featured[0] ?? null;
@@ -120,9 +119,9 @@ export default async function HomePage() {
       </div>
 
       {/* ── FEATURED COVERFLOW ──────────────────────────────────────── */}
-      {coverflowSlides.length >= 1 && (
-        <FeaturedCoverflowCarousel items={coverflowSlides} />
-      )}
+      <Suspense fallback={null}>
+        <FeaturedHomepageSection />
+      </Suspense>
 
       {/* ── LAS GRANDES LIGAS ──────────────────────────────────────── */}
       <section className="container-page py-16 md:py-20">
@@ -190,7 +189,7 @@ export default async function HomePage() {
           </div>
 
           <div className="mt-8">
-            <ProductGrid products={featuredProducts} priority currencyContext={currencyCtx} />
+            <ProductGrid products={featuredProducts} currencyContext={currencyCtx} />
           </div>
         </div>
       </section>

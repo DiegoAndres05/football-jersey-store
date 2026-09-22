@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const COMPONENT_PATH = "src/features/products/components/featured-coverflow-carousel.tsx";
 const PAGE_PATH = "src/app/page.tsx";
+const HOMEPAGE_SECTION_PATH = "src/components/home/featured-homepage-section.tsx";
 
 function readComponent(): string {
   return readFileSync(COMPONENT_PATH, "utf8");
@@ -11,6 +12,10 @@ function readComponent(): string {
 
 function readPage(): string {
   return readFileSync(PAGE_PATH, "utf8");
+}
+
+function readHomepageSection(): string {
+  return readFileSync(HOMEPAGE_SECTION_PATH, "utf8");
 }
 
 // ── Component source asserts ────────────────────────────────────────────────
@@ -99,14 +104,16 @@ test("page file exists and can be read", () => {
 
 test("page loads homepage carousel slides, not featured products", () => {
   const page = readPage();
-  assert.match(page, /getHomepageCarouselSlides/);
+  const section = readHomepageSection();
+  assert.match(section, /getHomepageCarouselSlides/);
   assert.doesNotMatch(page, /slidesForFeaturedCarousel/);
 });
 
 test("page mounts coverflow when there is at least one slide", () => {
   const page = readPage();
-  assert.match(page, /coverflowSlides\.length\s*>=\s*1/);
-  assert.doesNotMatch(page, /coverflowSlides\.length\s*>=\s*2/);
+  const section = readHomepageSection();
+  assert.match(section, /slides\.length\s*<\s*1/);
+  assert.match(section, /FeaturedCoverflowCarousel/);
 });
 
 test("carousel placement: after trust bar and before Las grandes ligas", () => {
@@ -201,7 +208,10 @@ test("010 controls and 009 slide source remain intact", () => {
   assert.match(source, /prefers-reduced-motion/);
   assert.match(source, /userPaused/);
   assert.match(source, /\/productos\//);
-  assert.match(page, /getHomepageCarouselSlides/);
+  assert.match(
+    readHomepageSection(),
+    /getHomepageCarouselSlides/,
+  );
   assert.doesNotMatch(page, /cdn\.21st\.dev/);
   assert.doesNotMatch(source, /cdn\.21st\.dev/);
 });
