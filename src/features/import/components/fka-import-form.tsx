@@ -62,7 +62,7 @@ export function FkaImportForm() {
             Previsualización · Football Kit Archive
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            La búsqueda usa el navegador CDP (Brave local o Chromium remoto). No escribe en la base de datos.
+            La búsqueda usa Brave local (CDP en 127.0.0.1:9222). No escribe en la base de datos.
           </p>
         </div>
 

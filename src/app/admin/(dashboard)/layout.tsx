@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ExternalLink, LogOut } from "lucide-react";
 import { getSessionUser } from "@/features/auth/server/session";
 import { logoutAction } from "@/features/auth/server/actions";
+import { isFkaImporterEnabled } from "@/features/import/fka/browser-provider";
 import { AdminNavigation } from "./admin-navigation";
 import { AdminBreadcrumbs } from "./admin-breadcrumbs";
 
@@ -31,7 +32,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/temporadas", label: "Temporadas" },
     { href: "/admin/tallas", label: "Tallas" },
     { href: "/admin/versiones", label: "Versiones" },
-    { href: "/admin/importar", label: "Importar" },
+    ...(isFkaImporterEnabled() ? [{ href: "/admin/importar", label: "Importar" }] : []),
     { href: "/admin/ajustes", label: "Ajustes" },
   ];
 

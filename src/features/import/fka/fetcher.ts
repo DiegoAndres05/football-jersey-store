@@ -7,7 +7,7 @@ import {
 } from "./fka-image.ts";
 import { FKA_BASE_URL, FkaBlockedError, FkaProviderError, isCloudflareChallenge, normalizeFkaBodyPreview } from "./http.ts";
 import { buildFkaTeamSearchUrl, parseFkaKitSearchResponse, parseFkaTeamSearchResponse } from "./search.ts";
-import { openFkaBrowser, readFkaBrowserEnv, type FkaBrowserEnv, type FkaBrowserHandle } from "./browser-provider.ts";
+import { isFkaImporterEnabled, openFkaBrowser, readFkaBrowserEnv, type FkaBrowserEnv, type FkaBrowserHandle } from "./browser-provider.ts";
 import { CdpSession, openCdpWebSocket } from "./cdp-session.ts";
 import {
   FKA_PAGE_EXTRACT_EXPRESSION,
@@ -34,19 +34,23 @@ export class FkaFetcher {
   private session: CdpSession | null = null;
   private browser: FkaBrowserHandle | null = null;
   private cdpSessionId: string | null = null;
-  requestId: string = "";
 
   private constructor() {}
 
   static async connect(env: FkaBrowserEnv = readFkaBrowserEnv()): Promise<FkaFetcher> {
+    if (!isFkaImporterEnabled()) {
+      throw new FkaProviderError(
+        "FKA_NETWORK_ERROR",
+        "El importador FKA solo está disponible en el entorno local (Brave CDP).",
+        { reason: "cdp local" },
+      );
+    }
     const fetcher = new FkaFetcher();
     try {
       fetcher.browser = await openFkaBrowser(env);
-      console.log("[FKA-DEBUG] browser.transport:", fetcher.browser.transport, "| wsUrl present:", !!fetcher.browser.webSocketUrl);
       const ws = await openCdpWebSocket(fetcher.browser.webSocketUrl);
       fetcher.session = new CdpSession(ws);
       fetcher.cdpSessionId = await attachPageSession(fetcher.session, fetcher.browser.transport);
-      console.log("[FKA-DEBUG] cdpSessionId:", fetcher.cdpSessionId === null ? "NULL" : fetcher.cdpSessionId === undefined ? "UNDEFINED" : "string(len=" + fetcher.cdpSessionId.length + ")");
       await fetcher.session.send("Page.enable", {}, fetcher.cdpSessionId);
       await fetcher.session.send("Runtime.enable", {}, fetcher.cdpSessionId);
       await fetcher.session.send("Page.navigate", { url: FKA_BASE_URL }, fetcher.cdpSessionId);
@@ -97,22 +101,12 @@ export class FkaFetcher {
 
   async searchTeam(query: string): Promise<TeamCandidate | null> {
     if (!this.session) throw new Error("Fetcher no conectado.");
-    console.log(`[FKA-DEBUG][${this.requestId}] searchTeam START input="${query}"`);
     const direct = await this.searchTeamOnce(query);
-    if (direct) {
-      console.log(`[FKA-DEBUG][${this.requestId}] searchTeam FINAL input="${query}" result="${direct.name}"`);
-      return direct;
-    }
+    if (direct) return direct;
     const compact = query.replace(/\b(fc|cf|club|the|de|del|a\.c\.|ac|as)\b/gi, " ").replace(/\s+/g, " ").trim();
     if (compact && compact.toLowerCase() !== query.toLowerCase()) {
-      console.log(`[FKA-DEBUG][${this.requestId}] searchTeam compact query="${compact}"`);
-      const compactResult = await this.searchTeamOnce(compact);
-      if (compactResult) {
-        console.log(`[FKA-DEBUG][${this.requestId}] searchTeam FINAL input="${query}" result="${compactResult.name}" (via compact="${compact}")`);
-        return compactResult;
-      }
+      return this.searchTeamOnce(compact);
     }
-    console.log(`[FKA-DEBUG][${this.requestId}] searchTeam FINAL input="${query}" result=NULL`);
     return null;
   }
 
@@ -264,7 +258,6 @@ export class FkaFetcher {
           true,
           this.cdpSessionId,
         );
-        console.log("[FKA-DEBUG] searchRaw evaluate done:", body ? `len=${body.length} preview=${body.slice(0, 200)}` : "EMPTY");
         if (isCloudflareChallenge(body)) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
           continue;
@@ -283,13 +276,8 @@ export class FkaFetcher {
   private async searchTeamOnce(query: string): Promise<TeamCandidate | null> {
     const searchUrl = buildFkaTeamSearchUrl(query);
     const body = await this.searchRaw(query);
-    if (!body) {
-      console.log(`[FKA-DEBUG][${this.requestId}] searchTeamOnce query="${query}" bodyLen=0 result=NULL`);
-      return null;
-    }
-    const result = parseFkaTeamSearchResponse(body, query, searchUrl);
-    console.log(`[FKA-DEBUG][${this.requestId}] searchTeamOnce query="${query}" bodyLen=${body.length} parsedTeams=${result ? 1 : 0} firstTeam="${result?.name ?? "null"}" bestMatch="${result?.name ?? "null"}"`);
-    return result;
+    if (!body) return null;
+    return parseFkaTeamSearchResponse(body, query, searchUrl);
   }
 }
 
@@ -301,27 +289,17 @@ async function attachPageSession(session: CdpSession, transport: FkaBrowserHandl
   if (transport === "page") return null;
 
   const listed = await session.send("Target.getTargets");
-  const targets = listed.result?.targetInfos ?? [];
-  console.log("[FKA-DEBUG] Target.getTargets: count=" + targets.length);
-  const existingPage = targets.find((target) => target.type === "page");
-  console.log("[FKA-DEBUG] existingPage:", existingPage ? `type=${existingPage.type} targetId=${existingPage.targetId ? existingPage.targetId.length + "chars" : "null"}` : "NOT FOUND");
-  let targetId: string | undefined;
-  if (existingPage?.targetId) {
-    targetId = existingPage.targetId;
-    console.log("[FKA-DEBUG] Using existingPage targetId.");
-  } else {
-    const created = await session.send("Target.createTarget", { url: "about:blank" });
-    targetId = created.result?.targetId;
-    console.log("[FKA-DEBUG] Target.createTarget:", targetId ? `targetId=${targetId.length}chars` : "null");
-  }
+  const existingPage = listed.result?.targetInfos?.find((target) => target.type === "page");
+  const targetId =
+    existingPage?.targetId ??
+    (await session.send("Target.createTarget", { url: "about:blank" })).result?.targetId;
   if (!targetId) {
-    throw new FkaProviderError("FKA_NETWORK_ERROR", "El navegador remoto no creó una pestaña CDP.");
+    throw new FkaProviderError("FKA_NETWORK_ERROR", "El navegador FKA/CDP no creó una pestaña.");
   }
   const attached = await session.send("Target.attachToTarget", { targetId, flatten: true });
   const sessionId = attached.result?.sessionId;
-  console.log("[FKA-DEBUG] Target.attachToTarget: sessionId=", sessionId ? sessionId.length + "chars" : "NULL");
   if (!sessionId) {
-    throw new FkaProviderError("FKA_NETWORK_ERROR", "El navegador remoto no adjuntó una pestaña CDP.");
+    throw new FkaProviderError("FKA_NETWORK_ERROR", "El navegador FKA/CDP no adjuntó una pestaña.");
   }
   return sessionId;
 }
