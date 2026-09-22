@@ -56,6 +56,8 @@ export class CdpSession {
 
   send(method: string, params: Record<string, unknown> = {}, sessionId?: string | null): Promise<CdpResponse> {
     const id = ++this.seq;
+    const hasSession = !!sessionId;
+    const sessionLen = sessionId ? sessionId.length : 0;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         if (this.pending.delete(id)) reject(new Error(`CDP timeout: ${method}`));
@@ -67,6 +69,7 @@ export class CdpSession {
       });
       const payload: Record<string, unknown> = { id, method, params };
       if (sessionId) payload.sessionId = sessionId;
+      console.log(`[FKA-DEBUG] CDP.send: method=${method} hasSessionId=${hasSession} sessionLen=${sessionLen}`);
       this.ws.send(JSON.stringify(payload));
     });
   }

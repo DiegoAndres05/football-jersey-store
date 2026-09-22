@@ -41,9 +41,11 @@ export class FkaFetcher {
     const fetcher = new FkaFetcher();
     try {
       fetcher.browser = await openFkaBrowser(env);
+      console.log("[FKA-DEBUG] browser.transport:", fetcher.browser.transport, "| wsUrl present:", !!fetcher.browser.webSocketUrl);
       const ws = await openCdpWebSocket(fetcher.browser.webSocketUrl);
       fetcher.session = new CdpSession(ws);
       fetcher.cdpSessionId = await attachPageSession(fetcher.session, fetcher.browser.transport);
+      console.log("[FKA-DEBUG] cdpSessionId:", fetcher.cdpSessionId === null ? "NULL" : fetcher.cdpSessionId === undefined ? "UNDEFINED" : "string(len=" + fetcher.cdpSessionId.length + ")");
       await fetcher.session.send("Page.enable", {}, fetcher.cdpSessionId);
       await fetcher.session.send("Runtime.enable", {}, fetcher.cdpSessionId);
       await fetcher.session.send("Page.navigate", { url: FKA_BASE_URL }, fetcher.cdpSessionId);
@@ -251,6 +253,7 @@ export class FkaFetcher {
           true,
           this.cdpSessionId,
         );
+        console.log("[FKA-DEBUG] searchRaw evaluate done:", body ? `len=${body.length} preview=${body.slice(0, 200)}` : "EMPTY");
         if (isCloudflareChallenge(body)) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
           continue;
@@ -282,15 +285,25 @@ async function attachPageSession(session: CdpSession, transport: FkaBrowserHandl
   if (transport === "page") return null;
 
   const listed = await session.send("Target.getTargets");
-  const existingPage = listed.result?.targetInfos?.find((target) => target.type === "page");
-  const targetId =
-    existingPage?.targetId ??
-    (await session.send("Target.createTarget", { url: "about:blank" })).result?.targetId;
+  const targets = listed.result?.targetInfos ?? [];
+  console.log("[FKA-DEBUG] Target.getTargets: count=" + targets.length);
+  const existingPage = targets.find((target) => target.type === "page");
+  console.log("[FKA-DEBUG] existingPage:", existingPage ? `type=${existingPage.type} targetId=${existingPage.targetId ? existingPage.targetId.length + "chars" : "null"}` : "NOT FOUND");
+  let targetId: string | undefined;
+  if (existingPage?.targetId) {
+    targetId = existingPage.targetId;
+    console.log("[FKA-DEBUG] Using existingPage targetId.");
+  } else {
+    const created = await session.send("Target.createTarget", { url: "about:blank" });
+    targetId = created.result?.targetId;
+    console.log("[FKA-DEBUG] Target.createTarget:", targetId ? `targetId=${targetId.length}chars` : "null");
+  }
   if (!targetId) {
     throw new FkaProviderError("FKA_NETWORK_ERROR", "El navegador remoto no creó una pestaña CDP.");
   }
   const attached = await session.send("Target.attachToTarget", { targetId, flatten: true });
   const sessionId = attached.result?.sessionId;
+  console.log("[FKA-DEBUG] Target.attachToTarget: sessionId=", sessionId ? sessionId.length + "chars" : "NULL");
   if (!sessionId) {
     throw new FkaProviderError("FKA_NETWORK_ERROR", "El navegador remoto no adjuntó una pestaña CDP.");
   }
