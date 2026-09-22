@@ -144,15 +144,16 @@ async function openBrowserbaseSession(env: FkaBrowserEnv): Promise<FkaBrowserHan
       { url: BROWSERBASE_API_URL },
     );
   }
-  if (!res?.ok) {
+  if (!res || !res.ok) {
+    const status = res?.status;
     const message =
-      res.status === 401 || res.status === 403
+      status === 401 || status === 403
         ? "El navegador remoto rechazó las credenciales. Revisa FKA_CDP_TOKEN (API key de Browserbase) y FKA_BROWSERBASE_PROJECT_ID."
         : "No se pudo crear la sesión del navegador remoto.";
     throw new FkaProviderError("FKA_NETWORK_ERROR", message, {
       url: BROWSERBASE_API_URL,
-      status: res.status,
-      statusText: res.statusText,
+      status,
+      statusText: res?.statusText,
       reason: "navegador remoto",
     });
   }
