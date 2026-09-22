@@ -124,23 +124,19 @@ async function openBrowserbaseSession(env: FkaBrowserEnv): Promise<FkaBrowserHan
     );
   }
   const fetchImpl = env.fetchImpl ?? fetch;
-  let res: Response;
+  let res: Response | null = null;
   try {
-    res = await fetchImpl(BROWSERBASE_API_URL, {
-      method: "POST",
-      headers: {
-        "X-BB-API-Key": env.token,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        projectId: env.browserbaseProjectId,
-        timeout: 300,
-        browserSettings: {
-          recordSession: false,
-          logSession: false,
+    for (const payload of browserbaseSessionPayloads(env.browserbaseProjectId)) {
+      res = await fetchImpl(BROWSERBASE_API_URL, {
+        method: "POST",
+        headers: {
+          "X-BB-API-Key": env.token,
+          "Content-Type": "application/json",
         },
-      }),
-    });
+        body: JSON.stringify(payload),
+      });
+      if (res.ok || (res.status !== 400 && res.status !== 422)) break;
+    }
   } catch (err) {
     throw new FkaProviderError(
       "FKA_NETWORK_ERROR",
@@ -148,7 +144,7 @@ async function openBrowserbaseSession(env: FkaBrowserEnv): Promise<FkaBrowserHan
       { url: BROWSERBASE_API_URL },
     );
   }
-  if (!res.ok) {
+  if (!res?.ok) {
     const message =
       res.status === 401 || res.status === 403
         ? "El navegador remoto rechazó las credenciales. Revisa FKA_CDP_TOKEN (API key de Browserbase) y FKA_BROWSERBASE_PROJECT_ID."
@@ -185,4 +181,27 @@ async function openBrowserbaseSession(env: FkaBrowserEnv): Promise<FkaBrowserHan
       }
     },
   };
+}
+
+function browserbaseSessionPayloads(projectId: string): Record<string, unknown>[] {
+  const baseSettings = { recordSession: false, logSession: false, solveCaptchas: true };
+  return [
+    {
+      projectId,
+      timeout: 300,
+      proxies: true,
+      browserSettings: { ...baseSettings, advancedStealth: true },
+    },
+    {
+      projectId,
+      timeout: 300,
+      proxies: true,
+      browserSettings: baseSettings,
+    },
+    {
+      projectId,
+      timeout: 300,
+      browserSettings: baseSettings,
+    },
+  ];
 }

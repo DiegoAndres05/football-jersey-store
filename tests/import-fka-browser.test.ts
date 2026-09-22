@@ -37,6 +37,9 @@ describe("FKA browser provider", () => {
       const headers = new Headers(init?.headers);
       calls.push({ url, method: init?.method, apiKey: headers.get("X-BB-API-Key") });
       if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        assert.equal(body.proxies, true);
+        assert.equal(body.browserSettings.solveCaptchas, true);
         return new Response(JSON.stringify({ id: "sess_1", connectUrl: "wss://connect.browserbase.com/sess_1" }), {
           status: 200,
           headers: { "content-type": "application/json" },

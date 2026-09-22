@@ -12,6 +12,7 @@ import { CdpSession, openCdpWebSocket } from "./cdp-session.ts";
 import { normalizeImageContentType, parseFetchedPage, resolveFkaUrl } from "./page-html.ts";
 
 const LOAD_TIMEOUT_MS = 40000;
+const CLOUDFLARE_WAIT_MS = 120000;
 
 const PAGE_STATE_EXPRESSION = `(() => {
   const body = document.body ? document.body.innerText : "";
@@ -124,7 +125,8 @@ export class FkaFetcher {
 
   private async waitForContent(url: string): Promise<string> {
     if (!this.session) throw new Error("Fetcher no conectado.");
-    const deadline = Date.now() + LOAD_TIMEOUT_MS;
+    const started = Date.now();
+    const deadline = started + LOAD_TIMEOUT_MS + CLOUDFLARE_WAIT_MS;
     while (Date.now() < deadline) {
       const state = await this.session.evaluate<{
         ready: string;
@@ -134,52 +136,67 @@ export class FkaFetcher {
         url: string;
         isChallenge: boolean;
       }>(PAGE_STATE_EXPRESSION, false, this.cdpSessionId);
-      if (state.isChallenge || isCloudflareChallenge(`${state.title} ${state.body} ${state.html}`)) {
-        throw new FkaBlockedError("Football Kit Archive respondió con verificación Cloudflare.", {
-          url,
-          finalUrl: state.url,
-          bodyPreview: normalizeFkaBodyPreview(`${state.title} ${state.body}`),
-        });
+      const challenged = state.isChallenge || isCloudflareChallenge(`${state.title} ${state.body} ${state.html}`);
+      if (challenged) {
+        if (Date.now() - started >= CLOUDFLARE_WAIT_MS) {
+          throw new FkaBlockedError("Football Kit Archive respondió con verificación Cloudflare.", {
+            url,
+            finalUrl: state.url,
+            bodyPreview: normalizeFkaBodyPreview(`${state.title} ${state.body}`),
+          });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        continue;
       }
       if (state.ready === "complete" && state.body.length > 300) return state.html;
+      if (Date.now() - started >= LOAD_TIMEOUT_MS && !challenged) {
+        throw new FkaProviderError("FKA_TIMEOUT", "Tiempo de espera agotado al cargar una página de FKA.", { url });
+      }
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
     throw new FkaProviderError("FKA_TIMEOUT", "Tiempo de espera agotado al cargar una página de FKA.", { url });
   }
 
   private async searchTeamOnce(query: string): Promise<TeamCandidate | null> {
-    try {
-      const searchUrl = buildFkaTeamSearchUrl(query);
-      if (!this.session) throw new Error("Fetcher no conectado.");
-      const body = await this.session.evaluate<string>(
-        `(async () => {
-          const res = await fetch("/es/api/search.php?filter=" + encodeURIComponent(${JSON.stringify(query)}), {
-            credentials: "include",
-          });
-          return await res.text();
-        })()`,
-        true,
-        this.cdpSessionId,
-      );
-      if (isCloudflareChallenge(body)) {
-        throw new FkaBlockedError("Football Kit Archive respondió con verificación Cloudflare.", {
-          url: searchUrl,
-          bodyPreview: normalizeFkaBodyPreview(body),
-        });
+    const searchUrl = buildFkaTeamSearchUrl(query);
+    if (!this.session) throw new Error("Fetcher no conectado.");
+    const started = Date.now();
+    while (Date.now() - started < CLOUDFLARE_WAIT_MS) {
+      try {
+        const body = await this.session.evaluate<string>(
+          `(async () => {
+            const res = await fetch("/es/api/search.php?filter=" + encodeURIComponent(${JSON.stringify(query)}), {
+              credentials: "include",
+            });
+            return await res.text();
+          })()`,
+          true,
+          this.cdpSessionId,
+        );
+        if (isCloudflareChallenge(body)) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          continue;
+        }
+        return parseFkaTeamSearchResponse(body, query, searchUrl);
+      } catch (err) {
+        if (err instanceof FkaProviderError && err.code !== "FKA_INVALID_RESPONSE") throw err;
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
-      return parseFkaTeamSearchResponse(body, query, searchUrl);
-    } catch (err) {
-      if (err instanceof FkaProviderError) throw err;
-      return null;
     }
+    throw new FkaBlockedError("Football Kit Archive respondió con verificación Cloudflare.", {
+      url: searchUrl,
+    });
   }
 }
 
 async function attachPageSession(session: CdpSession, transport: FkaBrowserHandle["transport"]): Promise<string | null> {
   if (transport === "page") return null;
 
-  const created = await session.send("Target.createTarget", { url: "about:blank" });
-  const targetId = created.result?.targetId;
+  const listed = await session.send("Target.getTargets");
+  const existingPage = listed.result?.targetInfos?.find((target) => target.type === "page");
+  const targetId =
+    existingPage?.targetId ??
+    (await session.send("Target.createTarget", { url: "about:blank" })).result?.targetId;
   if (!targetId) {
     throw new FkaProviderError("FKA_NETWORK_ERROR", "El navegador remoto no creó una pestaña CDP.");
   }

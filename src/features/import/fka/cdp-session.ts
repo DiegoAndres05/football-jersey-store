@@ -6,6 +6,7 @@ export type CdpResponse = {
   result?: {
     targetId?: string;
     sessionId?: string;
+    targetInfos?: { targetId: string; type: string }[];
     result?: { value?: unknown; subtype?: string; description?: string };
     exceptionDetails?: { text?: string };
   };
