@@ -81,6 +81,14 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
         return;
       }
       setImportResult(res);
+    } catch (err) {
+      setImportResult({
+        ok: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : "No se pudo importar. Si ves ERR_BLOCKED_BY_CLIENT, desactiva el bloqueador en este sitio.",
+      });
     } finally {
       setImporting(false);
     }
@@ -186,9 +194,9 @@ export function FkaImportResults({ result }: { result: FkaPreviewResult }) {
                   aria-label={`Seleccionar ${item.kit.title}`}
                 />
                 <div className="flex h-16 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-secondary">
-                  {item.previewImage ?? item.kit.imageUrl ? (
+                  {item.previewImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.previewImage ?? item.kit.imageUrl ?? ""} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    <img src={item.previewImage} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <span className="text-[10px] text-muted-foreground">Sin imagen</span>
                   )}

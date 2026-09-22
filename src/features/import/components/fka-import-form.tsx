@@ -32,6 +32,14 @@ export function FkaImportForm() {
         .map((t) => t.trim())
         .filter(Boolean);
       setResult(await searchFkaPreviewAction({ teams: parsedTeams, season: season.trim(), types }));
+    } catch (err) {
+      setResult({
+        ok: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : "No se pudo completar la búsqueda. Si ves ERR_BLOCKED_BY_CLIENT en consola, desactiva el bloqueador en este sitio e intenta de nuevo.",
+      });
     } finally {
       setPending(false);
     }
