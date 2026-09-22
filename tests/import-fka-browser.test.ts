@@ -13,10 +13,10 @@ describe("FKA browser provider", () => {
     assert.equal(describeFkaBrowserMode({ endpoint: "http://127.0.0.1:9222" }), "local-devtools");
   });
 
-  it("uses a direct websocket when the endpoint is wss", () => {
+  it("rejects remote websocket endpoints", () => {
     assert.equal(
       describeFkaBrowserMode({ endpoint: "wss://chrome.example.com/cdp", token: "secret" }),
-      "websocket",
+      "none",
     );
   });
 
@@ -34,13 +34,6 @@ describe("FKA browser provider", () => {
     );
   });
 
-  it("appends the token to a websocket endpoint", async () => {
-    const handle = await openFkaBrowser({ endpoint: "wss://chrome.example.com/cdp", token: "secret" });
-    assert.equal(handle.transport, "browser");
-    assert.equal(handle.webSocketUrl, "wss://chrome.example.com/cdp?token=secret");
-    await handle.close();
-  });
-
   it("fails closed when no local CDP endpoint is configured", async () => {
     await assert.rejects(
       openFkaBrowser({}),
@@ -52,10 +45,29 @@ describe("FKA browser provider", () => {
     );
   });
 
-  it("enables the importer only when FKA_IMPORTER_ENABLED=true", () => {
-    assert.equal(isFkaImporterEnabled({}), false);
-    assert.equal(isFkaImporterEnabled({ FKA_IMPORTER_ENABLED: "false" }), false);
-    assert.equal(isFkaImporterEnabled({ FKA_IMPORTER_ENABLED: "true" }), true);
+  it("enables the importer in development when explicitly enabled", () => {
+    assert.equal(
+      isFkaImporterEnabled({ NODE_ENV: "development", FKA_IMPORTER_ENABLED: "true" }),
+      true,
+    );
+  });
+
+  it("always disables the importer in production", () => {
+    assert.equal(
+      isFkaImporterEnabled({ NODE_ENV: "production", FKA_IMPORTER_ENABLED: "true" }),
+      false,
+    );
+    assert.equal(
+      isFkaImporterEnabled({ NODE_ENV: "production", FKA_IMPORTER_ENABLED: "false" }),
+      false,
+    );
+  });
+
+  it("disables the importer when the feature flag is false", () => {
+    assert.equal(
+      isFkaImporterEnabled({ NODE_ENV: "development", FKA_IMPORTER_ENABLED: "false" }),
+      false,
+    );
   });
 
   it("strips image content-type parameters", () => {

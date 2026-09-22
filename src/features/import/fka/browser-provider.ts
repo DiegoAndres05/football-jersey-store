@@ -1,6 +1,6 @@
 import { FkaProviderError } from "./http.ts";
 
-export type FkaCdpTransport = "page" | "browser";
+export type FkaCdpTransport = "page";
 
 export type FkaBrowserHandle = {
   webSocketUrl: string;
@@ -17,9 +17,14 @@ export type FkaBrowserEnv = {
 export const FKA_IMPORTER_DISABLED_MESSAGE =
   "El importador FKA solo está disponible en el entorno local (Brave CDP).";
 
-export function isFkaImporterEnabled(env?: { FKA_IMPORTER_ENABLED?: string }): boolean {
-  const source = env ?? (process.env as { FKA_IMPORTER_ENABLED?: string });
-  return source.FKA_IMPORTER_ENABLED?.trim() === "true";
+type FkaImporterConfig = {
+  FKA_IMPORTER_ENABLED?: string;
+  NODE_ENV?: string;
+};
+
+export function isFkaImporterEnabled(env?: FkaImporterConfig): boolean {
+  const source = env ?? (process.env as FkaImporterConfig);
+  return source.NODE_ENV !== "production" && source.FKA_IMPORTER_ENABLED?.trim() === "true";
 }
 
 export function readFkaBrowserEnv(): FkaBrowserEnv {
@@ -37,9 +42,8 @@ function emptyToNull(value: string | undefined): string | null {
 
 export function describeFkaBrowserMode(
   env: FkaBrowserEnv = readFkaBrowserEnv(),
-): "local-devtools" | "websocket" | "none" {
+): "local-devtools" | "none" {
   const endpoint = env.endpoint ?? "";
-  if (/^wss?:\/\//i.test(endpoint)) return "websocket";
   const isHttpDevtools = /^https?:\/\//i.test(endpoint);
   const isLoopback = /\/\/(127\.0\.0\.1|localhost|\[::1\])(:|\/|$)/i.test(endpoint);
   if (isHttpDevtools && isLoopback && env.nodeEnv !== "production") return "local-devtools";
@@ -49,7 +53,6 @@ export function describeFkaBrowserMode(
 export async function openFkaBrowser(env: FkaBrowserEnv = readFkaBrowserEnv()): Promise<FkaBrowserHandle> {
   const mode = describeFkaBrowserMode(env);
   if (mode === "local-devtools") return openLocalDevtools(env.endpoint!);
-  if (mode === "websocket") return openDirectWebsocket(env.endpoint!, env.token);
   throw new FkaProviderError(
     "FKA_NETWORK_ERROR",
     "No hay un navegador FKA configurado. Define FKA_CDP_ENDPOINT=http://127.0.0.1:9222 y arranca Brave con --remote-debugging-port=9222.",
@@ -99,16 +102,4 @@ async function openLocalDevtools(endpoint: string): Promise<FkaBrowserHandle> {
       }
     },
   };
-}
-
-function openDirectWebsocket(endpoint: string, token: string | null | undefined): Promise<FkaBrowserHandle> {
-  let url = endpoint;
-  if (token && !/[?&]token=/.test(url)) {
-    url += (url.includes("?") ? "&" : "?") + `token=${encodeURIComponent(token)}`;
-  }
-  return Promise.resolve({
-    webSocketUrl: url,
-    transport: "browser",
-    close: async () => undefined,
-  });
 }
