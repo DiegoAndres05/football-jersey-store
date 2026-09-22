@@ -112,63 +112,79 @@ export async function searchFkaPreviewAction(input: FkaSearchInput): Promise<Fka
         continue;
       }
 
+      const searchedKits = await fetcher.searchKits(team.name, parsed.data.season);
+      let kitLinks = extractKitLinks(
+        searchedKits.map((kit) => ({ text: kit.title, href: kit.url, className: "archive-result" })),
+        parsed.data.season,
+      ).filter((k) => parsed.data.types.includes(k.type as never));
+
       const teamPage = await fetcher.fetchPage(team.url);
       const teamContext = extractTeamContext(teamPage);
-      const teamId = parseTeamIdFromUrl(teamPage.url) ?? parseTeamIdFromUrl(team.url);
-      const seasonLink =
-        findSeasonLink(teamPage.anchors, teamId, parsed.data.season) ??
-        buildSeasonUrl(teamPage.url, teamId, parsed.data.season) ??
-        buildSeasonUrl(team.url, teamId, parsed.data.season);
-      if (!seasonLink) {
-        items.push({
-          kit: {
-            source: "football-kit-archive",
-            title: `${team.name} ${parsed.data.season}`,
-            team: team.name,
-            season: parsed.data.season,
-            type: parsed.data.types[0],
-            leagueName: teamContext.leagueName,
-            leagueUrl: teamContext.leagueUrl,
-            country: teamContext.country,
-            imageUrl: null,
-            sourceUrl: team.url,
-          },
-          status: "ERROR",
-          teamMatch: { found: false, name: team.name },
-          seasonMatch: { found: false, name: parsed.data.season },
-          message: `No se encontró la temporada ${parsed.data.season} en la página de "${team.name}".`,
-        });
-        continue;
+      let fkaTeamContext = teamContext;
+      let seasonLink = team.url;
+
+      if (kitLinks.length === 0) {
+        kitLinks = extractKitLinks(teamPage.anchors, parsed.data.season).filter((k) =>
+          parsed.data.types.includes(k.type as never),
+        );
       }
 
-      const seasonPage = await fetcher.fetchPage(seasonLink);
-      const seasonContext = extractTeamContext(seasonPage);
-      const fkaTeamContext = seasonContext.leagueName ? seasonContext : teamContext;
-      if (!isSeasonPage(seasonPage.url)) {
-        items.push({
-          kit: {
-            source: "football-kit-archive",
-            title: `${team.name} ${parsed.data.season}`,
-            team: team.name,
-            season: parsed.data.season,
-            type: parsed.data.types[0],
-            leagueName: fkaTeamContext.leagueName,
-            leagueUrl: fkaTeamContext.leagueUrl,
-            country: fkaTeamContext.country,
-            imageUrl: null,
-            sourceUrl: seasonLink,
-          },
-          status: "ERROR",
-          teamMatch: { found: false, name: team.name },
-          seasonMatch: { found: false, name: parsed.data.season },
-          message: `La página de temporada de "${team.name}" no cargó correctamente.`,
-        });
-        continue;
-      }
+      if (kitLinks.length === 0) {
+        const teamId = parseTeamIdFromUrl(teamPage.url) ?? parseTeamIdFromUrl(team.url);
+        seasonLink =
+          findSeasonLink(teamPage.anchors, teamId, parsed.data.season) ??
+          buildSeasonUrl(teamPage.url, teamId, parsed.data.season) ??
+          buildSeasonUrl(team.url, teamId, parsed.data.season);
+        if (!seasonLink) {
+          items.push({
+            kit: {
+              source: "football-kit-archive",
+              title: `${team.name} ${parsed.data.season}`,
+              team: team.name,
+              season: parsed.data.season,
+              type: parsed.data.types[0],
+              leagueName: teamContext.leagueName,
+              leagueUrl: teamContext.leagueUrl,
+              country: teamContext.country,
+              imageUrl: null,
+              sourceUrl: team.url,
+            },
+            status: "ERROR",
+            teamMatch: { found: false, name: team.name },
+            seasonMatch: { found: false, name: parsed.data.season },
+            message: `No se encontró la temporada ${parsed.data.season} en la página de "${team.name}".`,
+          });
+          continue;
+        }
 
-      const kitLinks = extractKitLinks(seasonPage.anchors, parsed.data.season).filter((k) =>
-        parsed.data.types.includes(k.type as never),
-      );
+        const seasonPage = await fetcher.fetchPage(seasonLink);
+        const seasonContext = extractTeamContext(seasonPage);
+        fkaTeamContext = seasonContext.leagueName ? seasonContext : teamContext;
+        kitLinks = extractKitLinks(seasonPage.anchors, parsed.data.season).filter((k) =>
+          parsed.data.types.includes(k.type as never),
+        );
+        if (kitLinks.length === 0 && !isSeasonPage(seasonPage.url)) {
+          items.push({
+            kit: {
+              source: "football-kit-archive",
+              title: `${team.name} ${parsed.data.season}`,
+              team: team.name,
+              season: parsed.data.season,
+              type: parsed.data.types[0],
+              leagueName: fkaTeamContext.leagueName,
+              leagueUrl: fkaTeamContext.leagueUrl,
+              country: fkaTeamContext.country,
+              imageUrl: null,
+              sourceUrl: seasonLink,
+            },
+            status: "ERROR",
+            teamMatch: { found: false, name: team.name },
+            seasonMatch: { found: false, name: parsed.data.season },
+            message: `La página de temporada de "${team.name}" no cargó correctamente.`,
+          });
+          continue;
+        }
+      }
 
       if (kitLinks.length === 0) {
         items.push({

@@ -43,8 +43,8 @@ export const FKA_PAGE_READY_EXPRESSION = `(() => {
     url: location.href,
     isChallenge,
     childCount: document.body ? document.body.childElementCount : 0,
-    hasSeasonLinks: !!document.querySelector('a[href*="camisetas-20"], a[href*="-20"][href*="-kits"]'),
-    hasKitLinks: !!document.querySelector('a[href*="home-kit"], a[href*="away-kit"], a[href*="third-kit"], a[href*="camiseta-"], a[class^="kit"], a[class*=" kit"], [class*="kit"] a[href]'),
+    hasSeasonLinks: !!document.querySelector('a[href*="camisetas-20"], a[href*="-20"][href*="-kits"], a[href$="-kits/"], a[href$="-kits"]'),
+    hasKitLinks: !!document.querySelector('a[href*="home-kit"], a[href*="away-kit"], a[href*="third-kit"], a[href*="camiseta-"], .archive-result, .archive-results-grid a'),
   };
 })()`;
 
@@ -54,29 +54,33 @@ export const FKA_PAGE_EXTRACT_EXPRESSION = `(() => {
   const abs = (href) => {
     try { return new URL(href, location.href).href; } catch { return href; }
   };
-  const classOf = (a) => {
-    const own = a.getAttribute("class") || "";
-    const parent = a.closest("[class*='kit']");
-    const inherited = parent ? parent.getAttribute("class") || "" : "";
-    return (own + " " + inherited).trim();
-  };
-  const kitAnchors = [];
-  const other = [];
-  for (const a of document.querySelectorAll("a[href]")) {
-    const href = a.getAttribute("href") || "";
-    const className = classOf(a);
-    const path = href.split(/[?#]/)[0];
-    const isKit = /(^|\\s)kit(\\s|$)/i.test(className) || /camiseta/i.test(href) || /(home|away|third)-kit/i.test(href) || /-\\d{4}-\\d{2}-\\d+\\/?$/.test(path);
-    const isSeason = /camisetas/i.test(href) || /-\\d{4}-\\d{2}-kits/i.test(href);
-    if (!isKit && !isSeason) continue;
-    const item = {
-      text: (a.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 180),
+  const seen = new Set();
+  const anchors = [];
+  const push = (href, text, className) => {
+    if (!href || seen.has(href)) return;
+    seen.add(href);
+    anchors.push({
+      text: (text || "").replace(/\\s+/g, " ").trim().slice(0, 180),
       href: abs(href),
-      className,
-    };
-    if (isKit) kitAnchors.push(item);
-    else other.push(item);
-    if (kitAnchors.length >= 80 && other.length >= 200) break;
+      className: className || "",
+    });
+  };
+  const nodes = document.querySelectorAll([
+    "a[href*='home-kit']",
+    "a[href*='away-kit']",
+    "a[href*='third-kit']",
+    "a[href*='camiseta-']",
+    "a[href*='-kits']",
+    "a[href*='camisetas-']",
+    "a.archive-result",
+    ".archive-result a",
+    ".archive-results-grid a",
+    "[class*='archive-result']",
+  ].join(","));
+  for (const el of nodes) {
+    const href = el.getAttribute("href") || el.getAttribute("data-href") || el.getAttribute("data-url") || (el.querySelector && el.querySelector("a[href]") ? el.querySelector("a[href]").getAttribute("href") : "");
+    push(href, el.textContent, el.getAttribute("class") || "");
+    if (anchors.length >= 200) break;
   }
   const crumbRoot = document.querySelector("[class*='breadcrumb']");
   const breadcrumbs = [...(crumbRoot ? crumbRoot.querySelectorAll("a[href]") : [])].slice(0, 12).map((a) => ({
@@ -98,7 +102,7 @@ export const FKA_PAGE_EXTRACT_EXPRESSION = `(() => {
   return {
     url: location.href,
     title: document.title || "",
-    anchors: kitAnchors.concat(other),
+    anchors,
     breadcrumbs,
     rows,
     images,

@@ -41,7 +41,6 @@ export function isSeasonPage(url: string): boolean {
 
 export function isKitDetailPage(url: string): boolean {
   const path = url.split(/[?#]/)[0];
-  if (!/\/es\//.test(path)) return false;
   if (new RegExp(`-\\d{4}-\\d{2}-(?:${KIT_KIND})-kit(?:/\\d+)?/?$`, "i").test(path)) return true;
   return /-\d{4}-\d{2}-\d+\/?$/.test(path) && /camiseta/i.test(path);
 }
@@ -82,7 +81,7 @@ const NON_JERSEY_WORDS =
   /calentamiento|himno|chandal|pista|abrigo|chaqueta|campera|portero|guante|bufanda|pelota|botas|shorts|medias|sudader|parka|anorak/i;
 
 function isKitClass(className: string): boolean {
-  return /(^|\s)kit(\s|$)/i.test(className);
+  return /(^|\s)kit(\s|$)/i.test(className) || /archive-result/i.test(className);
 }
 
 export function extractKitLinks(

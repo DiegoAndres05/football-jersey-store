@@ -135,7 +135,7 @@ test("parseSeasonFromUrl: extrae temporada de la URL", () => {
 test("isSeasonPage / isKitDetailPage: slugs actuales de FKA", () => {
   assert.equal(isSeasonPage("https://www.footballkitarchive.com/es/real-madrid-2026-27-kits/"), true);
   assert.equal(isSeasonPage("https://www.footballkitarchive.com/es/real-madrid-kits/"), false);
-  assert.equal(isKitDetailPage("https://www.footballkitarchive.com/es/real-madrid-2026-27-home-kit/"), true);
+    assert.equal(isKitDetailPage("https://www.footballkitarchive.com/real-madrid-2026-27-home-kit/"), true);
   assert.equal(isKitDetailPage("https://www.footballkitarchive.com/es/real-madrid-2026-27-third-kit/99/"), true);
   assert.equal(isKitDetailPage("https://www.footballkitarchive.com/es/real-madrid-2026-27-kits/"), false);
 });

@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { parseFetchedPage } from "../src/features/import/fka/page-html.ts";
-import { parseFkaTeamSearchResponse } from "../src/features/import/fka/search.ts";
+import { parseFkaKitSearchResponse, parseFkaTeamSearchResponse } from "../src/features/import/fka/search.ts";
 import { FkaProviderError } from "../src/features/import/fka/http.ts";
 import {
   extractKitLinks,
@@ -84,6 +84,23 @@ describe("FKA HTML/search parsers used by CDP FkaFetcher", () => {
       TEAM_URL,
     );
     assert.equal(findSeasonLink(page.anchors, "t16", "2025-26"), null);
+  });
+
+  it("reads kit hits from search JSON with current FKA slugs", () => {
+    const kits = parseFkaKitSearchResponse(
+      JSON.stringify({
+        data: [
+          { type: "kit", name: "Real Madrid 2026-27 Local", url: "/es/real-madrid-2026-27-home-kit/320888/" },
+          { type: "kit", name: "Real Madrid 2026-27 Visitante", url: "real-madrid-2026-27-away-kit" },
+          { type: "team", name: "Real Madrid", url: "/es/real-madrid-kits/" },
+        ],
+      }),
+      "2026-27",
+      SEARCH_URL,
+    );
+    assert.equal(kits.length, 2);
+    assert.equal(kits[0]?.url, "https://www.footballkitarchive.com/es/real-madrid-2026-27-home-kit/320888/");
+    assert.equal(kits[1]?.url, "https://www.footballkitarchive.com/real-madrid-2026-27-away-kit");
   });
 
   it("turns invalid search JSON into FKA_INVALID_RESPONSE", () => {

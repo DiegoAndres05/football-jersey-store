@@ -6,7 +6,7 @@ import {
   FkaImageError,
 } from "./fka-image.ts";
 import { FKA_BASE_URL, FkaBlockedError, FkaProviderError, isCloudflareChallenge, normalizeFkaBodyPreview } from "./http.ts";
-import { buildFkaTeamSearchUrl, parseFkaTeamSearchResponse } from "./search.ts";
+import { buildFkaTeamSearchUrl, parseFkaKitSearchResponse, parseFkaTeamSearchResponse } from "./search.ts";
 import { openFkaBrowser, readFkaBrowserEnv, type FkaBrowserEnv, type FkaBrowserHandle } from "./browser-provider.ts";
 import { CdpSession, openCdpWebSocket } from "./cdp-session.ts";
 import {
@@ -68,6 +68,28 @@ export class FkaFetcher {
         { url: resolved },
       );
     }
+  }
+
+  async searchKits(teamName: string, season: string): Promise<{ title: string; url: string }[]> {
+    if (!this.session) throw new Error("Fetcher no conectado.");
+    const queries = [`${teamName} ${season}`, teamName];
+    const found: { title: string; url: string }[] = [];
+    const seen = new Set<string>();
+    for (const query of queries) {
+      const body = await this.searchRaw(query);
+      if (!body) continue;
+      try {
+        for (const kit of parseFkaKitSearchResponse(body, season, buildFkaTeamSearchUrl(query))) {
+          if (seen.has(kit.url)) continue;
+          seen.add(kit.url);
+          found.push(kit);
+        }
+      } catch {
+        /* JSON inválido: probar siguiente consulta */
+      }
+      if (found.length > 0) break;
+    }
+    return found;
   }
 
   async searchTeam(query: string): Promise<TeamCandidate | null> {
@@ -135,7 +157,10 @@ export class FkaFetcher {
     const wantsSeasonLinks =
       (/camisetas-t\d+\/?$/.test(url) && !/camisetas-\d{4}-\d{2}-t\d+/.test(url)) ||
       (/\/[^/]+-kits\/?$/.test(url) && !/\d{4}-\d{2}-kits\/?$/.test(url));
-    const wantsKitLinks = /camisetas-\d{4}-\d{2}-t\d+\/?$/.test(url) || /-\d{4}-\d{2}-kits\/?$/.test(url);
+    const wantsKitLinks =
+      /camisetas-\d{4}-\d{2}-t\d+\/?$/.test(url) ||
+      /-\d{4}-\d{2}-kits\/?$/.test(url) ||
+      wantsSeasonLinks;
     let contentStarted: number | null = null;
     let lastReady: FkaPageReady | null = null;
 
@@ -210,7 +235,7 @@ export class FkaFetcher {
     }
   }
 
-  private async searchTeamOnce(query: string): Promise<TeamCandidate | null> {
+  private async searchRaw(query: string): Promise<string | null> {
     const searchUrl = buildFkaTeamSearchUrl(query);
     if (!this.session) throw new Error("Fetcher no conectado.");
     const started = Date.now();
@@ -230,7 +255,7 @@ export class FkaFetcher {
           await new Promise((resolve) => setTimeout(resolve, 2000));
           continue;
         }
-        return parseFkaTeamSearchResponse(body, query, searchUrl);
+        return body;
       } catch (err) {
         if (err instanceof FkaProviderError && err.code !== "FKA_INVALID_RESPONSE") throw err;
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -239,6 +264,13 @@ export class FkaFetcher {
     throw new FkaBlockedError("Football Kit Archive respondió con verificación Cloudflare.", {
       url: searchUrl,
     });
+  }
+
+  private async searchTeamOnce(query: string): Promise<TeamCandidate | null> {
+    const searchUrl = buildFkaTeamSearchUrl(query);
+    const body = await this.searchRaw(query);
+    if (!body) return null;
+    return parseFkaTeamSearchResponse(body, query, searchUrl);
   }
 }
 
