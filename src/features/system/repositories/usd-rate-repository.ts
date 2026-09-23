@@ -1,5 +1,25 @@
 import { prisma } from "@/lib/prisma";
 
+export async function getUsdRateSettings(): Promise<{
+  copPerUsd: number;
+  enabled: boolean;
+  updatedAt: string | null;
+}> {
+  const [rateRow, enabledRow, updatedAtRow] = await Promise.all([
+    prisma.setting.findUnique({ where: { key: "usd_cop_rate" } }),
+    prisma.setting.findUnique({ where: { key: "usd_enabled" } }),
+    prisma.setting.findUnique({ where: { key: "usd_cop_rate_at" } }),
+  ]);
+
+  const parsedRate = Number.parseInt(rateRow?.value ?? "", 10);
+
+  return {
+    copPerUsd: Number.isFinite(parsedRate) && parsedRate >= 1 ? parsedRate : 4000,
+    enabled: enabledRow?.value === "true",
+    updatedAt: updatedAtRow?.value ?? null,
+  };
+}
+
 /**
  * Lectura pública de la tasa USD vigente.
  * Se usa en Server Components y en el selector de moneda.
@@ -7,14 +27,7 @@ import { prisma } from "@/lib/prisma";
 export async function getPublicUsdRate(): Promise<
   { available: false } | { available: true; copPerUsd: number; updatedAt: string }
 > {
-  const [rateRow, enabledRow, updatedAtRow] = await Promise.all([
-    prisma.setting.findUnique({ where: { key: "usd_cop_rate" } }),
-    prisma.setting.findUnique({ where: { key: "usd_enabled" } }),
-    prisma.setting.findUnique({ where: { key: "usd_cop_rate_at" } }),
-  ]);
-
-  const enabled = enabledRow?.value === "true";
-  const copPerUsd = parseInt(rateRow?.value ?? "0", 10);
+  const { copPerUsd, enabled, updatedAt } = await getUsdRateSettings();
 
   if (!enabled || copPerUsd < 1) {
     return { available: false };
@@ -23,7 +36,7 @@ export async function getPublicUsdRate(): Promise<
   return {
     available: true,
     copPerUsd,
-    updatedAt: updatedAtRow?.value ?? new Date().toISOString(),
+    updatedAt: updatedAt ?? new Date().toISOString(),
   };
 }
 

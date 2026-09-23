@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { getSessionUser } from "@/features/auth/server/session";
 import { validateUsdRate } from "@/features/system/schemas/usd-rate-schema";
 import { persistUsdRate } from "@/features/system/repositories/usd-rate-repository";
@@ -28,6 +29,8 @@ export async function updateUsdRateAction(
 
   try {
     await persistUsdRate(parsed.data.copPerUsd, parsed.data.enabled);
+    revalidatePath("/admin/ajustes");
+    revalidatePath("/", "layout");
     return { ok: true };
   } catch {
     return { ok: false, error: "Error al guardar la tasa. Intenta de nuevo." };

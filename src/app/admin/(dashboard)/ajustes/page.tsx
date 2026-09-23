@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getPublicUsdRate } from "@/features/system/repositories/usd-rate-repository";
+import { getUsdRateSettings } from "@/features/system/repositories/usd-rate-repository";
 import { UsdRateForm } from "@/features/system/components/usd-rate-form";
 
 export const metadata: Metadata = {
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminSettingsPage() {
-  const rate = await getPublicUsdRate();
+  const rate = await getUsdRateSettings();
 
   return (
     <div className="space-y-6">
@@ -26,8 +26,8 @@ export default async function AdminSettingsPage() {
           Tasa de conversión USD
         </h3>
         <UsdRateForm
-          initialCopPerUsd={rate.available ? rate.copPerUsd : 4000}
-          initialEnabled={rate.available}
+          initialCopPerUsd={rate.copPerUsd}
+          initialEnabled={rate.enabled}
         />
       </div>
     </div>

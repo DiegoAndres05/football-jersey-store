@@ -20,6 +20,6 @@ export type UsdRateInput = z.infer<typeof usdRateSchema>;
 export function validateUsdRate(formData: FormData) {
   return usdRateSchema.safeParse({
     copPerUsd: formData.get("copPerUsd"),
-    enabled: formData.get("enabled"),
+    enabled: formData.has("enabled"),
   });
 }
