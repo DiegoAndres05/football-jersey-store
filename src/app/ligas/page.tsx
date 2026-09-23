@@ -6,11 +6,17 @@ import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE } from "@/features/seo/domain/robots-policy";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
 import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
+import { appendKeywords } from "@/features/seo/domain/keywords";
 
 export const metadata: Metadata = {
   title: "Ligas",
   description:
     "Explora las principales ligas de fútbol del mundo. Encuentra camisetas de equipos por competición.",
+  keywords: appendKeywords(
+    "camisetas de ligas de fútbol",
+    "camisetas de fútbol europeas",
+    "camisetas de fútbol por competición",
+  ),
   robots: INDEXABLE,
   alternates: { canonical: `${resolvePublicOrigin()}/ligas` },
 };

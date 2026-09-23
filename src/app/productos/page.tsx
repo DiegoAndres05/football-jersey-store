@@ -24,6 +24,7 @@ import { INDEXABLE, NOINDEX_FOLLOW } from "@/features/seo/domain/robots-policy";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
 import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
 import { decideCatalogIndexation } from "@/features/seo/domain/catalog-indexation";
+import { appendKeywords } from "@/features/seo/domain/keywords";
 
 const siteUrl = resolvePublicOrigin();
 
@@ -41,6 +42,12 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
     title: "Catálogo de camisetas de fútbol",
     description:
       "Explora nuestro catálogo de camisetas de fútbol: ligas, equipos, temporadas y tallas. Envío a toda Colombia.",
+    keywords: appendKeywords(
+      "catálogo de camisetas de fútbol",
+      "camisetas de fútbol por liga",
+      "camisetas de fútbol por equipo",
+      "camisetas de fútbol por temporada",
+    ),
     robots,
     alternates: { canonical: `${siteUrl}/productos` },
     openGraph: {

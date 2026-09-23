@@ -7,6 +7,7 @@ import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { getProducts } from "@/features/products/repositories/product-repository";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
 import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
+import { appendKeywords } from "@/features/seo/domain/keywords";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -26,6 +27,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${league.name} — Camisetas de fútbol`,
     description,
+    keywords: appendKeywords(
+      `camisetas de fútbol ${league.name}`,
+      `camisetas de equipos ${league.name}`,
+      `camisetas ${league.name} Colombia`,
+    ),
     alternates: { canonical },
     openGraph: {
       title: `${league.name} — Camisetas de fútbol`,

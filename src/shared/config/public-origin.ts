@@ -15,7 +15,7 @@ export function resolvePublicOrigin(): string {
   if (!raw) {
     if (isProduction) {
       throw new Error(
-        "NEXT_PUBLIC_SITE_URL es obligatoria en producción. Configura una URL HTTPS válida (ej: https://flashsport.co).",
+        "NEXT_PUBLIC_SITE_URL es obligatoria en producción. Configura una URL HTTPS válida (ej: https://flashsports.shop).",
       );
     }
     return LOCALHOST_FALLBACK;
@@ -45,7 +45,7 @@ export function resolvePublicOrigin(): string {
   // No path allowed (only origin)
   if (url.pathname !== "/" && url.pathname !== "") {
     throw new Error(
-      `NEXT_PUBLIC_SITE_URL no debe incluir path. Recibido: "${raw}". Usa solo el origen (ej: https://flashsport.co).`,
+      `NEXT_PUBLIC_SITE_URL no debe incluir path. Recibido: "${raw}". Usa solo el origen (ej: https://flashsports.shop).`,
     );
   }
 

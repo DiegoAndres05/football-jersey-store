@@ -5,6 +5,7 @@ import { ProductGrid } from "@/features/products/components/product-grid";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { getProducts } from "@/features/products/repositories/product-repository";
+import { appendKeywords } from "@/features/seo/domain/keywords";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -25,6 +26,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${team.name} — Camisetas de fútbol`,
     description,
+    keywords: appendKeywords(
+      `camiseta ${team.name}`,
+      `camiseta de fútbol ${team.name}`,
+      `camiseta ${team.name} Colombia`,
+    ),
     alternates: { canonical },
     openGraph: {
       title: `${team.name} — Camisetas de fútbol`,

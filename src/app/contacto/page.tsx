@@ -5,11 +5,17 @@ import { Button } from "@/components/ui/button";
 import { SITE, whatsappLink } from "@/shared/config/site";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE } from "@/features/seo/domain/robots-policy";
+import { appendKeywords } from "@/features/seo/domain/keywords";
 
 export const metadata: Metadata = {
   title: "Contacto",
   description:
     "Contacta a Flashsport por WhatsApp o correo para pedidos, dudas de tallas y envíos.",
+  keywords: appendKeywords(
+    "contacto tienda camisetas de fútbol",
+    "tallas camisetas de fútbol",
+    "envíos de camisetas de fútbol",
+  ),
   robots: INDEXABLE,
   alternates: { canonical: `${resolvePublicOrigin()}/contacto` },
 };

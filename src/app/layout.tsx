@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SITE } from "@/shared/config/site";
 import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
+import { SITE_KEYWORDS } from "@/features/seo/domain/keywords";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import "./globals.css";
 
@@ -29,6 +30,10 @@ export const metadata: Metadata = {
   },
   description:
     "Camisetas de fútbol de calidad, réplicas de tus equipos favoritos, con personalización y envío a toda Colombia.",
+  keywords: [...SITE_KEYWORDS],
+  authors: [{ name: "Flashsport" }],
+  creator: "Flashsport",
+  publisher: "Flashsport",
   verification: {
     google: "YEctg6SwsHUdA0jRQbxmfoHBYFt_YIoRHglGtDFmnIE",
   },

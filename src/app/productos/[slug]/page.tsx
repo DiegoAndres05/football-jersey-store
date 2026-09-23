@@ -10,6 +10,7 @@ import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { buildProductJsonLd } from "@/features/seo/domain/product-json-ld";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
 import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
+import { appendKeywords } from "@/features/seo/domain/keywords";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -31,6 +32,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: product.name,
     description,
+    keywords: appendKeywords(
+      `camiseta ${product.team.name}`,
+      `camiseta de ${product.team.name}`,
+      product.season.name,
+      product.kitType,
+    ),
     alternates: { canonical: productUrl },
     openGraph: {
       title: product.name,

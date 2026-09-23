@@ -29,11 +29,17 @@ import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE } from "@/features/seo/domain/robots-policy";
 import { LeagueCard } from "@/components/home/league-card";
 import { Suspense } from "react";
+import { appendKeywords } from "@/features/seo/domain/keywords";
 
 export const metadata: Metadata = {
   title: "Flashsport — Camisetas de fútbol",
   description:
     "Camisetas de fútbol de las mejores ligas del mundo. Equipos, temporadas y tallas reales, con envío a toda Colombia.",
+  keywords: appendKeywords(
+    "camisetas de fútbol en Colombia",
+    "camisetas de fútbol por equipos",
+    "camisetas de fútbol por tallas",
+  ),
   robots: INDEXABLE,
   alternates: { canonical: resolvePublicOrigin() },
 };

@@ -4,11 +4,17 @@ import { ChevronRight, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE } from "@/features/seo/domain/robots-policy";
+import { appendKeywords } from "@/features/seo/domain/keywords";
 
 export const metadata: Metadata = {
   title: "Sobre nosotros",
   description:
     "Conoce a Flashsport: camisetas de fútbol de calidad, réplicas de tus equipos favoritos con atención personalizada.",
+  keywords: appendKeywords(
+    "Flashsport camisetas de fútbol",
+    "tienda de camisetas de fútbol en Colombia",
+    "camisetas de fútbol con envío",
+  ),
   robots: INDEXABLE,
   alternates: { canonical: `${resolvePublicOrigin()}/sobre-nosotros` },
 };
