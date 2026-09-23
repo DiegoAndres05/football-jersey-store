@@ -28,6 +28,10 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
   const reconcileWithStock = useCartStore((s) => s.reconcileWithStock);
+  const setCoupon = useCartStore((s) => s.setCoupon);
+  const clearCoupon = useCartStore((s) => s.clearCoupon);
+  const appliedCouponCode = useCartStore((s) => s.couponCode);
+  const appliedCouponDiscount = useCartStore((s) => s.couponDiscount);
 
   const [mounted, setMounted] = useState(false);
   const [couponCode, setCouponCode] = useState("");
@@ -69,10 +73,23 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
 
   const isEmpty = !mounted || items.length === 0;
   const applyCoupon = async () => {
-    if (!couponCode.trim()) { setCouponDiscount(0); setCouponMessage("Escribe un código de cupón válido."); return; }
+    if (!couponCode.trim()) {
+      clearCoupon();
+      setCouponDiscount(0);
+      setCouponMessage("Escribe un código de cupón válido.");
+      return;
+    }
     const result = await validateCoupon({ code: couponCode, lines: items.map((item) => ({ variantId: item.variantId, quantity: item.quantity, customizationType: item.customizationType })) });
-    if (result.ok) { setCouponDiscount(result.discountAmount); setCouponMessage(result.message); }
-    else { setCouponDiscount(0); setCouponMessage(result.message); }
+    if (result.ok) {
+      setCouponDiscount(result.discountAmount);
+      setCouponMessage(result.message);
+      setCoupon(result.code, result.discountAmount);
+    }
+    else {
+      clearCoupon();
+      setCouponDiscount(0);
+      setCouponMessage(result.message);
+    }
   };
 
   const freeShippingThreshold = 200000;
@@ -266,7 +283,16 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
             </div>
             {couponMessage && <p className="mt-1 text-xs text-muted-foreground">{couponMessage}</p>}
           </div>
-          {couponDiscount > 0 && <div className="mt-2 flex justify-between text-sm"><span className="text-muted-foreground">Descuento</span><span className="font-medium text-green-700">-{formatMoney({ amountCop: couponDiscount, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span></div>}
+          {appliedCouponDiscount > 0 && (
+            <div className="mt-2 flex justify-between text-sm">
+              <span className="text-muted-foreground">
+                Descuento {appliedCouponCode ? `(${appliedCouponCode})` : ""}
+              </span>
+              <span className="font-medium text-green-700">
+                -{formatMoney({ amountCop: appliedCouponDiscount, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}
+              </span>
+            </div>
+          )}
 
           {remaining > 0 ? (
             <p className="mt-3 rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
@@ -283,7 +309,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
 
           <div className="flex justify-between items-baseline">
             <span className="text-sm font-medium">Total</span>
-            <span className="text-2xl font-bold tabular-nums transition-colors duration-200 motion-reduce:transition-none">{formatMoney({ amountCop: subtotal + shipping - couponDiscount, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span>
+            <span className="text-2xl font-bold tabular-nums transition-colors duration-200 motion-reduce:transition-none">{formatMoney({ amountCop: subtotal + shipping - appliedCouponDiscount, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span>
           </div>
 
           <Button className="w-full mt-4" asChild>

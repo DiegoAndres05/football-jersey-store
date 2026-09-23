@@ -56,10 +56,14 @@ type LegacyCartItem = Omit<CartItem, "lineId" | "deliveryMode">;
 
 interface CartState {
   items: CartItem[];
+  couponCode: string | null;
+  couponDiscount: number;
   addItem: (draft: CartDraft, immediateStock?: number) => CartMutationResult;
   removeItem: (lineId: string) => void;
   updateQuantity: (lineId: string, quantity: number, immediateStock?: number) => CartMutationResult;
   reconcileWithStock: (stockByVariantId: ReadonlyMap<string, number>) => CartAdjustment[];
+  setCoupon: (code: string, discount: number) => void;
+  clearCoupon: () => void;
   clear: () => void;
   itemCount: () => number;
   subtotal: () => number;
@@ -69,6 +73,8 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
+      couponCode: null,
+      couponDiscount: 0,
       addItem: (draft, immediateStock) => {
         if (draft.deliveryMode === "INMEDIATA" && typeof immediateStock === "number") {
           if (remainingImmediate(get().items, draft.variantId, immediateStock) <= 0) {
@@ -83,14 +89,24 @@ export const useCartStore = create<CartState>()(
               items: s.items.map((i) =>
                 i.lineId === lineId ? { ...i, quantity: i.quantity + 1 } : i,
               ),
+              couponCode: null,
+              couponDiscount: 0,
             };
           }
-          return { items: [...s.items, { ...draft, lineId, quantity: 1, lineTotalCop: (draft.unitPrice ?? 0) }] };
+          return {
+            items: [...s.items, { ...draft, lineId, quantity: 1, lineTotalCop: (draft.unitPrice ?? 0) }],
+            couponCode: null,
+            couponDiscount: 0,
+          };
         });
         return { ok: true };
       },
       removeItem: (lineId) => {
-        set((s) => ({ items: s.items.filter((i) => i.lineId !== lineId) }));
+        set((s) => ({
+          items: s.items.filter((i) => i.lineId !== lineId),
+          couponCode: null,
+          couponDiscount: 0,
+        }));
       },
       updateQuantity: (lineId, quantity, immediateStock) => {
         if (quantity < 1) return { ok: false, reason: "at_cap" };
@@ -103,29 +119,43 @@ export const useCartStore = create<CartState>()(
         }
         set({
           items: items.map((i) => (i.lineId === lineId ? { ...i, quantity, lineTotalCop: i.unitPrice * quantity } : i)),
+          couponCode: null,
+          couponDiscount: 0,
         });
         return { ok: true };
       },
       reconcileWithStock: (stockByVariantId) => {
         const { items, adjustments } = reconcileImmediateCart(get().items, stockByVariantId);
-        if (adjustments.length > 0) set({ items });
+        if (adjustments.length > 0) set({ items, couponCode: null, couponDiscount: 0 });
         return adjustments;
       },
-      clear: () => set({ items: [] }),
+      setCoupon: (couponCode, couponDiscount) => set({ couponCode, couponDiscount }),
+      clearCoupon: () => set({ couponCode: null, couponDiscount: 0 }),
+      clear: () => set({ items: [], couponCode: null, couponDiscount: 0 }),
       itemCount: () => get().items.reduce((acc, i) => acc + i.quantity, 0),
       subtotal: () => get().items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0),
     }),
     {
       name: "fjs-cart",
       version: 3,
-      partialize: (state) => ({ items: state.items }),
+      partialize: (state) => ({
+        items: state.items,
+        couponCode: state.couponCode,
+        couponDiscount: state.couponDiscount,
+      }),
       migrate: (persisted) => {
-        const state = persisted as { items?: LegacyCartItem[] };
+        const state = persisted as {
+          items?: LegacyCartItem[];
+          couponCode?: string | null;
+          couponDiscount?: number;
+        };
         return {
           items: (state.items ?? []).map((item) => {
             const normalized = { ...item, deliveryMode: "INMEDIATA" as const };
             return { ...normalized, lineId: buildLineId(normalized) };
           }),
+          couponCode: state.couponCode ?? null,
+          couponDiscount: state.couponDiscount ?? 0,
         };
       },
     },

@@ -27,7 +27,6 @@ import {
   type PaymentMethod,
 } from "@/features/checkout/schemas/checkout-schema";
 import { buildBoldCheckoutPayload } from "@/features/payments/domain/bold-checkout-attrs";
-import { validateCoupon } from "@/features/coupons/server/coupon-actions";
 import { CheckoutConsents } from "@/app/checkout/consents";
 import type { LegalConfig } from "@/shared/config/legal";
 import { validateConsents } from "@/features/checkout/validation";
@@ -103,6 +102,9 @@ function loadBoldCheckoutScript(): Promise<void> {
 export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyContext?: CurrencyContext; legalConfig?: LegalConfig | null }) {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
+  const appliedCouponCode = useCartStore((s) => s.couponCode);
+  const appliedCouponDiscount = useCartStore((s) => s.couponDiscount);
+  const clearCoupon = useCartStore((s) => s.clearCoupon);
   const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
   const clearCart = useCartStore((s) => s.clear);
 
@@ -111,8 +113,6 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
   const [payError, setPayError] = useState("");
-  const [couponCode, setCouponCode] = useState("");
-  const [couponDiscount, setCouponDiscount] = useState(0);
   const formRef = useRef<CheckoutFormValues | null>(null);
   const paymentKeyRef = useRef<string>("");
   if (!paymentKeyRef.current) paymentKeyRef.current = createPaymentIdempotencyKey();
@@ -121,7 +121,6 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
   const cartItemsKey = items.map((item) => `${item.lineId}:${item.quantity}`).join("|");
   useEffect(() => {
     // A cart mutation invalidates any previously validated promotion.
-    setCouponDiscount(0);
     setPayError("");
   }, [subtotal, cartItemsKey]);
 
@@ -176,7 +175,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
     () => (mounted ? shippingFee(subtotal) : 0),
     [mounted, subtotal],
   );
-  const total = subtotal + fee;
+  const total = subtotal + fee - appliedCouponDiscount;
   const remaining = SHIPPING.freeThreshold - subtotal;
   const destinationCountry = watch("shippingCountry") || SITE.country;
   const checkoutCurrency = {
@@ -253,18 +252,6 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
       setPaymentStatus("idle");
       return;
     }
-    if (couponCode.trim()) {
-      const couponResult = await validateCoupon({ code: couponCode, lines: lines.map((i) => ({ variantId: i.variantId, quantity: i.quantity, customizationType: i.customizationType })) });
-      if (!couponResult.ok) {
-        setPayError(couponResult.message);
-        setCouponCode("");
-        setCouponDiscount(0);
-        setPaymentStatus("idle");
-        return;
-      }
-      setCouponDiscount(couponResult.discountAmount);
-    }
-
     const result = await submitOrder({
       form: formRef.current,
       lines: lines.map((i) => ({
@@ -278,14 +265,13 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
       paymentMethod,
       paymentReference: paymentKeyRef.current,
       saleCurrency: checkoutCurrencyForCountry(formRef.current.shippingCountry, currencyContext).currency,
-      couponCode: couponCode.trim() || null,
+      couponCode: appliedCouponCode,
     });
 
     if (!result.ok) {
       setPayError(result.error);
-      if (couponCode.trim()) {
-        setCouponCode("");
-        setCouponDiscount(0);
+      if (appliedCouponCode) {
+        clearCoupon();
       }
       setPaymentStatus("failed");
       return;
@@ -538,11 +524,17 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
         {/* Summary */}
         <aside className="rounded-xl border border-border bg-card p-5 lg:sticky lg:top-24 space-y-4">
           <h2 className="font-display text-lg font-bold uppercase tracking-tight">Resumen</h2>
-          <div className="mt-3 flex gap-2">
-            <Input aria-label="Código de cupón" value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="Cupón" />
-            <Button type="button" variant="outline" onClick={() => setPayError("")}>Aplicar</Button>
-          </div>
-          {couponDiscount > 0 && <p className="mt-2 text-sm text-green-700">Descuento: -{formatMoney({ amountCop: couponDiscount, currency: checkoutCurrency.currency, copPerUsd: checkoutCurrency.copPerUsd ?? undefined })} <button type="button" className="ml-2 underline" onClick={() => { setCouponCode(""); setCouponDiscount(0); setPayError(""); }}>Quitar cupón</button></p>}
+          {appliedCouponCode ? (
+            <p className="mt-3 text-sm text-green-700">
+              Cupón <strong>{appliedCouponCode}</strong> aplicado: -
+              {formatMoney({ amountCop: appliedCouponDiscount, currency: checkoutCurrency.currency, copPerUsd: checkoutCurrency.copPerUsd ?? undefined })}
+              <button type="button" className="ml-2 underline" onClick={() => { clearCoupon(); setPayError(""); }}>Quitar cupón</button>
+            </p>
+          ) : (
+            <p className="mt-3 text-xs text-muted-foreground">
+              El cupón se aplica en el carrito antes de continuar al pago.
+            </p>
+          )}
           <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
             {items.map((item) => (
               <div key={item.lineId} className="flex gap-3">
