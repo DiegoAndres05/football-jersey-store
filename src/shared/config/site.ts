@@ -5,7 +5,7 @@ export const SITE = {
   whatsappNumber: "+57 304 614 9525",
   whatsappMessage:
     "Hola Flashsport, estoy buscando una camiseta. ¿Me ayudan?",
-  email: "hola@flashsports.shop",
+  email: "flashsport.col@gmail.com",
   country: "Colombia",
 } as const;
 
