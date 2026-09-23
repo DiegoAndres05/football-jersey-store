@@ -61,16 +61,37 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const organizationJsonLd = {
     "@context": "https://schema.org",
-    "@type": "Organization",
-    name: SITE.name,
-    url: siteUrl,
-    description: SITE.tagline,
-    contactPoint: {
-      "@type": "ContactPoint",
-      contactType: "customer service",
-      email: SITE.email,
-      availableLanguage: "Spanish",
-    },
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${siteUrl}/#organization`,
+        name: SITE.name,
+        url: siteUrl,
+        description: SITE.tagline,
+        telephone: SITE.whatsappNumber,
+        areaServed: SITE.country,
+        contactPoint: {
+          "@type": "ContactPoint",
+          contactType: "customer service",
+          telephone: SITE.whatsappNumber,
+          email: SITE.email,
+          areaServed: SITE.country,
+          availableLanguage: "Spanish",
+        },
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${siteUrl}/#website`,
+        name: SITE.name,
+        url: siteUrl,
+        publisher: { "@id": `${siteUrl}/#organization` },
+        potentialAction: {
+          "@type": "SearchAction",
+          target: `${siteUrl}/productos?q={search_term_string}`,
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
   };
 
   return (

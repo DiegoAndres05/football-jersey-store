@@ -8,6 +8,7 @@ import { getProducts } from "@/features/products/repositories/product-repository
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
 import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
 import { appendKeywords } from "@/features/seo/domain/keywords";
+import { leagueLogoSrc } from "@/features/products/domain/league-logos";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -40,6 +41,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       siteName: "Flashsport",
       type: "website",
       locale: "es_CO",
+      images: leagueLogoSrc(league.slug)
+        ? [{ url: leagueLogoSrc(league.slug)!, alt: `Logo de ${league.name}` }]
+        : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${league.name} — Camisetas de fútbol`,
+      description,
+      images: leagueLogoSrc(league.slug) ? [leagueLogoSrc(league.slug)!] : undefined,
     },
   };
 }

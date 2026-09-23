@@ -24,7 +24,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!product) return { title: "Producto no encontrado" };
 
-  const description = product.description ?? `${product.name} - ${product.team.name} · ${product.season.name}`;
+  const description =
+    product.description ??
+    `Camiseta de fútbol de ${product.team.name}, temporada ${product.season.name}. Tipo: ${product.kitType}.${product.team.league ? ` Liga: ${product.team.league.name}.` : ""}`;
   const primaryImage = product.images.find((img) => img.isPrimary) ?? product.images[0];
   const imageUrl = primaryImage?.url;
   const productUrl = `${siteUrl}/productos/${product.slug}`;
@@ -72,11 +74,14 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   const primaryImage = product.images.find((img) => img.isPrimary) ?? product.images[0];
   const imageUrl = primaryImage?.url;
+  const productDescription =
+    product.description ??
+    `Camiseta de fútbol de ${product.team.name}, temporada ${product.season.name}. Tipo: ${product.kitType}.${product.team.league ? ` Liga: ${product.team.league.name}.` : ""}`;
 
   const jsonLd = buildProductJsonLd({
     slug: product.slug,
     name: product.name,
-    description: product.description,
+    description: productDescription,
     brand: product.brand,
     kitType: product.kitType,
     imageUrl,

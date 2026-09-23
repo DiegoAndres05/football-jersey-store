@@ -32,9 +32,9 @@ import { Suspense } from "react";
 import { appendKeywords } from "@/features/seo/domain/keywords";
 
 export const metadata: Metadata = {
-  title: "Flashsport — Camisetas de fútbol",
+  title: "Camisetas de Fútbol en Colombia | Flashsport",
   description:
-    "Camisetas de fútbol de las mejores ligas del mundo. Equipos, temporadas y tallas reales, con envío a toda Colombia.",
+    "Camisetas de fútbol de las principales ligas y equipos del mundo. Elige tu temporada, talla y versión, con envíos a toda Colombia.",
   keywords: appendKeywords(
     "camisetas de fútbol en Colombia",
     "camisetas de fútbol por equipos",
@@ -42,6 +42,21 @@ export const metadata: Metadata = {
   ),
   robots: INDEXABLE,
   alternates: { canonical: resolvePublicOrigin() },
+  openGraph: {
+    title: "Camisetas de Fútbol en Colombia | Flashsport",
+    description:
+      "Camisetas de fútbol de las principales ligas y equipos del mundo. Elige tu temporada, talla y versión, con envíos a toda Colombia.",
+    url: resolvePublicOrigin(),
+    siteName: "Flashsport",
+    type: "website",
+    locale: "es_CO",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Camisetas de Fútbol en Colombia | Flashsport",
+    description:
+      "Camisetas de fútbol de las principales ligas y equipos del mundo. Elige tu temporada, talla y versión, con envíos a toda Colombia.",
+  },
 };
 
 const BIG_LEAGUES = BIG_LEAGUE_SLUGS;
@@ -81,9 +96,9 @@ export default async function HomePage() {
               Tienda de camisetas de fútbol
             </p>
             <h1 className="mt-5 font-display text-5xl font-bold uppercase leading-[0.95] tracking-tight md:text-6xl xl:text-7xl">
-              Viste tu
+              Camisetas de fútbol
               <br />
-              pasión.
+              en Colombia
             </h1>
             <p className="mt-5 max-w-md text-muted-foreground leading-relaxed">
               Camisetas de fútbol de las mejores ligas del mundo. Equipos,

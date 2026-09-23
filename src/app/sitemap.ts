@@ -28,7 +28,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/ligas`, priority: 0.7 },
     { url: `${BASE_URL}/sobre-nosotros`, priority: 0.5 },
     { url: `${BASE_URL}/contacto`, priority: 0.5 },
-    { url: `${BASE_URL}/cuenta`, priority: 0.3 },
   ];
 
   return [
