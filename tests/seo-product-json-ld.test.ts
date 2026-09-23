@@ -6,7 +6,7 @@ describe("buildProductJsonLd", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    process.env.NEXT_PUBLIC_SITE_URL = "https://flashsport.co";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://flashsports.shop";
   });
 
   afterEach(() => {
@@ -153,6 +153,6 @@ describe("buildProductJsonLd", () => {
     });
 
     const offer = result.offers[0] as Record<string, unknown>;
-    assert.equal(offer.url, "https://flashsport.co/productos/camiseta-colombia-2024");
+    assert.equal(offer.url, "https://flashsports.shop/productos/camiseta-colombia-2024");
   });
 });

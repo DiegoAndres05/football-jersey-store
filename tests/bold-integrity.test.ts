@@ -70,8 +70,8 @@ test("customer phone is digits-only so data-customer-data stays valid", () => {
 
 test("redirection URL must be https, or http://localhost (never 127.0.0.1)", () => {
   assert.equal(
-    sanitizeBoldRedirectionUrl("https://flashsport.co/pedido/confirmado/FS-1"),
-    "https://flashsport.co/pedido/confirmado/FS-1",
+    sanitizeBoldRedirectionUrl("https://flashsports.shop/pedido/confirmado/FS-1"),
+    "https://flashsports.shop/pedido/confirmado/FS-1",
   );
   assert.equal(
     sanitizeBoldRedirectionUrl("http://127.0.0.1:3000/pedido/confirmado/FS-1"),

@@ -7,7 +7,7 @@ viewport 320×800 y escritorio 1440×900.
 
 - `npx tsc --noEmit`: correcto.
 - `npx eslint 'src/app/admin/(dashboard)/**/*.ts' 'src/app/admin/(dashboard)/**/*.tsx' ...`: correcto.
-- `NEXT_PUBLIC_SITE_URL=https://flashsport.co npm run build`: correcto; las rutas
+- `NEXT_PUBLIC_SITE_URL=https://flashsports.shop npm run build`: correcto; las rutas
   administrativas existentes se compilan sin cambios de contrato.
 - `npm run lint`: no ejecutable con Next 16 porque `next lint` interpreta `lint`
   como directorio. Se conserva la configuración y se validó con ESLint directo.

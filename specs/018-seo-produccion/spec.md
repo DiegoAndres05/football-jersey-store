@@ -356,7 +356,7 @@ Asset: una imagen OG global en `src/app` (p. ej. `opengraph-image`) o ruta públ
 
 ## Assumptions
 
-- El dominio de producción se configura por variable de entorno; esta spec no fija el hostname (`flashsport.co` es ejemplo, no requisito de código). HTTP no es válido en producción.
+- El dominio de producción se configura por variable de entorno; el dominio actual es `flashsports.shop`. HTTP no es válido en producción.
 - El seed local puede seguir usando placeholders; el catálogo de producción es responsabilidad editorial, no de este cambio.
 - No se crean landings de temporada ni rutas anidadas liga/equipo.
 - No se declara política de devoluciones ni envío en schema hasta que exista un texto legal único.
