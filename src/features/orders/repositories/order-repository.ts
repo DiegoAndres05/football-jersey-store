@@ -84,7 +84,7 @@ export async function createOrder(input: CreateOrderInput): Promise<
     include: {
       version: true,
       size: true,
-      product: { select: { name: true, team: { select: { name: true } }, customizationsEnabled: true, customizationSurcharge: true, id: true } },
+      product: { select: { name: true, productKind: true, team: { select: { name: true } }, customizationsEnabled: true, customizationSurcharge: true, id: true } },
     },
   });
   const variantById = new Map(variants.map((v) => [v.id, v]));
@@ -101,8 +101,10 @@ export async function createOrder(input: CreateOrderInput): Promise<
     if (line.deliveryMode !== "INMEDIATA" && line.deliveryMode !== "BAJO_PEDIDO") {
       return { ok: false, error: "Modalidad de entrega inválida." };
     }
-    const surcharge =
-      line.customizationType !== "NONE" && variant.product.customizationsEnabled
+    const isBox = variant.product.productKind === "MYSTERY_BOX";
+    const surcharge = isBox
+      ? 0
+      : line.customizationType !== "NONE" && variant.product.customizationsEnabled
         ? variant.product.customizationSurcharge
         : 0;
     const unitPrice = variant.salePrice + surcharge;
@@ -113,7 +115,7 @@ export async function createOrder(input: CreateOrderInput): Promise<
       productId: variant.productId,
       variantId: variant.id,
       productName: variant.product.name,
-      teamName: variant.product.team.name,
+      teamName: isBox ? "" : variant.product.team.name,
       versionName: variant.version.name,
       sizeName: variant.size.name,
       unitPrice,
@@ -121,12 +123,16 @@ export async function createOrder(input: CreateOrderInput): Promise<
       personalizationSurcharge: surcharge,
       quantity: line.quantity,
       subtotal: lineSubtotal,
-      customizationType: line.customizationType,
-      customizationName: line.customizationName || null,
-      customizationNumber: line.customizationNumber || null,
-      officialPlayer:
-        line.customizationType === "OFFICIAL_PLAYER" ? line.customizationName || null : null,
+      customizationType: isBox ? "NONE" : line.customizationType,
+      customizationName: isBox ? null : line.customizationName || null,
+      customizationNumber: isBox ? null : line.customizationNumber || null,
+      officialPlayer: isBox
+        ? null
+        : line.customizationType === "OFFICIAL_PLAYER"
+          ? line.customizationName || null
+          : null,
       deliveryMode: line.deliveryMode,
+      lineKind: isBox ? "MYSTERY_BOX" : "JERSEY",
     });
   }
 

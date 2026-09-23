@@ -25,9 +25,11 @@ import { whatsappLink } from "@/shared/config/site";
 import { HeroProduct } from "@/components/home/hero-product";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
 import { FeaturedHomepageSection } from "@/components/home/featured-homepage-section";
+import { getMysteryBoxPage } from "@/features/products/repositories/product-repository";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE } from "@/features/seo/domain/robots-policy";
 import { LeagueCard } from "@/components/home/league-card";
+import { ProductImage } from "@/shared/ui/product-image";
 import { Suspense } from "react";
 import { appendKeywords } from "@/features/seo/domain/keywords";
 
@@ -70,10 +72,11 @@ const TRUST_ITEMS = [
 ] as const;
 
 export default async function HomePage() {
-  const [featured, leagues, currencyCtx] = await Promise.all([
+  const [featured, leagues, currencyCtx, mysteryBox] = await Promise.all([
     getFeaturedProducts(8),
     getLeagues(),
     getCurrencyContext(),
+    getMysteryBoxPage(),
   ]);
 
   const heroProduct = featured[0] ?? null;
@@ -143,6 +146,42 @@ export default async function HomePage() {
       <Suspense fallback={null}>
         <FeaturedHomepageSection />
       </Suspense>
+
+      {mysteryBox && mysteryBox.variants.length > 0 && (
+        <section className="border-y border-border bg-card/30">
+          <div className="container-page py-12 md:py-16">
+            <div className="grid items-center gap-8 overflow-hidden rounded-2xl border border-border bg-background md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <div className="relative aspect-[4/3] bg-secondary">
+                <ProductImage
+                  src={mysteryBox.imageUrl}
+                  alt={mysteryBox.name}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 40vw"
+                  className="object-cover"
+                  fallbackLabel="Caja misteriosa"
+                />
+              </div>
+              <div className="px-6 pb-8 md:px-10 md:py-10">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+                  Una elección sorpresa
+                </p>
+                <h2 className="mt-2 font-display text-3xl font-bold uppercase tracking-tight md:text-4xl">
+                  Caja misteriosa
+                </h2>
+                <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
+                  {mysteryBox.description}
+                </p>
+                <Button className="mt-6" asChild>
+                  <Link href="/caja-misteriosa">
+                    Descubrir la caja
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── LAS GRANDES LIGAS ──────────────────────────────────────── */}
       <section className="container-page py-16 md:py-20">

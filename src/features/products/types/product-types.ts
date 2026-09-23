@@ -11,6 +11,7 @@ export type ProductCardData = {
   kitType: string;
   brand: string | null;
   isFeatured: boolean;
+  productKind: string;
   team: Pick<Team, "id" | "slug" | "name" | "shortName"> & {
     league: Pick<League, "id" | "slug" | "name"> | null;
   };
@@ -71,6 +72,7 @@ export type ProductDetailData = {
   brand: string | null;
   isFeatured: boolean;
   isActive: boolean;
+  productKind: string;
   customizationsEnabled: boolean;
   customizationSurcharge: number;
   hasPlayerPrint: boolean;

@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Product" ADD COLUMN "productKind" TEXT NOT NULL DEFAULT 'JERSEY';
+
+-- AlterTable
+ALTER TABLE "OrderItem" ADD COLUMN "lineKind" TEXT NOT NULL DEFAULT 'JERSEY';

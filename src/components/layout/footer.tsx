@@ -18,7 +18,6 @@ const FOOTER_LINKS = [
     title: "Flashsport",
     links: [
       { href: "/sobre-nosotros", label: "Sobre nosotros" },
-      { href: "/contacto", label: "Contacto" },
       { href: "/cuenta", label: "Mi cuenta" },
     ],
   },
@@ -60,6 +59,23 @@ export function Footer() {
                 {SITE.email}
               </a>
             </p>
+            <nav aria-label="Redes sociales" className="mt-5 flex flex-wrap gap-2">
+              {[
+                ["Instagram", SITE.social.instagram],
+                ["TikTok", SITE.social.tiktok],
+                ["Facebook", SITE.social.facebook],
+              ].map(([label, href]) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
           </div>
 
           {FOOTER_LINKS.map((group) => (

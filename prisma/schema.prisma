@@ -118,6 +118,7 @@ model Product {
   brand       String?
   isFeatured  Boolean @default(false)
   isActive    Boolean @default(true)
+  productKind String  @default("JERSEY") // JERSEY | MYSTERY_BOX
 
   customizationsEnabled  Boolean @default(true)
   customizationSurcharge Int     @default(0)
@@ -482,6 +483,7 @@ model OrderItem {
   officialPlayer      String?
 
   deliveryMode String @default("INMEDIATA") // INMEDIATA | BAJO_PEDIDO (snapshot del pedido)
+  lineKind     String @default("JERSEY") // JERSEY | MYSTERY_BOX
 
   sourceType String  @default("LOCAL") // LOCAL | SUPPLIER
   supplierId String?

@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { SHIPPING, shippingFee, SITE } from "@/shared/config/site";
 import { DELIVERY_MODE_INFO } from "@/features/products/types/delivery-mode";
+import { formatPurchaseLineDetail } from "@/features/products/domain/mystery-box";
 import { formatMoney } from "@/shared/money/format";
 import { SALE_CURRENCY_COOKIE, type SaleCurrency } from "@/shared/currency/sale-currency";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
@@ -548,7 +549,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
                 <div className="min-w-0 flex-1 text-sm">
                   <p className="font-medium truncate">{item.productName}</p>
                   <p className="text-xs text-muted-foreground">
-                    {item.teamName} · {item.versionName} · Talla {item.sizeName} · x{item.quantity}
+                    {formatPurchaseLineDetail(item)}
                   </p>
                   {item.customizationType !== "NONE" && (
                     <p className="text-xs text-muted-foreground">

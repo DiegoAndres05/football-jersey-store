@@ -14,7 +14,11 @@ import { SITE } from "@/shared/config/site";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
 import { MobileCartFab } from "@/features/cart/components/mobile-cart-fab";
 
-export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
+export function Header({
+  currencySlot,
+}: {
+  currencySlot?: React.ReactNode;
+}) {
   const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -78,8 +82,8 @@ export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
             : "bg-background border-b border-border",
         )}
       >
-        <div className="container-page flex items-center justify-between h-16 md:h-[4.5rem]">
-          <div className="flex items-center gap-8">
+        <div className="container-page relative grid grid-cols-[max-content_minmax(0,1fr)_auto] items-center gap-3 h-16 md:h-[4.5rem]">
+          <div className="flex min-w-0 items-center gap-4 xl:gap-6">
             <Link
               href="/"
               className="font-display text-xl font-bold uppercase tracking-[0.12em] shrink-0"
@@ -87,14 +91,16 @@ export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
               {SITE.brand}
             </Link>
 
-            <NavLinks className="hidden lg:flex" />
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="min-w-0">
+            <NavLinks className="hidden justify-center lg:flex" />
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             {currencySlot && (
-              <div className="hidden sm:block">{currencySlot}</div>
+              <div className="hidden border-l border-border pl-3 sm:ml-3 sm:block xl:ml-4 xl:pl-4">{currencySlot}</div>
             )}
-            <span aria-hidden className="hidden h-6 w-px bg-border md:ml-2 md:mr-3" />
 
             <form
               role="search"
@@ -109,7 +115,7 @@ export function Header({ currencySlot }: { currencySlot?: React.ReactNode }) {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar camisetas..."
                 aria-label="Buscar camisetas"
-                className="h-9 w-48 lg:w-56 rounded-md border border-input bg-background pl-9 pr-3 text-sm transition-all hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
+                className="h-9 w-36 rounded-md border border-input bg-background pl-9 pr-3 text-sm transition-all hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground lg:w-40 xl:w-56"
               />
             </form>
 

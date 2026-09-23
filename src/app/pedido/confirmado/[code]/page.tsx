@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { getOrderByCode } from "@/features/orders/repositories/order-repository";
 import { ConfirmationPaymentStatus } from "./confirmation-payment-status";
 import { DELIVERY_MODE_INFO, type DeliveryMode } from "@/features/products/types/delivery-mode";
+import { formatPurchaseLineDetail } from "@/features/products/domain/mystery-box";
 import { formatMoney } from "@/shared/money/format";
 import type { SaleCurrency } from "@/shared/currency/sale-currency";
 import { NOINDEX_NOFOLLOW } from "@/features/seo/domain/robots-policy";
@@ -160,7 +161,13 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
                 <div className="min-w-0">
                   <p className="font-medium truncate">{item.productName}</p>
                   <p className="text-xs text-muted-foreground">
-                    {item.teamName} · {item.versionName} · Talla {item.sizeName} · x{item.quantity}
+                    {formatPurchaseLineDetail({
+                      lineKind: item.lineKind,
+                      teamName: item.teamName,
+                      versionName: item.versionName,
+                      sizeName: item.sizeName,
+                      quantity: item.quantity,
+                    })}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {deliveryMode === "BAJO_PEDIDO" ? "Bajo pedido" : "Entrega inmediata"} ·{" "}

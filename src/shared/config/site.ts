@@ -7,6 +7,11 @@ export const SITE = {
     "Hola Flashsport, estoy buscando una camiseta. ¿Me ayudan?",
   email: "flashsport.col@gmail.com",
   country: "Colombia",
+  social: {
+    instagram: "https://www.instagram.com/flashsport.col?stkn=ZDNlZDc0MzIxNw==",
+    tiktok: "https://www.tiktok.com/@flashsport.col?is_from_webapp=1&sender_device=pc",
+    facebook: "https://www.facebook.com/profile.php?id=61594650920339",
+  },
 } as const;
 
 export const SHIPPING = {

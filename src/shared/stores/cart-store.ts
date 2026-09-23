@@ -28,6 +28,7 @@ export type CartItem = {
   customizationName: string;
   customizationNumber: string;
   deliveryMode: DeliveryMode;
+  lineKind?: "JERSEY" | "MYSTERY_BOX";
 };
 
 export type CartDraft = Omit<CartItem, "quantity" | "lineId">;

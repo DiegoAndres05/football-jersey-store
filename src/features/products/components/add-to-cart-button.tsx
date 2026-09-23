@@ -6,6 +6,7 @@ import { Check } from "lucide-react";
 import { CartIcon } from "@/components/ui/cart-icon";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { toast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 import type { DeliveryMode } from "@/features/products/types/delivery-mode";
 import { IMMEDIATE_AT_CAP_MESSAGE } from "@/features/cart/domain/immediate-quantity";
 
@@ -24,7 +25,9 @@ export function AddToCartButton({
   deliveryMode,
   immediateStock,
   remainingImmediate: remainingImmediateUnits,
+  lineKind = "JERSEY",
   disabled,
+  className,
 }: {
   variantId: string;
   productSlug: string;
@@ -40,7 +43,9 @@ export function AddToCartButton({
   deliveryMode: DeliveryMode;
   immediateStock?: number;
   remainingImmediate?: number;
+  lineKind?: "JERSEY" | "MYSTERY_BOX";
   disabled?: boolean;
+  className?: string;
 }) {
   const [added, setAdded] = useState(false);
   const addItem = useCartStore((s) => s.addItem);
@@ -48,7 +53,7 @@ export function AddToCartButton({
   const handleClick = useCallback(() => {
     if (disabled) return;
 
-    if (deliveryMode === "INMEDIATA" && (remainingImmediateUnits ?? 0) <= 0) {
+    if (deliveryMode === "INMEDIATA" && remainingImmediateUnits !== undefined && remainingImmediateUnits <= 0) {
       toast({ title: IMMEDIATE_AT_CAP_MESSAGE, variant: "warning" });
       return;
     }
@@ -67,6 +72,7 @@ export function AddToCartButton({
         customizationName,
         customizationNumber,
         deliveryMode,
+        lineKind,
       },
       deliveryMode === "INMEDIATA" ? immediateStock : undefined,
     );
@@ -80,12 +86,12 @@ export function AddToCartButton({
     toast({ title: "Agregado al carrito", variant: "success" });
 
     setTimeout(() => setAdded(false), 2000);
-  }, [variantId, productSlug, productName, teamName, versionName, sizeName, imageUrl, unitPrice, customizationType, customizationName, customizationNumber, deliveryMode, immediateStock, remainingImmediateUnits, disabled, addItem]);
+  }, [variantId, productSlug, productName, teamName, versionName, sizeName, imageUrl, unitPrice, customizationType, customizationName, customizationNumber, deliveryMode, immediateStock, remainingImmediateUnits, lineKind, disabled, addItem]);
 
   return (
     <Button
       size="xl"
-      className="w-full"
+      className={cn("w-full whitespace-nowrap", className)}
       disabled={disabled}
       onClick={handleClick}
       icon={added ? <Check className="h-5 w-5" /> : <CartIcon className="h-5 w-5" />}

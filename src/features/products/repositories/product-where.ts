@@ -23,6 +23,7 @@ export function buildProductWhere(filters: ProductFilters): Prisma.ProductWhereI
   }
   if (Object.keys(teamFilter).length > 0) {
     where.team = teamFilter;
+    where.productKind = { not: "MYSTERY_BOX" };
   }
 
   if (filters.version || filters.size) {

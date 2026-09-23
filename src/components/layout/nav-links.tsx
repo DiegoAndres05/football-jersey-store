@@ -22,16 +22,17 @@ export function NavLinks({
   onNavClick?: () => void;
 }) {
   const pathname = usePathname();
+  const items = NAV_ITEMS;
 
   return (
     <nav
       className={cn(
         "flex",
-        mobile ? "flex-col gap-1" : "items-center gap-8",
+        mobile ? "flex-col gap-1" : "items-center gap-4 whitespace-nowrap xl:gap-6",
         className,
       )}
     >
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const isActive =
           pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
         return (
@@ -43,16 +44,16 @@ export function NavLinks({
             className={cn(
               mobile
                 ? cn(
-                    "border-l-2 py-2.5 pl-4 text-sm font-semibold uppercase tracking-[0.14em] transition-colors",
+                    "whitespace-nowrap border-l-2 py-2.5 pl-4 text-sm font-semibold uppercase tracking-[0.14em] transition-colors",
                     isActive
                       ? "border-foreground text-foreground"
                       : "border-transparent text-muted-foreground hover:text-foreground",
                   )
                 : cn(
-                    "border-b-2 py-2 text-[13px] font-semibold uppercase tracking-[0.14em] transition-colors",
+                    "whitespace-nowrap border-b-2 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors xl:text-[13px] xl:tracking-[0.12em]",
                     isActive
                       ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+                        : "border-transparent text-muted-foreground hover:border-foreground/40 hover:text-foreground",
                   ),
             )}
           >

@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { getProductBySlug, getRelatedProducts } from "@/features/products/repositories/product-repository";
@@ -23,6 +23,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const product = await getProductBySlug(slug);
 
   if (!product) return { title: "Producto no encontrado" };
+  if (product.productKind === "MYSTERY_BOX") redirect("/caja-misteriosa");
 
   const description =
     product.description ??
@@ -69,6 +70,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   if (!product) {
     notFound();
   }
+  if (product.productKind === "MYSTERY_BOX") redirect("/caja-misteriosa");
 
   const related = await getRelatedProducts(product);
 

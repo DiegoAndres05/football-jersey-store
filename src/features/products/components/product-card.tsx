@@ -11,7 +11,10 @@ import { cn } from "@/lib/utils";
 import { ProductImage } from "@/shared/ui/product-image";
 
 export function ProductCard({ product, priority, currencyContext, contextQuery }: { product: ProductCardData; priority?: boolean; currencyContext?: CurrencyContext; contextQuery?: string }) {
-  const isOutlet = product.season.isRetro;
+  const isMystery = product.productKind === "MYSTERY_BOX";
+  const isOutlet = !isMystery && product.season.isRetro;
+  const jerseyHref = `/productos/${product.slug}` + (contextQuery ? `?${contextQuery}` : "");
+  const href = isMystery ? "/caja-misteriosa" : jerseyHref;
   const favorite = useFavoritesStore((state) => state.isFavorite(product.id));
   const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
   const listing = listingAvailabilityFromCardFlags({
@@ -31,7 +34,8 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
   return (
     <Link
       // Canonical route: href={`/productos/${product.slug}`}
-      href={`/productos/${product.slug}` + (contextQuery ? `?${contextQuery}` : "")}
+      // Canonical jersey route: href={`/productos/${product.slug}`}
+      href={href}
       className={cn(
         "group flex flex-col rounded-xl border border-border bg-card overflow-hidden transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         isSoldOut && "opacity-70",
@@ -61,8 +65,8 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
 
       <div className="flex-1 flex flex-col p-3.5 gap-1.5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground truncate">
-          {product.team.name}
-          {product.team.league && (
+          {isMystery ? "Camiseta sorpresa" : product.team.name}
+          {!isMystery && product.team.league && (
             <>
               <span aria-hidden> · </span>
               {product.team.league.name}
@@ -75,8 +79,8 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
         </h3>
 
         <p className="text-xs text-muted-foreground">
-          {product.season.name}
-          {product.versionNames.length > 0 && (
+          {isMystery ? "Básica, Estándar o Premium" : product.season.name}
+          {!isMystery && product.versionNames.length > 0 && (
             <>
               <span aria-hidden> · </span>
               {product.versionNames.join(" / ")}

@@ -3,7 +3,7 @@ import { Footer } from "./footer";
 import { Toaster } from "@/components/ui/toaster";
 import { CurrencySelectorServer } from "@/features/system/components/currency-selector-server";
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
+export async function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Header currencySlot={<CurrencySelectorServer />} />

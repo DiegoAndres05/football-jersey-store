@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { DELIVERY_MODE_INFO } from "@/features/products/types/delivery-mode";
+import { formatPurchaseLineDetail } from "@/features/products/domain/mystery-box";
 import { formatMoney } from "@/shared/money/format";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
 import { getImmediateStockByVariantIds } from "@/features/cart/server/cart-stock-actions";
@@ -136,7 +137,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
               key={item.lineId}
               className="flex gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 motion-reduce:transition-none"
             >
-              <Link href={`/productos/${item.productSlug}`} className="shrink-0">
+              <Link href={item.lineKind === "MYSTERY_BOX" ? "/caja-misteriosa" : `/productos/${item.productSlug}`} className="shrink-0">
                 {item.imageUrl ? (
                   <div className="relative h-24 w-20 rounded-lg overflow-hidden bg-secondary">
                     <Image
@@ -158,13 +159,18 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <Link
-                      href={`/productos/${item.productSlug}`}
+                      href={item.lineKind === "MYSTERY_BOX" ? "/caja-misteriosa" : `/productos/${item.productSlug}`}
                       className="font-medium hover:underline line-clamp-1"
                     >
                       {item.productName}
                     </Link>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {item.teamName} · {item.versionName} · Talla {item.sizeName}
+                      {formatPurchaseLineDetail({
+                        lineKind: item.lineKind,
+                        teamName: item.teamName,
+                        versionName: item.versionName,
+                        sizeName: item.sizeName,
+                      })}
                     </p>
                     {item.customizationType !== "NONE" && (
                       <p className="text-xs text-muted-foreground mt-0.5">

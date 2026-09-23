@@ -14,6 +14,7 @@ import type {
   SortOption,
 } from "../types/product-types";
 import { deriveProductDisplayPrice } from "../domain/product-price-display";
+import { MYSTERY_BOX_SLUG, mysteryBoxTier } from "../domain/mystery-box";
 
 const productCardSelect = {
   id: true,
@@ -23,6 +24,7 @@ const productCardSelect = {
   kitType: true,
   brand: true,
   isFeatured: true,
+  productKind: true,
   team: {
     select: {
       id: true,
@@ -190,7 +192,7 @@ export async function getRelatedProducts(
   }
 
   const candidates = await prisma.product.findMany({
-    where: { isActive: true, id: { not: product.id }, OR: or },
+    where: { isActive: true, productKind: { not: "MYSTERY_BOX" }, id: { not: product.id }, OR: or },
     select: productCardSelect,
     take: limit * 3,
     orderBy: { createdAt: "desc" },
@@ -250,13 +252,15 @@ export async function getLeagues(): Promise<LeagueData[]> {
     orderBy: { name: "asc" },
   });
 
-  return leagues.map((l) => ({
-    id: l.id,
-    slug: l.slug,
-    name: l.name,
-    country: l.country,
-    productCount: l.teams.reduce((acc, t) => acc + t.products.length, 0),
-  }));
+  return leagues
+    .filter((l) => l.slug !== "interno")
+    .map((l) => ({
+      id: l.id,
+      slug: l.slug,
+      name: l.name,
+      country: l.country,
+      productCount: l.teams.reduce((acc, t) => acc + t.products.length, 0),
+    }));
 }
 
 export async function getTeamsByLeague(leagueSlug?: string): Promise<TeamData[]> {
@@ -292,7 +296,7 @@ export async function getLeagueBySlug(slug: string) {
   });
   if (!league) return null;
   const activeProducts = await prisma.product.count({
-    where: { isActive: true, team: { leagueId: league.id } },
+    where: { isActive: true, productKind: { not: "MYSTERY_BOX" }, team: { leagueId: league.id } },
   });
   if (activeProducts === 0) return null;
   return { ...league, activeProducts };
@@ -305,7 +309,7 @@ export async function getTeamBySlug(slug: string) {
   });
   if (!team) return null;
   const activeProducts = await prisma.product.count({
-    where: { isActive: true, teamId: team.id },
+    where: { isActive: true, productKind: { not: "MYSTERY_BOX" }, teamId: team.id },
   });
   if (activeProducts === 0) return null;
   return { ...team, activeProducts };
@@ -313,7 +317,7 @@ export async function getTeamBySlug(slug: string) {
 
 export async function getProductsByLeague(leagueId: string, limit = 50) {
   return prisma.product.findMany({
-    where: { isActive: true, team: { leagueId } },
+    where: { isActive: true, productKind: { not: "MYSTERY_BOX" }, team: { leagueId } },
     include: { team: true, season: true, images: { take: 1 } },
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -322,7 +326,7 @@ export async function getProductsByLeague(leagueId: string, limit = 50) {
 
 export async function getProductsByTeam(teamId: string, limit = 50) {
   return prisma.product.findMany({
-    where: { isActive: true, teamId },
+    where: { isActive: true, productKind: { not: "MYSTERY_BOX" }, teamId },
     include: { team: true, season: true, images: { take: 1 } },
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -330,7 +334,10 @@ export async function getProductsByTeam(teamId: string, limit = 50) {
 }
 
 export async function getSeasons() {
-  return prisma.season.findMany({ orderBy: { year: "desc" } });
+  return prisma.season.findMany({
+    where: { slug: { not: "interno-caja-misteriosa" } },
+    orderBy: { year: "desc" },
+  });
 }
 
 export async function getVersions() {
@@ -405,6 +412,7 @@ async function mapProductCards(
       kitType: p.kitType,
       brand: p.brand,
       isFeatured: p.isFeatured,
+      productKind: p.productKind,
       team: p.team,
       season: p.season,
       primaryImage: p.images[0] ?? null,
@@ -499,4 +507,79 @@ async function getVariantInfosByProductIds(productIds: string[]): Promise<Map<st
     byProduct.set(v.productId, list);
   }
   return byProduct;
+}
+
+export type MysteryBoxVariantView = {
+  id: string;
+  versionSlug: string;
+  level: string;
+  quality: string;
+  sizeCode: string;
+  sizeName: string;
+  salePrice: number;
+  stock: number;
+  allowsBackorder: boolean;
+  availability: Availability;
+};
+
+export type MysteryBoxPageData = {
+  name: string;
+  description: string;
+  imageUrl: string | null;
+  variants: MysteryBoxVariantView[];
+};
+
+export async function isMysteryBoxInNav(): Promise<boolean> {
+  const product = await prisma.product.findFirst({
+    where: { slug: MYSTERY_BOX_SLUG, isActive: true, productKind: "MYSTERY_BOX" },
+    select: { variants: { select: { id: true, allowsBackorder: true } } },
+  });
+  if (!product || product.variants.length === 0) return false;
+  const stock = await getStockByVariantIds(product.variants.map((variant) => variant.id));
+  return product.variants.some(
+    (variant) => (stock.get(variant.id) ?? 0) > 0 || variant.allowsBackorder,
+  );
+}
+
+export async function getMysteryBoxPage(): Promise<MysteryBoxPageData | null> {
+  const product = await prisma.product.findFirst({
+    where: { slug: MYSTERY_BOX_SLUG, isActive: true, productKind: "MYSTERY_BOX" },
+    include: {
+      images: { orderBy: { order: "asc" } },
+      variants: {
+        include: { version: true, size: true },
+        orderBy: [{ version: { priceAdjustment: "asc" } }, { size: { position: "asc" } }],
+      },
+    },
+  });
+  if (!product) return null;
+  const stock = await getStockByVariantIds(product.variants.map((variant) => variant.id));
+  const variants = product.variants.flatMap((variant) => {
+    const tier = mysteryBoxTier(variant.version.slug);
+    if (!tier) return [];
+    const onHand = stock.get(variant.id) ?? 0;
+    return [
+      {
+        id: variant.id,
+        versionSlug: tier.slug,
+        level: tier.level,
+        quality: tier.quality,
+        sizeCode: variant.size.code,
+        sizeName: variant.size.name,
+        salePrice: variant.salePrice,
+        stock: onHand,
+        allowsBackorder: variant.allowsBackorder,
+        availability: computeAvailability(onHand, variant.allowsBackorder),
+      },
+    ];
+  });
+  const image = product.images.find((item) => item.isPrimary) ?? product.images[0];
+  return {
+    name: product.name,
+    description:
+      product.description ??
+      "Elige Básica, Estándar o Premium y tu talla. Dentro llega una camiseta de esa calidad. El equipo es sorpresa.",
+    imageUrl: image?.url ?? null,
+    variants,
+  };
 }

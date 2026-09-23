@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { SITE } from "../src/shared/config/site";
+import { seedMysteryBox } from "./seed-mystery-box";
 
 const prisma = new PrismaClient();
 
@@ -372,6 +373,8 @@ async function main() {
   });
 
   // ── Stats ──
+  await seedMysteryBox(prisma);
+
   const stats = {
     versions: await prisma.version.count(),
     sizes: await prisma.size.count(),
