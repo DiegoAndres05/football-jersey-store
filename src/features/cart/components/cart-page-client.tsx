@@ -20,7 +20,8 @@ import {
 } from "@/features/cart/domain/immediate-quantity";
 import { toast } from "@/components/ui/toast";
 import { validateCoupon } from "@/features/coupons/server/coupon-actions";
-import { shippingFee } from "@/shared/config/site";
+import { SHIPPING } from "@/shared/config/site";
+import { calculateOrderBreakdown } from "@/features/checkout/domain/order-breakdown";
 
 export function CartPageClient({ currencyContext }: { currencyContext?: CurrencyContext }) {
   const items = useCartStore((s) => s.items);
@@ -39,7 +40,17 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponMessage, setCouponMessage] = useState("");
   const [stockByVariant, setStockByVariant] = useState<Map<string, number> | null>(null);
-  const shipping = shippingFee(subtotal);
+  const personalizationFee = items.reduce((sum, item) => sum + item.quantity * (item.personalizationSurchargeCop ?? 0), 0);
+  const orderBreakdown = useMemo(
+    () => calculateOrderBreakdown({
+      productSubtotal: subtotal,
+      personalizationFee,
+      discount: appliedCouponDiscount,
+      country: "Colombia",
+    }),
+    [subtotal, personalizationFee, appliedCouponDiscount],
+  );
+  const shipping = orderBreakdown.shipping;
   const variantKey = useMemo(
     () => [...new Set(items.map((item) => item.variantId))].sort().join(","),
     [items],
@@ -93,8 +104,8 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
     }
   };
 
-  const freeShippingThreshold = 200000;
-  const remaining = Math.max(0, freeShippingThreshold - subtotal);
+  const freeShippingThreshold = SHIPPING.freeThreshold;
+  const remaining = Math.max(0, freeShippingThreshold - (subtotal + personalizationFee));
 
   if (isEmpty) {
     return (
@@ -277,7 +288,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Envío</dt>
               <dd className="font-medium tabular-nums">
-                {remaining === 0 ? "Gratis" : "Se calcula al pagar"}
+                {shipping === 0 ? "Gratis" : formatMoney({ amountCop: shipping, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}
               </dd>
             </div>
           </dl>
@@ -313,9 +324,21 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
 
           <Separator className="my-4" />
 
+          {personalizationFee > 0 && (
+            <div className="flex justify-between text-sm">
+              <dt className="text-muted-foreground">Personalización</dt>
+              <dd className="font-medium tabular-nums">{formatMoney({ amountCop: personalizationFee, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</dd>
+            </div>
+          )}
+          {appliedCouponDiscount > 0 && (
+            <div className="flex justify-between text-sm">
+              <dt className="text-muted-foreground">Descuento</dt>
+              <dd className="font-medium tabular-nums text-green-700">-{formatMoney({ amountCop: appliedCouponDiscount, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</dd>
+            </div>
+          )}
           <div className="flex justify-between items-baseline">
             <span className="text-sm font-medium">Total</span>
-            <span className="text-2xl font-bold tabular-nums transition-colors duration-200 motion-reduce:transition-none">{formatMoney({ amountCop: subtotal + shipping - appliedCouponDiscount, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span>
+            <span className="text-2xl font-bold tabular-nums transition-colors duration-200 motion-reduce:transition-none">{formatMoney({ amountCop: orderBreakdown.total, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}</span>
           </div>
 
           <Button className="w-full mt-4" asChild>

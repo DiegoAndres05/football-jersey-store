@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useCartStore } from "@/shared/stores/cart-store";
-import { SHIPPING, shippingFee, SITE } from "@/shared/config/site";
+import { SHIPPING, SITE } from "@/shared/config/site";
+import { calculateOrderBreakdown } from "@/features/checkout/domain/order-breakdown";
 import { DELIVERY_MODE_INFO } from "@/features/products/types/delivery-mode";
 import { formatPurchaseLineDetail } from "@/features/products/domain/mystery-box";
 import { formatMoney } from "@/shared/money/format";
@@ -172,13 +173,27 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
     },
   });
 
-  const fee = useMemo(
-    () => (mounted ? shippingFee(subtotal) : 0),
-    [mounted, subtotal],
-  );
-  const total = subtotal + fee - appliedCouponDiscount;
-  const remaining = SHIPPING.freeThreshold - subtotal;
   const destinationCountry = watch("shippingCountry") || SITE.country;
+  const productSubtotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.quantity * (item.baseUnitPriceCop ?? item.unitPrice), 0),
+    [items],
+  );
+  const personalizationFee = useMemo(
+    () => items.reduce((sum, item) => sum + item.quantity * (item.personalizationSurchargeCop ?? (item.customizationType !== "NONE" ? Math.max(0, item.unitPrice - (item.baseUnitPriceCop ?? item.unitPrice)) : 0)), 0),
+    [items],
+  );
+  const breakdown = useMemo(
+    () => calculateOrderBreakdown({
+      productSubtotal,
+      personalizationFee,
+      discount: appliedCouponDiscount,
+      country: destinationCountry,
+    }),
+    [productSubtotal, personalizationFee, appliedCouponDiscount, destinationCountry],
+  );
+  const fee = useMemo(() => (mounted ? breakdown.shipping : 0), [mounted, breakdown.shipping]);
+  const total = breakdown.total;
+  const remaining = SHIPPING.freeThreshold - (productSubtotal + personalizationFee);
   const checkoutCurrency = {
     currency: currencyContext?.currency ?? "COP",
     copPerUsd: currencyContext?.copPerUsd ?? null,
@@ -331,7 +346,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
   };
 
   return (
-    <div className="container-page py-8">
+    <div className="container-page py-6 sm:py-8">
       <div className="mb-6">
         <Link href="/carrito" className="text-sm text-muted-foreground hover:underline inline-flex items-center gap-1 mb-2">
           <ArrowLeft className="h-3.5 w-3.5" /> Volver al carrito
@@ -342,11 +357,11 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
         </p>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_380px] gap-8 items-start">
-        <div className="space-y-6">
+      <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8">
+        <div className="min-w-0 space-y-6">
           {step === "form" ? (
             <form onSubmit={handleSubmit(onValid)} className="space-y-6" noValidate>
-              <section className="rounded-xl border border-border bg-card p-5">
+              <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
                 <h2 className="font-display text-lg font-bold uppercase tracking-tight mb-4">Contacto</h2>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5 sm:col-span-2">
@@ -367,11 +382,11 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
                 </div>
               </section>
 
-              <section className="rounded-xl border border-border bg-card p-5">
+              <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
                 <CheckoutConsents register={register} errors={errors} legal={legalConfig ?? null} />
               </section>
 
-              <section className="rounded-xl border border-border bg-card p-5">
+              <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
                 <h2 className="font-display text-lg font-bold uppercase tracking-tight mb-1">Envío</h2>
                 <p className="text-xs text-muted-foreground mb-4">
                   {destinationCountry} · {shippingScope} ·{" "}
@@ -442,13 +457,18 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
                 </div>
               </section>
 
-              <Button type="submit" className="w-full sm:w-auto" disabled={!isValid}>
-                Continuar al pago <ArrowRight className="h-4 w-4" />
+              <Button
+                type="submit"
+                className="w-full flex-nowrap whitespace-nowrap sm:w-auto"
+                disabled={!isValid}
+              >
+                <span className="min-w-0 whitespace-nowrap">Continuar al pago</span>
+                <ArrowRight className="h-4 w-4 shrink-0" />
               </Button>
             </form>
           ) : (
             <div className="space-y-6">
-              <section className="rounded-xl border border-border bg-card p-5">
+              <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
                 <h2 className="font-display text-lg font-bold uppercase tracking-tight mb-4">Medio de pago</h2>
                 <div className="space-y-2">
                   {([
@@ -461,24 +481,22 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
                       type="button"
                       aria-pressed={paymentMethod === m.id}
                       onClick={() => setPaymentMethod(m.id)}
-                      className={`w-full flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all ${
+                      className={`flex w-full min-w-0 items-center gap-2 whitespace-nowrap rounded-xl border-2 px-3 py-3 text-left transition-all sm:gap-3 sm:px-4 ${
                         paymentMethod === m.id
                           ? "border-primary bg-primary/5"
                           : "border-border hover:border-muted-foreground/40"
                       }`}
                     >
-                      <m.icon className="h-5 w-5 text-primary shrink-0" />
-                      <span className="flex-1">
-                        <span className="block text-sm font-medium">{m.label}</span>
-                        <span className="block text-xs text-muted-foreground">{m.note}</span>
-                      </span>
+                      <m.icon className="h-5 w-5 shrink-0 text-primary" />
+                      <span className="min-w-0 truncate text-sm font-medium">{m.label}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">· {m.note}</span>
                     </button>
                   ))}
                 </div>
               </section>
 
               {paymentStatus === "processing" && (
-                <div className="rounded-xl border border-border bg-card p-8 text-center">
+                <div className="rounded-xl border border-border bg-card p-6 text-center sm:p-8">
                   <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
                   <p className="mt-4 text-sm font-medium">Conectando con Bold…</p>
                   <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
@@ -488,7 +506,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
               )}
 
               {paymentStatus === "success" && (
-                <div className="rounded-xl border border-border bg-card p-6 text-center">
+                <div className="rounded-xl border border-border bg-card p-5 text-center sm:p-6">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
                     <ShieldCheck className="h-6 w-6" />
                   </div>
@@ -502,7 +520,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
               )}
 
               {paymentStatus === "failed" && (
-                <div className="rounded-xl border border-border bg-card p-6 text-center">
+                <div className="rounded-xl border border-border bg-card p-5 text-center sm:p-6">
                   <p className="text-sm font-medium text-destructive">{payError || "No se pudo procesar el pago."}</p>
                   <Button className="mt-4" onClick={() => setPaymentStatus("idle")}>
                     Reintentar
@@ -511,7 +529,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
               )}
 
               {paymentStatus === "idle" && (
-                <Button onClick={payNow} disabled={normalizeCountry(destinationCountry) !== normalizeCountry(SITE.country)} className="w-full sm:w-auto">
+                <Button onClick={payNow} disabled={normalizeCountry(destinationCountry) !== normalizeCountry(SITE.country)} className="w-full whitespace-nowrap sm:w-auto">
                   Pagar {formatMoney({ amountCop: total, ...moneyContext })} <ShieldCheck className="h-4 w-4" />
                 </Button>
               )}
@@ -523,7 +541,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
         </div>
 
         {/* Summary */}
-        <aside className="rounded-xl border border-border bg-card p-5 lg:sticky lg:top-24 space-y-4">
+        <aside className="min-w-0 rounded-xl border border-border bg-card p-4 space-y-4 sm:p-5 lg:sticky lg:top-24">
           <h2 className="font-display text-lg font-bold uppercase tracking-tight">Resumen</h2>
           {appliedCouponCode ? (
             <p className="mt-3 text-sm text-green-700">
@@ -538,16 +556,16 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
           )}
           <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
             {items.map((item) => (
-              <div key={item.lineId} className="flex gap-3">
+              <div key={item.lineId} className="flex min-w-0 gap-3">
                 {item.imageUrl ? (
-                  <div className="relative h-16 w-13 shrink-0 rounded-md overflow-hidden bg-secondary">
+                  <div className="relative h-16 w-14 shrink-0 overflow-hidden rounded-md bg-secondary">
                     <Image src={item.imageUrl} alt={item.productName} fill sizes="52px" className="object-cover" />
                   </div>
                 ) : (
-                  <div className="h-16 w-13 shrink-0 rounded-md bg-secondary" />
+                  <div className="h-16 w-14 shrink-0 rounded-md bg-secondary" />
                 )}
                 <div className="min-w-0 flex-1 text-sm">
-                  <p className="font-medium truncate">{item.productName}</p>
+                  <p className="truncate font-medium">{item.productName}</p>
                   <p className="text-xs text-muted-foreground">
                     {formatPurchaseLineDetail(item)}
                   </p>
@@ -562,7 +580,9 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
                     {DELIVERY_MODE_INFO[item.deliveryMode].eta}
                   </p>
                 </div>
-                <p className="text-sm font-medium tabular-nums">{formatMoney({ amountCop: item.unitPrice * item.quantity, ...moneyContext })}</p>
+                <p className="shrink-0 text-right text-sm font-medium tabular-nums">
+                  {formatMoney({ amountCop: item.unitPrice * item.quantity, ...moneyContext })}
+                </p>
               </div>
             ))}
           </div>
@@ -570,11 +590,23 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
           <Separator />
 
           <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
+            <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
               <dt className="text-muted-foreground">Subtotal</dt>
-              <dd className="font-medium tabular-nums">{formatMoney({ amountCop: subtotal, ...moneyContext })}</dd>
+              <dd className="font-medium tabular-nums">{formatMoney({ amountCop: breakdown.productSubtotal, ...moneyContext })}</dd>
             </div>
-            <div className="flex justify-between">
+            {personalizationFee > 0 && (
+              <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+                <dt className="text-muted-foreground">Personalización</dt>
+                <dd className="font-medium tabular-nums">{formatMoney({ amountCop: personalizationFee, ...moneyContext })}</dd>
+              </div>
+            )}
+            {appliedCouponDiscount > 0 && (
+              <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+                <dt className="text-muted-foreground">Descuento</dt>
+                <dd className="font-medium tabular-nums text-green-700">-{formatMoney({ amountCop: appliedCouponDiscount, ...moneyContext })}</dd>
+              </div>
+            )}
+            <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
               <dt className="text-muted-foreground">Envío ({shippingScope})</dt>
               <dd className="font-medium tabular-nums">{fee === 0 ? "Gratis" : formatMoney({ amountCop: fee, ...moneyContext })}</dd>
             </div>
@@ -587,9 +619,9 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
 
           <Separator />
 
-          <div className="flex justify-between items-baseline">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <span className="text-sm font-medium">Total</span>
-            <span className="text-2xl font-bold tabular-nums">{formatMoney({ amountCop: total, ...moneyContext })}</span>
+            <span className="text-xl font-bold tabular-nums sm:text-2xl">{formatMoney({ amountCop: total, ...moneyContext })}</span>
           </div>
         </aside>
       </div>

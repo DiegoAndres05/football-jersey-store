@@ -19,6 +19,8 @@ export function AddToCartButton({
   sizeName,
   imageUrl,
   unitPrice,
+  baseUnitPriceCop,
+  personalizationSurchargeCop,
   customizationType,
   customizationName,
   customizationNumber,
@@ -27,6 +29,8 @@ export function AddToCartButton({
   remainingImmediate: remainingImmediateUnits,
   lineKind = "JERSEY",
   disabled,
+  sizeRequired = false,
+  onMissingSize,
   className,
 }: {
   variantId: string;
@@ -37,6 +41,8 @@ export function AddToCartButton({
   sizeName: string;
   imageUrl: string;
   unitPrice: number;
+  baseUnitPriceCop?: number;
+  personalizationSurchargeCop?: number;
   customizationType: "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
   customizationName: string;
   customizationNumber: string;
@@ -45,12 +51,19 @@ export function AddToCartButton({
   remainingImmediate?: number;
   lineKind?: "JERSEY" | "MYSTERY_BOX";
   disabled?: boolean;
+  sizeRequired?: boolean;
+  onMissingSize?: () => void;
   className?: string;
 }) {
   const [added, setAdded] = useState(false);
   const addItem = useCartStore((s) => s.addItem);
 
   const handleClick = useCallback(() => {
+    if (sizeRequired) {
+      onMissingSize?.();
+      return;
+    }
+
     if (disabled) return;
 
     if (deliveryMode === "INMEDIATA" && remainingImmediateUnits !== undefined && remainingImmediateUnits <= 0) {
@@ -68,6 +81,8 @@ export function AddToCartButton({
         sizeName,
         imageUrl,
         unitPrice,
+        baseUnitPriceCop: baseUnitPriceCop ?? unitPrice,
+        personalizationSurchargeCop,
         customizationType,
         customizationName,
         customizationNumber,
@@ -86,7 +101,7 @@ export function AddToCartButton({
     toast({ title: "Agregado al carrito", variant: "success" });
 
     setTimeout(() => setAdded(false), 2000);
-  }, [variantId, productSlug, productName, teamName, versionName, sizeName, imageUrl, unitPrice, customizationType, customizationName, customizationNumber, deliveryMode, immediateStock, remainingImmediateUnits, lineKind, disabled, addItem]);
+  }, [variantId, productSlug, productName, teamName, versionName, sizeName, imageUrl, unitPrice, baseUnitPriceCop, personalizationSurchargeCop, customizationType, customizationName, customizationNumber, deliveryMode, immediateStock, remainingImmediateUnits, lineKind, disabled, sizeRequired, onMissingSize, addItem]);
 
   return (
     <Button

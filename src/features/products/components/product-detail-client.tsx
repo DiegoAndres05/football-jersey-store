@@ -2,16 +2,11 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { ChevronRight, Heart, MessageCircle, RefreshCw, Shield, Truck } from "lucide-react";
+import { ChevronRight, Heart, MessageCircle, Truck, ShieldCheck, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { whatsappLink } from "@/shared/config/site";
-import {
-  getAvailableDeliveryModes,
-  resolveDeliveryModeSelection,
-  type DeliveryMode,
-} from "@/features/products/types/delivery-mode";
+import { whatsappLink, SHIPPING } from "@/shared/config/site";
 import { ProductGallery } from "./product-gallery";
 import { ProductVariantSelector } from "./product-variant-selector";
 import { ProductCustomization } from "./product-customization";
@@ -26,22 +21,27 @@ import { useRecentlyViewedStore } from "@/shared/stores/recently-viewed-store";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { remainingImmediate } from "@/features/cart/domain/immediate-quantity";
 import { toast } from "@/components/ui/toast";
-import { SHIPPING } from "@/shared/config/site";
-import { formatMoney } from "@/shared/money/format";
+import {
+  getAvailableDeliveryModes,
+  resolveDeliveryModeSelection,
+  type DeliveryMode,
+} from "@/features/products/types/delivery-mode";
+import { validatePersonalization } from "@/features/products/personalization";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
 import { deriveProductDisplayPrice } from "../domain/product-price-display";
-import { validatePersonalization } from "@/features/products/personalization";
+import { resolveSelectedSize } from "../domain/size-selection";
 
 type CustomType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
 
 export function ProductDetailClient({ product, currencyContext }: { product: ProductDetailData; currencyContext?: CurrencyContext }) {
   const [selectedVersion, setSelectedVersion] = useState(product.variants[0]?.version.slug ?? "");
-  const [selectedSize, setSelectedSize] = useState(product.variants[0]?.size.code ?? "");
+  const [selectedSize, setSelectedSize] = useState("");
   const [customType, setCustomType] = useState<CustomType>("NONE");
   const [customName, setCustomName] = useState("");
   const [customNumber, setCustomNumber] = useState("");
   const [customPlayerId, setCustomPlayerId] = useState("");
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("INMEDIATA");
+  const [sizeError, setSizeError] = useState("");
   const favorite = useFavoritesStore((state) => state.isFavorite(product.id));
   const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
   const recordViewed = useRecentlyViewedStore((state) => state.recordViewed);
@@ -57,6 +57,24 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
       map.set(`${v.version.slug}_${v.size.code}`, v);
     }
     return map;
+  }, [product.variants]);
+
+  const uniqueVersions = useMemo(() => {
+    const seen = new Set<string>();
+    return product.variants.filter((v) => {
+      if (seen.has(v.version.slug)) return false;
+      seen.add(v.version.slug);
+      return true;
+    }).map((v) => v.version);
+  }, [product.variants]);
+
+  const uniqueSizes = useMemo(() => {
+    const seen = new Set<string>();
+    return product.variants.filter((v) => {
+      if (seen.has(v.size.code)) return false;
+      seen.add(v.size.code);
+      return true;
+    }).map((v) => v.size);
   }, [product.variants]);
 
   const currentVariant = variantMap.get(`${selectedVersion}_${selectedSize}`);
@@ -96,24 +114,6 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
     [variantMap, selectedSize, product.variants],
   );
 
-  const uniqueVersions = useMemo(() => {
-    const seen = new Set<string>();
-    return product.variants.filter((v) => {
-      if (seen.has(v.version.slug)) return false;
-      seen.add(v.version.slug);
-      return true;
-    }).map((v) => v.version);
-  }, [product.variants]);
-
-  const uniqueSizes = useMemo(() => {
-    const seen = new Set<string>();
-    return product.variants.filter((v) => {
-      if (seen.has(v.size.code)) return false;
-      seen.add(v.size.code);
-      return true;
-    }).map((v) => v.size);
-  }, [product.variants]);
-
   const selectedPlayer = useMemo(
     () => product.players.find((p) => p.id === customPlayerId) ?? null,
     [product.players, customPlayerId],
@@ -125,17 +125,34 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
   const customizationNumber =
     customType === "CUSTOM" ? customNumber : customType === "OFFICIAL_PLAYER" ? selectedPlayer?.number ?? "" : "";
 
-  const availableModes = currentVariant
-    ? getAvailableDeliveryModes(currentVariant.stock, currentVariant.allowsBackorder)
-    : [];
+  const availableModes = currentVariant ? getAvailableDeliveryModes(currentVariant.stock, currentVariant.allowsBackorder) : [];
   const personalizationValidation = validatePersonalization(
     { type: customType, name: customName, number: customNumber, playerId: customPlayerId },
     { enabled: product.customizationsEnabled, officialPlayer: selectedPlayer ?? undefined },
   );
 
-  const immediateRemaining = currentVariant
-    ? remainingImmediate(cartItems, currentVariant.id, currentVariant.stock ?? 0)
-    : 0;
+  const immediateRemaining = currentVariant ? remainingImmediate(cartItems, currentVariant.id, currentVariant.stock ?? 0) : 0;
+
+  const handleVersionChange = useCallback((nextVersion: string) => {
+    setSelectedVersion(nextVersion);
+    const availableSizesForVersion = product.variants
+      .filter((variant) => variant.version.slug === nextVersion)
+      .map((variant) => variant.size.code);
+    const nextSelection = resolveSelectedSize({
+      currentSize: selectedSize,
+      allowedSizes: uniqueSizes.map((size) => size.code),
+      nextVersionSizes: availableSizesForVersion,
+    });
+    setSelectedSize(nextSelection.selectedSize);
+    setSizeError(nextSelection.isSelected ? "" : "Elige una talla");
+  }, [product.variants, selectedSize, uniqueSizes]);
+
+  const handleMissingSize = useCallback(() => {
+    setSizeError("Elige una talla");
+    const target = document.getElementById("product-size-selector");
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    target?.focus();
+  }, []);
 
   useEffect(() => {
     if (!currentVariant) return;
@@ -145,8 +162,7 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
 
   return (
     <div className="container-page py-8">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6 flex-wrap">
+      <div className="mb-6 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <Link href="/" className="hover:text-foreground transition-colors">Inicio</Link>
         <ChevronRight className="h-3.5 w-3.5 shrink-0" />
         <Link href="/productos" className="hover:text-foreground transition-colors">Catálogo</Link>
@@ -154,14 +170,12 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
         <span className="text-foreground font-medium">{product.name}</span>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-        {/* Left: Gallery */}
+      <div className="grid gap-8 md:grid-cols-2 lg:gap-12 min-w-0">
         <ProductGallery images={product.images} product={product} />
 
-        {/* Right: Product info */}
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
           <div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2 flex-wrap">
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span>{product.team.name}</span>
               <span>·</span>
               <span>{product.brand}</span>
@@ -174,47 +188,36 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
               <span>·</span>
               <span>{product.season.name}</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold">{product.name}</h1>
+            <h1 className="text-2xl font-bold md:text-3xl">{product.name}</h1>
             <button type="button" aria-label={favorite ? "Quitar de favoritos" : "Guardar en favoritos"} aria-pressed={favorite} onClick={() => { toggleFavorite({ productId: product.id, slug: product.slug }); toast({ title: favorite ? "Quitado de favoritos" : "Guardado en favoritos", variant: "success" }); }} className="mt-3 inline-flex items-center gap-2 text-sm underline underline-offset-4"><Heart className={`h-4 w-4 ${favorite ? "fill-current text-red-600" : ""}`} /> {favorite ? "Guardado en favoritos" : "Guardar en favoritos"}</button>
-            {product.shortName && (
-              <p className="text-sm text-muted-foreground mt-1">{product.shortName}</p>
-            )}
-            {product.season.isRetro && (
-              <Badge tone="warning" className="mt-2">Edición retro</Badge>
-            )}
+            {product.shortName && <p className="mt-1 text-sm text-muted-foreground">{product.shortName}</p>}
+            {product.season.isRetro && <Badge tone="warning" className="mt-2">Edición retro</Badge>}
           </div>
 
-          {/* Price */}
           {priceDisplay.showPrice && priceDisplay.displayPrice !== null && (
-            <ProductPrice
-              salePrice={priceDisplay.displayPrice + surcharge}
-              compareAtPrice={currentVariant?.compareAtPrice
-                ? currentVariant.compareAtPrice + surcharge
-                : null}
-              currencyContext={currencyContext}
-            />
+            <ProductPrice salePrice={priceDisplay.displayPrice + surcharge} compareAtPrice={currentVariant?.compareAtPrice ? currentVariant.compareAtPrice + surcharge : null} currencyContext={currencyContext} />
           )}
-          {product.availability === "OUT_OF_STOCK" && (
-            <ProductAvailability availability="OUT_OF_STOCK" stock={0} />
-          )}
+
+          {product.availability === "OUT_OF_STOCK" && <ProductAvailability availability="OUT_OF_STOCK" stock={0} />}
 
           <Separator />
 
-          {/* Variant Selector */}
-          <ProductVariantSelector
-            versions={uniqueVersions}
-            sizes={uniqueSizes}
-            selectedVersion={selectedVersion}
-            selectedSize={selectedSize}
-            onVersionChange={setSelectedVersion}
-            onSizeChange={setSelectedSize}
-            getVariantAvailability={getVariantAvailability}
-            getVariantPrice={getVariantPrice}
-            currencyContext={currencyContext}
-          />
-          <SizeGuideDialog kind={selectedVersion.toLowerCase().includes("player") ? "PLAYER" : "FAN"} variants={product.variants.filter((variant) => variant.version.slug === selectedVersion).map((variant) => ({ sizeCode: variant.size.code, availability: variant.availability }))} onApply={setSelectedSize} />
+          <div id="product-size-selector" tabIndex={-1} className="space-y-2 outline-none">
+            <ProductVariantSelector
+              versions={uniqueVersions}
+              sizes={uniqueSizes}
+              selectedVersion={selectedVersion}
+              selectedSize={selectedSize}
+              onVersionChange={handleVersionChange}
+              onSizeChange={(nextSize) => { setSelectedSize(nextSize); setSizeError(""); }}
+              getVariantAvailability={getVariantAvailability}
+              getVariantPrice={getVariantPrice}
+              currencyContext={currencyContext}
+            />
+            <SizeGuideDialog kind={selectedVersion.toLowerCase().includes("player") ? "PLAYER" : "FAN"} variants={product.variants.filter((variant) => variant.version.slug === selectedVersion).map((variant) => ({ sizeCode: variant.size.code, availability: variant.availability }))} onApply={(nextSize) => { setSelectedSize(nextSize); setSizeError(""); }} />
+            {sizeError && <p role="alert" aria-live="assertive" className="text-sm text-destructive">{sizeError}</p>}
+          </div>
 
-          {/* Customization */}
           {product.customizationsEnabled && <Separator />}
           <ProductCustomization
             enabled={product.customizationsEnabled}
@@ -233,78 +236,103 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
           />
           {product.customizationsEnabled && <Separator />}
 
-          {/* Delivery mode + Add to cart */}
-          {currentVariant &&
-            (availableModes.length > 0 ? (
-              <>
-                <ProductDeliveryMode
-                  stock={currentVariant.stock}
-                  allowsBackorder={currentVariant.allowsBackorder}
-                  selected={deliveryMode}
-                  onSelect={setDeliveryMode}
-                />
-
-                <AddToCartButton
-                  variantId={currentVariant.id}
-                  productSlug={product.slug}
-                  productName={product.name}
-                  teamName={product.team.name}
-                  versionName={currentVariant.version.name}
-                  sizeName={currentVariant.size.name}
-                  imageUrl={product.images[0]?.url ?? ""}
-                  unitPrice={currentVariant.salePrice + surcharge}
-                  customizationType={customType}
-                  customizationName={customizationName}
-                  customizationNumber={customizationNumber}
-                  deliveryMode={deliveryMode}
-                  immediateStock={currentVariant.stock ?? 0}
-                  remainingImmediate={immediateRemaining}
-                  disabled={!personalizationValidation.ok}
-                />
-                {!personalizationValidation.ok && (
-                  <p role="alert" className="text-sm text-destructive">{personalizationValidation.message}</p>
-                )}
-              </>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Esta talla está agotada y no se puede pedir bajo encargo.
-                </p>
+          {product.availability === "OUT_OF_STOCK" ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Este producto está agotado y no se puede reservar.</p>
+              <div className="grid gap-2 sm:grid-cols-2">
                 <Button size="xl" variant="outline" className="w-full" asChild>
-                  <a
-                    href={whatsappLink(
-                      `Hola Flashsport, me interesa la camiseta ${product.name} (${product.team.name}, ${currentVariant.version.name}, talla ${currentVariant.size.name}). Está agotada. ¿Cómo puedo conseguirla?`,
-                    )}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
+                  <a href={whatsappLink(`Hola Flashsport, quiero avisarme cuando vuelva a estar disponible ${product.name}.`)} target="_blank" rel="noopener noreferrer">
                     <MessageCircle className="h-5 w-5" />
-                    Consultar por WhatsApp
+                    Avisarme
+                  </a>
+                </Button>
+                <Button size="xl" variant="outline" className="w-full" asChild>
+                  <a href={whatsappLink(`Hola Flashsport, quiero pedir por encargo ${product.name}.`)} target="_blank" rel="noopener noreferrer">
+                    <MessageCircle className="h-5 w-5" />
+                    Pedir por encargo
                   </a>
                 </Button>
               </div>
-            ))}
+            </div>
+          ) : currentVariant && availableModes.length > 0 ? (
+            <>
+              <ProductDeliveryMode stock={currentVariant.stock} allowsBackorder={currentVariant.allowsBackorder} selected={deliveryMode} onSelect={setDeliveryMode} />
 
-          {/* Trust badges */}
-          {product.description && (
-            <p className="text-sm text-muted-foreground leading-relaxed">{product.description}</p>
+              <AddToCartButton
+                variantId={currentVariant.id}
+                productSlug={product.slug}
+                productName={product.name}
+                teamName={product.team.name}
+                versionName={currentVariant.version.name}
+                sizeName={currentVariant.size.name}
+                imageUrl={product.images[0]?.url ?? ""}
+                unitPrice={currentVariant.salePrice + surcharge}
+                customizationType={customType}
+                customizationName={customizationName}
+                customizationNumber={customizationNumber}
+                deliveryMode={deliveryMode}
+                immediateStock={currentVariant.stock ?? 0}
+                remainingImmediate={immediateRemaining}
+                disabled={!personalizationValidation.ok || !selectedSize}
+                sizeRequired={!selectedSize}
+                onMissingSize={handleMissingSize}
+              />
+              {!personalizationValidation.ok && <p role="alert" className="text-sm text-destructive">{personalizationValidation.message}</p>}
+            </>
+          ) : currentVariant && currentVariant.availability === "OUT_OF_STOCK" ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Esta talla está agotada.</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button size="xl" variant="outline" className="w-full" asChild>
+                  <a href={whatsappLink(`Hola Flashsport, quiero avisarme cuando esté disponible la talla ${currentVariant.size.name} de ${product.name}.`)} target="_blank" rel="noopener noreferrer">
+                    <MessageCircle className="h-5 w-5" />
+                    Avisarme
+                  </a>
+                </Button>
+                <Button size="xl" variant="outline" className="w-full" asChild>
+                  <a href={whatsappLink(`Hola Flashsport, quiero pedir por encargo ${product.name} en talla ${currentVariant.size.name}.`)} target="_blank" rel="noopener noreferrer">
+                    <MessageCircle className="h-5 w-5" />
+                    Pedir por encargo
+                  </a>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <AddToCartButton
+              variantId={currentVariant?.id ?? ""}
+              productSlug={product.slug}
+              productName={product.name}
+              teamName={product.team.name}
+              versionName={selectedVersion ? product.variants.find((variant) => variant.version.slug === selectedVersion)?.version.name ?? "" : ""}
+              sizeName={selectedSize || ""}
+              imageUrl={product.images[0]?.url ?? ""}
+              unitPrice={currentVariant?.salePrice ?? 0}
+              customizationType={customType}
+              customizationName={customizationName}
+              customizationNumber={customizationNumber}
+              deliveryMode={deliveryMode}
+              immediateStock={currentVariant?.stock ?? 0}
+              remainingImmediate={immediateRemaining}
+              disabled={!personalizationValidation.ok}
+              sizeRequired={!selectedSize || !currentVariant}
+              onMissingSize={handleMissingSize}
+            />
           )}
+
+          {product.description && <p className="text-sm leading-relaxed text-muted-foreground">{product.description}</p>}
 
           <div className="grid grid-cols-3 gap-3 pt-2">
             {[
-              { icon: Truck, label: "Envío gratis", sub: `desde ${formatMoney({ amountCop: SHIPPING.freeThreshold, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}` },
-              { icon: Shield, label: "Pago seguro", sub: "Tarjeta, PSE, Nequi" },
-              { icon: RefreshCw, label: "Cambios", sub: "hasta 30 días" },
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <div key={item.label} className="flex flex-col items-center gap-1 text-center rounded-xl bg-secondary/50 p-3">
-                  <Icon className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-medium">{item.label}</span>
-                  <span className="text-[10px] text-muted-foreground">{item.sub}</span>
-                </div>
-              );
-            })}
+              { icon: Truck, label: "Envío gratis", sub: `desde ${SHIPPING.freeThreshold.toLocaleString("es-CO")}` },
+              { icon: ShieldCheck, label: "Pago seguro", sub: "En línea" },
+              { icon: ArrowRight, label: "1–2 días", sub: "de despacho" },
+            ].map(({ icon: Icon, label, sub }) => (
+              <div key={label} className="rounded-xl border border-border bg-card p-3 text-center">
+                <Icon className="mx-auto h-5 w-5 text-primary" />
+                <p className="mt-2 text-xs font-medium">{label}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

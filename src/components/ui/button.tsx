@@ -72,13 +72,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         <Slot
           ref={ref}
           className={cn(
-            "inline-flex items-center justify-center rounded-xl font-sans font-semibold transition-all",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-          "active:scale-[0.98]",
+            "inline-flex min-w-0 items-center justify-center rounded-xl font-sans font-semibold transition-all whitespace-nowrap",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+            "active:scale-[0.98]",
+            "[text-wrap:nowrap]",
             variantClasses[variant],
             sizeClasses[size],
             className,
           )}
+          style={{ whiteSpace: "nowrap", flexWrap: "nowrap" }}
           {...props}
         >
           {children}
@@ -90,23 +92,25 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center rounded-xl font-sans font-semibold transition-all",
+          "inline-flex min-w-0 items-center justify-center rounded-xl font-sans font-semibold transition-all whitespace-nowrap",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "active:scale-[0.98]",
           "disabled:pointer-events-none disabled:opacity-50",
+          "[text-wrap:nowrap]",
           variantClasses[variant],
           sizeClasses[size],
           className,
         )}
+        style={{ whiteSpace: "nowrap", flexWrap: "nowrap" }}
         disabled={disabled || loading}
         {...props}
       >
         {(loading || icon) && (
-          <span className={cn("shrink-0", loading && "animate-spin")}>
+          <span className={cn("shrink-0", loading && "animate-spin")} style={{ whiteSpace: "nowrap" }}>
             {loading ? <Spinner /> : icon}
           </span>
         )}
-        {children && <span className="truncate">{children}</span>}
+        {children && <span className="min-w-0 truncate whitespace-nowrap" style={{ whiteSpace: "nowrap" }}>{children}</span>}
       </button>
     );
   },
