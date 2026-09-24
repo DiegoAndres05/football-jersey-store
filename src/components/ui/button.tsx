@@ -72,7 +72,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         <Slot
           ref={ref}
           className={cn(
-            "inline-flex min-w-0 items-center justify-center rounded-xl font-sans font-semibold transition-all whitespace-nowrap",
+            "inline-flex min-w-0 items-center justify-center rounded-xl font-sans font-semibold transition-all !whitespace-nowrap !flex-nowrap",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             "active:scale-[0.98]",
             "[text-wrap:nowrap]",
@@ -92,7 +92,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "inline-flex min-w-0 items-center justify-center rounded-xl font-sans font-semibold transition-all whitespace-nowrap",
+          "inline-flex min-w-0 items-center justify-center rounded-xl font-sans font-semibold transition-all !whitespace-nowrap !flex-nowrap",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "active:scale-[0.98]",
           "disabled:pointer-events-none disabled:opacity-50",

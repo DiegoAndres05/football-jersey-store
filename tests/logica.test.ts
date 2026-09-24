@@ -18,6 +18,9 @@ const VALID_FORM = {
   shippingCountry: "Colombia",
   shippingZipCode: "110111",
   notes: "",
+  consentTerms: true,
+  consentPrivacy: true,
+  consentDataProcessing: true,
 };
 
 test("shippingFee: gratis en el umbral y gratis por encima", () => {
@@ -68,9 +71,13 @@ test("checkout: país de destino gobierna moneda y payload de Bold", () => {
   assert.match(source, /saleCurrency: checkoutCurrencyForCountry/);
 });
 
-test("checkout: zipCode y notes opcionales", () => {
-  const { shippingZipCode: _zip, notes: _notes, ...sinOpcionales } = VALID_FORM;
-  const res = checkoutFormSchema.safeParse(sinOpcionales);
+test("checkout: código postal requerido y notas opcionales", () => {
+  const { shippingZipCode: _zip, ...sinCodigoPostal } = VALID_FORM;
+  const sinZip = checkoutFormSchema.safeParse(sinCodigoPostal);
+  assert.equal(sinZip.success, false);
+
+  const { notes: _notes, ...sinNotas } = VALID_FORM;
+  const res = checkoutFormSchema.safeParse(sinNotas);
   assert.equal(res.success, true);
 });
 

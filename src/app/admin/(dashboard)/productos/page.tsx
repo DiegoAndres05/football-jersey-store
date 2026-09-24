@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ImageIcon, ArrowRight } from "lucide-react";
 import {
   createProductAction,
-  updateProductAction,
+  updateAllProductsAction,
 } from "@/features/catalog/server/catalog-actions";
 import { ProductDeleteButton } from "@/features/catalog/components/product-delete-button";
 import { ProductVisibilityButton } from "@/features/catalog/components/product-visibility-button";
@@ -38,38 +38,38 @@ export default async function AdminProductsPage() {
 
   const productInputs = (p: (typeof products)[number]) => (
     <>
-      <input name="name" defaultValue={p.name} required className="h-7 w-40 rounded-md border border-input bg-background px-2 text-xs" />
-      <input name="shortName" defaultValue={p.shortName ?? ""} placeholder="Abrev." className="h-7 w-16 rounded-md border border-input bg-background px-2 text-xs" />
-      <select name="teamId" defaultValue={p.teamId} className="h-7 w-32 rounded-md border border-input bg-background px-1.5 text-xs">
+      <input name={`product.${p.id}.name`} defaultValue={p.name} required className="h-7 w-40 rounded-md border border-input bg-background px-2 text-xs" />
+      <input name={`product.${p.id}.shortName`} defaultValue={p.shortName ?? ""} placeholder="Abrev." className="h-7 w-16 rounded-md border border-input bg-background px-2 text-xs" />
+      <select name={`product.${p.id}.teamId`} defaultValue={p.teamId} className="h-7 w-32 rounded-md border border-input bg-background px-1.5 text-xs">
         {teams.map((t) => (
           <option key={t.id} value={t.id}>{t.name}</option>
         ))}
       </select>
-      <select name="seasonId" defaultValue={p.seasonId} className="h-7 w-28 rounded-md border border-input bg-background px-1.5 text-xs">
+      <select name={`product.${p.id}.seasonId`} defaultValue={p.seasonId} className="h-7 w-28 rounded-md border border-input bg-background px-1.5 text-xs">
         {seasons.map((s) => (
           <option key={s.id} value={s.id}>{s.year ?? s.name}</option>
         ))}
       </select>
-      <select name="kitType" defaultValue={p.kitType} className="h-7 w-28 rounded-md border border-input bg-background px-1.5 text-xs">
+      <select name={`product.${p.id}.kitType`} defaultValue={p.kitType} className="h-7 w-28 rounded-md border border-input bg-background px-1.5 text-xs">
         {KIT_TYPES.map((k) => (
           <option key={k} value={k}>{k}</option>
         ))}
       </select>
-      <input name="brand" defaultValue={p.brand ?? ""} placeholder="Marca" className="h-7 w-24 rounded-md border border-input bg-background px-2 text-xs" />
+      <input name={`product.${p.id}.brand`} defaultValue={p.brand ?? ""} placeholder="Marca" className="h-7 w-24 rounded-md border border-input bg-background px-2 text-xs" />
       <label className="flex items-center gap-1 text-xs text-muted-foreground">
-        <input type="checkbox" name="isFeatured" defaultChecked={p.isFeatured} className="accent-primary" /> Destacado
+        <input type="checkbox" name={`product.${p.id}.isFeatured`} defaultChecked={p.isFeatured} className="accent-primary" /> Destacado
       </label>
       <label className="flex items-center gap-1 text-xs text-muted-foreground">
-        <input type="checkbox" name="isActive" defaultChecked={p.isActive} className="accent-primary" /> Activo
+        <input type="checkbox" name={`product.${p.id}.isActive`} defaultChecked={p.isActive} className="accent-primary" /> Activo
       </label>
-      <input name="customizationSurcharge" type="number" min={0} defaultValue={p.customizationSurcharge} className="h-7 w-20 rounded-md border border-input bg-background px-2 text-xs" title="Recargo personalización (COP)" />
+      <input name={`product.${p.id}.customizationSurcharge`} type="number" min={0} defaultValue={p.customizationSurcharge} className="h-7 w-20 rounded-md border border-input bg-background px-2 text-xs" title="Recargo personalización (COP)" />
       <label className="flex items-center gap-1 text-xs text-muted-foreground">
-        <input type="checkbox" name="customizationsEnabled" defaultChecked={p.customizationsEnabled} className="accent-primary" /> Personal.
+        <input type="checkbox" name={`product.${p.id}.customizationsEnabled`} defaultChecked={p.customizationsEnabled} className="accent-primary" /> Personal.
       </label>
       <label className="flex items-center gap-1 text-xs text-muted-foreground">
-        <input type="checkbox" name="hasPlayerPrint" defaultChecked={p.hasPlayerPrint} className="accent-primary" /> Dorsal
+        <input type="checkbox" name={`product.${p.id}.hasPlayerPrint`} defaultChecked={p.hasPlayerPrint} className="accent-primary" /> Dorsal
       </label>
-      <input name="description" defaultValue={p.description ?? ""} placeholder="Descripción" className="hidden" />
+      <input name={`product.${p.id}.description`} defaultValue={p.description ?? ""} placeholder="Descripción" className="hidden" />
     </>
   );
 
@@ -145,7 +145,16 @@ export default async function AdminProductsPage() {
         </div>
       </form>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <form action={updateAllProductsAction} className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <p className="text-sm font-medium">Edición de productos</p>
+          <button type="submit" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-[hsl(var(--primary-hover))]">
+            Guardar todo
+          </button>
+        </div>
+        {products.map((p) => (
+          <input key={`id-${p.id}`} type="hidden" name="productId" value={p.id} />
+        ))}
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -176,15 +185,9 @@ export default async function AdminProductsPage() {
                 <td className="px-4 py-3 text-center tabular-nums">{p._count.images}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap justify-end gap-2">
-                    <form action={updateProductAction.bind(null, p.id)} className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {productInputs(p)}
-                      <button
-                        type="submit"
-                        className="rounded-md border border-border px-2.5 py-1 text-xs hover:border-muted-foreground/40 transition-colors"
-                      >
-                        Guardar
-                      </button>
-                    </form>
+                    </div>
                     <Link
                       href={`/admin/productos/${p.slug}/imagenes`}
                       className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs hover:border-muted-foreground/40 transition-colors"
@@ -218,7 +221,7 @@ export default async function AdminProductsPage() {
             ))}
           </tbody>
         </table>
-      </div>
+    </form>
     </div>
   );
 }

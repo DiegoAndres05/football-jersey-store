@@ -227,6 +227,50 @@ export async function updateProductAction(productId: string, formData: FormData)
   redirect("/admin/productos");
 }
 
+export async function updateAllProductsAction(formData: FormData) {
+  await requireAdmin();
+  const productIds = formData.getAll("productId").filter((value): value is string => typeof value === "string" && value.length > 0);
+
+  const updates = productIds.map((productId) => {
+    const input = new FormData();
+    const fields = ["name", "shortName", "description", "kitType", "brand", "teamId", "seasonId", "customizationSurcharge"];
+    for (const field of fields) input.set(field, formData.get(`product.${productId}.${field}`) ?? "");
+    for (const field of ["isFeatured", "isActive", "customizationsEnabled", "hasPlayerPrint"]) {
+      if (formData.get(`product.${productId}.${field}`) === "on") input.set(field, "on");
+    }
+    return { productId, parsed: parseProductForm(input) };
+  });
+
+  for (const update of updates) {
+    if (!update.parsed.success) throw new Error(update.parsed.error.issues[0].message);
+    await assertProductRefs(update.parsed.data);
+  }
+
+  const slugs = updates.map((update) => slugify(update.parsed.success ? update.parsed.data.name : ""));
+  if (new Set(slugs).size !== slugs.length) {
+    throw new Error("No puede haber productos con el mismo nombre.");
+  }
+  const existing = await prisma.product.findMany({
+    where: { slug: { in: slugs } },
+    select: { id: true, slug: true },
+  });
+  if (existing.some((product) => !productIds.includes(product.id) || !slugs[productIds.indexOf(product.id)] || product.slug !== slugs[productIds.indexOf(product.id)])) {
+    throw new Error("Ya existe otro producto con uno de los nombres indicados.");
+  }
+
+  await prisma.$transaction(
+    updates.map((update) => {
+      if (!update.parsed.success) throw new Error("Producto inválido.");
+      return prisma.product.update({
+        where: { id: update.productId },
+        data: { slug: slugify(update.parsed.data.name), ...update.parsed.data },
+      });
+    }),
+  );
+  revalidatePath("/admin/productos");
+  redirect("/admin/productos");
+}
+
 export async function deleteProductAction(productId: string): Promise<AdminSaveResult> {
   try {
     const admin = await getSessionUser();

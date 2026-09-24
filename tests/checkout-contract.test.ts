@@ -9,7 +9,8 @@ test("checkout requires guest contact and address fields", () => {
     fullName: "Ana Pérez", email: "ana@example.com", phone: "3001234567",
     shippingFullName: "Ana Pérez", shippingPhone: "3001234567",
     shippingLine1: "Calle 1 # 2-3", shippingCity: "Bogotá", shippingState: "Cundinamarca",
-    shippingCountry: "Colombia", consentTerms: true, consentPrivacy: true, consentDataProcessing: true,
+    shippingCountry: "Colombia", shippingZipCode: "110111",
+    consentTerms: true, consentPrivacy: true, consentDataProcessing: true,
   });
   assert.equal(result.success, true);
 });

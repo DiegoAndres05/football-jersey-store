@@ -16,7 +16,7 @@ export const productDeliveryModeSchema = z.enum(["INMEDIATA", "BAJO_PEDIDO"]);
 
 export const productFiltersParamsSchema = z.object({
   q: z.string().trim().max(100).optional(),
-  liga: z.string().max(60).optional(),
+  liga: z.string().max(500).optional(),
   equipo: z.string().max(60).optional(),
   temporada: z.string().max(60).optional(),
   version: z.string().max(60).optional(),

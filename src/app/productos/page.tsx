@@ -124,8 +124,8 @@ export default async function ProductosPage({ searchParams }: PageProps) {
 
       <div className="flex gap-8">
         {/* Sidebar filters (desktop) */}
-        <aside className="hidden lg:block w-64 shrink-0">
-          <div className="sticky top-24 space-y-6">
+        <aside className="hidden w-64 shrink-0 self-start lg:sticky lg:top-24 lg:block lg:h-[calc(100vh-6rem)]">
+          <div className="h-full space-y-6 overflow-y-auto overscroll-contain pr-2 pb-6">
             <h2 className="font-display text-2xl font-bold uppercase tracking-tight">Filtros</h2>
             <ProductFilters
               leagues={leagues.map((l) => ({ slug: l.slug, name: l.name, country: l.country }))}

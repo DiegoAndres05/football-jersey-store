@@ -266,7 +266,8 @@ export async function getLeagues(): Promise<LeagueData[]> {
 export async function getTeamsByLeague(leagueSlug?: string): Promise<TeamData[]> {
   const where: Prisma.TeamWhereInput = {};
   if (leagueSlug) {
-    where.league = { slug: leagueSlug };
+    const leagueSlugs = leagueSlug.split(",").filter(Boolean);
+    where.league = leagueSlugs.length > 1 ? { slug: { in: leagueSlugs } } : { slug: leagueSlugs[0] };
   }
   const teams = await prisma.team.findMany({
     where,

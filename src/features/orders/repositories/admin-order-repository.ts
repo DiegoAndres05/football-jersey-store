@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { DeliverySummary } from "../types/admin-order-types";
+import type { AdminOrderDateFilter } from "@/app/admin/(dashboard)/pedidos/admin-order-filters";
 
 export type AdminDeliveryMode = "INMEDIATA" | "BAJO_PEDIDO" | "NO_DISPONIBLE";
 
@@ -14,8 +15,17 @@ export function deriveDeliverySummary(items: { deliveryMode: unknown }[]): Deliv
   return { hasImmediate, hasBackorder, isMixed: hasImmediate && hasBackorder };
 }
 
-export async function listAdminOrders(deliveryMode?: "INMEDIATA" | "BAJO_PEDIDO") {
-  const orders = await prisma.order.findMany({ orderBy: { createdAt: "desc" }, include: { items: true, notificationAttempts: true } });
+export async function listAdminOrders(
+  deliveryMode?: "INMEDIATA" | "BAJO_PEDIDO",
+  dateFilter?: AdminOrderDateFilter,
+) {
+  const orders = await prisma.order.findMany({
+    where: dateFilter?.from || dateFilter?.to
+      ? { createdAt: { ...(dateFilter.from ? { gte: dateFilter.from } : {}), ...(dateFilter.to ? { lte: dateFilter.to } : {}) } }
+      : undefined,
+    orderBy: { createdAt: "desc" },
+    include: { items: true, notificationAttempts: true },
+  });
   return orders
     .map((order) => ({ ...order, items: order.items.map((item) => ({ ...item, deliveryMode: normalizeAdminDeliveryMode(item.deliveryMode) })), deliverySummary: deriveDeliverySummary(order.items), notificationAttempt: order.notificationAttempts.find((a) => a.channel === "TELEGRAM" && a.eventKey === "ORDER_CREATED_PAID") ?? null }))
     .filter((order) => !deliveryMode || order.items.some((item) => item.deliveryMode === deliveryMode));

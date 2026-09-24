@@ -13,7 +13,8 @@ export function buildProductWhere(filters: ProductFilters): Prisma.ProductWhereI
     ];
   }
   if (filters.league) {
-    teamFilter.league = { slug: filters.league };
+    const leagueSlugs = filters.league.split(",").filter(Boolean);
+    teamFilter.league = leagueSlugs.length > 1 ? { slug: { in: leagueSlugs } } : { slug: leagueSlugs[0] };
   }
   if (filters.team) {
     teamFilter.slug = filters.team;

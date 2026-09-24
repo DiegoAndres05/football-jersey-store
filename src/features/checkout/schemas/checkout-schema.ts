@@ -31,7 +31,11 @@ export const checkoutFormSchema = z.object({
   shippingCity: z.string().min(2, "Escribe la ciudad").max(80, "Ciudad demasiado larga"),
   shippingState: z.string().min(2, "Escribe el departamento").max(80, "Departamento demasiado largo"),
   shippingCountry: z.string().trim().min(2, "Escoge el país de destino").max(80, "País demasiado largo"),
-  shippingZipCode: z.string().max(12, "Código postal demasiado largo").optional().or(z.literal("")),
+  shippingZipCode: z
+    .string()
+    .trim()
+    .min(1, "Escribe el código postal")
+    .max(12, "Código postal demasiado largo"),
   notes: z.string().max(500, "Nota demasiado larga").optional().or(z.literal("")),
   consentTerms: z.boolean().refine((value) => value === true, {
     message: "Debes aceptar los términos y condiciones.",
@@ -56,7 +60,7 @@ export const checkoutFormSchema = z.object({
 
 export type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;
 
-export type PaymentMethod = "CARD" | "PSE" | "NEQUI";
+export type PaymentMethod = "CARD" | "PSE" | "PAYPAL";
 
 /** Client input for the cart; prices are deliberately absent and are always
  * loaded from ProductVariant during order creation. */

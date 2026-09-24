@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, ArrowRight, CreditCard, Landmark, Smartphone, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, CreditCard, Landmark, ShieldCheck, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -205,8 +205,21 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
   const shippingScope = normalizeCountry(destinationCountry) === normalizeCountry(SITE.country)
     ? SHIPPING.methodName
     : "Destino internacional";
+  const isPayPalCheckout = normalizeCountry(destinationCountry) !== normalizeCountry(SITE.country)
+    || checkoutCurrency.currency !== "COP";
+  const paymentMethods = [
+    { id: "CARD", label: "Tarjeta débito o crédito", icon: CreditCard, note: "Visa, Mastercard" },
+    { id: "PSE", label: "PSE", icon: Landmark, note: "Débito desde tu banco" },
+    ...(isPayPalCheckout
+      ? [{ id: "PAYPAL", label: "PayPal", icon: WalletCards, note: "Pago internacional" } as const]
+      : []),
+  ] as const;
 
   const shippingCountryField = register("shippingCountry");
+
+  useEffect(() => {
+    setPaymentMethod(isPayPalCheckout ? "PAYPAL" : "CARD");
+  }, [isPayPalCheckout]);
 
   if (!mounted) return null;
 
@@ -445,7 +458,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
                     {errors.shippingState && <p className="text-xs text-destructive">{errors.shippingState.message}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="shippingZipCode">Código postal (opcional)</Label>
+                    <Label htmlFor="shippingZipCode">Código postal</Label>
                     <Input id="shippingZipCode" {...register("shippingZipCode")} placeholder="110111" autoComplete="postal-code" />
                     {errors.shippingZipCode && <p className="text-xs text-destructive">{errors.shippingZipCode.message}</p>}
                   </div>
@@ -459,11 +472,13 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
 
               <Button
                 type="submit"
-                className="w-full flex-nowrap whitespace-nowrap sm:w-auto"
+                className="w-full !flex-nowrap !whitespace-nowrap sm:w-auto"
                 disabled={!isValid}
               >
-                <span className="min-w-0 whitespace-nowrap">Continuar al pago</span>
-                <ArrowRight className="h-4 w-4 shrink-0" />
+                <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                  Continuar al pago
+                  <ArrowRight className="h-4 w-4 shrink-0" />
+                </span>
               </Button>
             </form>
           ) : (
@@ -471,11 +486,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
               <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
                 <h2 className="font-display text-lg font-bold uppercase tracking-tight mb-4">Medio de pago</h2>
                 <div className="space-y-2">
-                  {([
-                    { id: "CARD", label: "Tarjeta débito o crédito", icon: CreditCard, note: "Visa, Mastercard" },
-                    { id: "PSE", label: "PSE", icon: Landmark, note: "Débito desde tu banco" },
-                    { id: "NEQUI", label: "Nequi", icon: Smartphone, note: "Pago desde la app" },
-                  ] as const).map((m) => (
+                  {paymentMethods.map((m) => (
                     <button
                       key={m.id}
                       type="button"
@@ -529,8 +540,15 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
               )}
 
               {paymentStatus === "idle" && (
-                <Button onClick={payNow} disabled={normalizeCountry(destinationCountry) !== normalizeCountry(SITE.country)} className="w-full whitespace-nowrap sm:w-auto">
-                  Pagar {formatMoney({ amountCop: total, ...moneyContext })} <ShieldCheck className="h-4 w-4" />
+                <Button
+                  onClick={payNow}
+                  disabled={normalizeCountry(destinationCountry) !== normalizeCountry(SITE.country)}
+                  className="w-full !flex-nowrap !whitespace-nowrap sm:w-auto"
+                >
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                    Pagar {formatMoney({ amountCop: total, ...moneyContext })}
+                    <ShieldCheck className="h-4 w-4 shrink-0" />
+                  </span>
                 </Button>
               )}
               {normalizeCountry(destinationCountry) !== normalizeCountry(SITE.country) && (

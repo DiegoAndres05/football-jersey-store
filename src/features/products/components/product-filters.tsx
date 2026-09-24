@@ -136,7 +136,6 @@ export function ProductFilters({
   }, [router, pathname]);
 
   const hasActiveFilters = countActiveProductFilters(new URLSearchParams(searchParams.toString())) > 0;
-
   return (
     <div className={cn("space-y-6", className)}>
       {isPending && (
@@ -231,19 +230,20 @@ export function ProductFilters({
 
       {/* League */}
       <fieldset>
-        <legend className="text-xs font-medium text-muted-foreground mb-2 block">Liga</legend>
-        <div className="flex flex-wrap gap-1.5">
+        <label htmlFor="catalog-league" className="text-xs font-medium text-muted-foreground mb-2 block">Liga</label>
+        <select
+          id="catalog-league"
+          name="liga"
+          value={active.league}
+          disabled={isPending}
+          onChange={(event) => setParam("liga", event.target.value)}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        >
+          <option value="">Todas las ligas</option>
           {leagues.map((l) => (
-            <Chip
-              key={l.slug}
-              active={active.league === l.slug}
-              disabled={isPending}
-              onClick={() => setParam("liga", active.league === l.slug ? "" : l.slug)}
-            >
-              {l.name}
-            </Chip>
+            <option key={l.slug} value={l.slug}>{l.name}</option>
           ))}
-        </div>
+        </select>
       </fieldset>
 
       {/* Team (cascada desde la liga) */}
@@ -267,19 +267,22 @@ export function ProductFilters({
 
       {/* Season */}
       <fieldset>
-        <legend className="text-xs font-medium text-muted-foreground mb-2 block">Temporada</legend>
-        <div className="flex flex-wrap gap-1.5">
+        <label htmlFor="catalog-season" className="text-xs font-medium text-muted-foreground mb-2 block">Temporada</label>
+        <select
+          id="catalog-season"
+          name="temporada"
+          value={active.season}
+          disabled={isPending}
+          onChange={(event) => setParam("temporada", event.target.value)}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        >
+          <option value="">Todas las temporadas</option>
           {seasons.map((s) => (
-            <Chip
-              key={s.slug}
-              active={active.season === s.slug}
-              disabled={isPending}
-              onClick={() => setParam("temporada", active.season === s.slug ? "" : s.slug)}
-            >
+            <option key={s.slug} value={s.slug}>
               {s.isRetro ? `Retro ${s.name.replace("Retro ", "")}` : s.name}
-            </Chip>
+            </option>
           ))}
-        </div>
+        </select>
       </fieldset>
 
       {/* Version */}
