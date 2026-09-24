@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -24,14 +25,18 @@ import { leagueLogoAlt } from "@/features/seo/domain/product-image-alt";
 import { whatsappLink } from "@/shared/config/site";
 import { HeroProduct } from "@/components/home/hero-product";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
-import { FeaturedHomepageSection } from "@/components/home/featured-homepage-section";
+import {
+  FeaturedHomepageSection,
+  FeaturedHomepageSectionFallback,
+} from "@/components/home/featured-homepage-section";
 import { getMysteryBoxPage } from "@/features/products/repositories/product-repository";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE } from "@/features/seo/domain/robots-policy";
-import { LeagueCard } from "@/components/home/league-card";
 import { ProductImage } from "@/shared/ui/product-image";
 import { Suspense } from "react";
 import { appendKeywords } from "@/features/seo/domain/keywords";
+import { Marquee } from "@/components/ui/marquee";
+import { HeroCopyAnimation } from "@/components/home/hero-copy-animation";
 
 export const metadata: Metadata = {
   title: "Camisetas de Fútbol en Colombia | Flashsport",
@@ -62,7 +67,6 @@ export const metadata: Metadata = {
 };
 
 const BIG_LEAGUES = BIG_LEAGUE_SLUGS;
-const LEAGUE_CARD_VISUAL_CLASS = "h-11 w-11";
 
 const TRUST_ITEMS = [
   { icon: Truck, label: "Envíos a todo el país" },
@@ -95,29 +99,43 @@ export default async function HomePage() {
         <div className="container-page grid items-center gap-10 pb-16 pt-10 md:pb-20 md:pt-14 lg:grid-cols-12 lg:gap-6">
           {/* Texto */}
           <div className="lg:col-span-6 lg:pr-8">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-              Tienda de camisetas de fútbol
-            </p>
-            <h1 className="mt-5 font-display text-5xl font-bold uppercase leading-[0.95] tracking-tight md:text-6xl xl:text-7xl">
-              Camisetas de fútbol
-              <br />
-              en Colombia
-            </h1>
-            <p className="mt-5 max-w-md text-muted-foreground leading-relaxed">
-              Camisetas de fútbol de las mejores ligas del mundo. Equipos,
-              temporadas y tallas reales, con envío a todo el país.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Button size="lg" asChild>
-                <Link href="/productos">
-                  Comprar ahora
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link href="/ligas">Explorar ligas</Link>
-              </Button>
-            </div>
+            <HeroCopyAnimation>
+              <p
+                data-hero-eyebrow
+                className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground"
+              >
+                Tienda de camisetas de fútbol
+              </p>
+              <h1
+                data-hero-title
+                className="mt-5 font-display text-5xl font-bold uppercase leading-[0.95] tracking-[-0.01em] md:text-6xl xl:text-7xl"
+              >
+                Camisetas de fútbol
+                <br />
+                en Colombia
+              </h1>
+              <p
+                data-hero-description
+                className="mt-5 max-w-md text-muted-foreground leading-relaxed"
+              >
+                Camisetas de fútbol de las mejores ligas del mundo. Equipos,
+                temporadas y tallas reales, con envío a todo el país.
+              </p>
+              <div
+                data-hero-actions
+                className="mt-8 flex flex-wrap items-center gap-4"
+              >
+                <Button size="lg" asChild>
+                  <Link href="/productos">
+                    Comprar ahora
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button size="lg" variant="outline" asChild>
+                  <Link href="/ligas">Explorar ligas</Link>
+                </Button>
+              </div>
+            </HeroCopyAnimation>
           </div>
 
           {/* Fotografía de producto */}
@@ -143,7 +161,7 @@ export default async function HomePage() {
       </div>
 
       {/* ── FEATURED COVERFLOW ──────────────────────────────────────── */}
-      <Suspense fallback={null}>
+      <Suspense fallback={<FeaturedHomepageSectionFallback />}>
         <FeaturedHomepageSection />
       </Suspense>
 
@@ -203,28 +221,47 @@ export default async function HomePage() {
           </Link>
         </div>
 
-        <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+        <Marquee
+          className="mt-8"
+          pauseOnHover
+          speed={36}
+          aria-label="Principales ligas de fútbol"
+        >
           {bigLeagues.map((league) => {
             const liga = league.name;
             const logo = leagueLogo(league.slug, league.name);
             const logoSrc = logo.src ?? leagueLogoSrc(league.slug);
             const fallbackMonogram = leagueMonogram(league.slug, league.name);
             return (
-              <LeagueCard
+              <Link
                 key={league.slug}
-                liga={liga}
-                slug={league.slug}
-                name={liga}
-                productCount={league.productCount}
-                logoSrc={logoSrc}
-                logoAlt={leagueLogoAlt(league.name)}
-                fallbackLabel={`${logo.fallbackLabel} (${fallbackMonogram})`}
-                visualClassName={LEAGUE_CARD_VISUAL_CLASS}
-                imageClassName="h-full w-full object-contain"
-              />
+                href={`/productos?liga=${league.slug}&sort=default`}
+                aria-label={`Ver camisetas de ${liga}`}
+                className="group flex h-36 w-36 shrink-0 items-center justify-center rounded-full p-3 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-4 sm:h-44 sm:w-44 sm:p-4"
+              >
+                {logoSrc ? (
+                  <Image
+                    src={logoSrc}
+                    alt={leagueLogoAlt(league.name)}
+                    width={176}
+                    height={176}
+                    unoptimized
+                    loading="eager"
+                    sizes="(max-width: 639px) 144px, 176px"
+                    className="block h-full w-full object-contain transition-transform group-hover:scale-105"
+                  />
+                ) : (
+                  <span
+                    className="font-display text-4xl font-bold uppercase"
+                    aria-hidden="true"
+                  >
+                    {fallbackMonogram}
+                  </span>
+                )}
+              </Link>
             );
           })}
-        </div>
+        </Marquee>
       </section>
 
       {/* ── LAS MÁS BUSCADAS ───────────────────────────────────────── */}

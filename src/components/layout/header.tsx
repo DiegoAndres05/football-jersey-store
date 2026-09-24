@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Menu, X, Search, User, Heart, History } from "lucide-react";
+import Image from "next/image";
 import { CartIcon } from "@/components/ui/cart-icon";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -86,9 +87,16 @@ export function Header({
           <div className="flex min-w-0 items-center gap-4 xl:gap-6">
             <Link
               href="/"
-              className="font-display text-xl font-bold uppercase tracking-[0.12em] shrink-0"
+              className="relative -ml-3 block translate-y-1 h-8 w-[11.75rem] shrink-0 md:h-9 md:w-[13.5rem]"
             >
-              {SITE.brand}
+              <Image
+                src="/flashsport-logo.png"
+                alt={SITE.brand}
+                fill
+                priority
+                sizes="(max-width: 767px) 188px, 216px"
+                className="object-contain object-left"
+              />
             </Link>
 
           </div>

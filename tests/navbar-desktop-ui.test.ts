@@ -19,8 +19,8 @@ test("desktop navbar exposes an accessible Radix popover with quick links", () =
   assert.match(header, /Vistos recientemente/);
 });
 
-test("public navigation keeps its five destinations and active semantics", () => {
-  for (const href of ["/", "/productos", "/ligas", "/sobre-nosotros", "/contacto"]) {
+test("public navigation keeps its four destinations and active semantics", () => {
+  for (const href of ["/", "/productos", "/sobre-nosotros", "/contacto"]) {
     assert.match(navLinks, new RegExp(`href: "${href.replace("/", "\\/")}"`));
   }
   assert.match(navLinks, /pathname === item\.href/);

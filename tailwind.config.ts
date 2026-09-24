@@ -100,6 +100,13 @@ const config: Config = {
         toast: "var(--z-toast)",
       },
       keyframes: {
+        marquee: {
+          to: { transform: "translateX(-33.333333%)" },
+        },
+        "marquee-reverse": {
+          to: { transform: "translateX(0)" },
+          from: { transform: "translateX(-33.333333%)" },
+        },
         "fade-in": {
           "0%": { opacity: "0", transform: "translateY(4px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
@@ -117,6 +124,8 @@ const config: Config = {
         },
       },
       animation: {
+        marquee: "marquee var(--duration, 30s) linear infinite",
+        "marquee-reverse": "marquee-reverse var(--duration, 30s) linear infinite",
         "fade-in": "fade-in 0.4s ease-out",
         shimmer: "shimmer 1.6s infinite",
         "accordion-down": "accordion-down 0.2s ease-out",

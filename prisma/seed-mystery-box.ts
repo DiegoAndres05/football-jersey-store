@@ -64,11 +64,16 @@ export async function seedMysteryBox(prisma: PrismaClient) {
     await prisma.productImage.create({
       data: {
         productId: product.id,
-        url: "https://images.unsplash.com/photo-1577223625816-7546f13df25d?auto=format&fit=crop&w=900&q=80",
+        url: "/mystery-box.jpg",
         altText: "Caja misteriosa",
         order: 0,
         isPrimary: true,
       },
+    });
+  } else {
+    await prisma.productImage.updateMany({
+      where: { productId: product.id, isPrimary: true },
+      data: { url: "/mystery-box.jpg", altText: "Caja misteriosa" },
     });
   }
 

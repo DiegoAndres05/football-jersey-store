@@ -8,15 +8,21 @@ import { SITE_KEYWORDS } from "@/features/seo/domain/keywords";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import "./globals.css";
 
-// Fuentes locales (self-hosted) para builds reproducibles sin red.
-// El display condensado usa Arial Narrow / Impact vía fallback CSS
-// (ver tailwind.config.ts y el :root en globals.css).
 const inter = localFont({
   src: [
     { path: "./fonts/inter-400.woff2", weight: "400", style: "normal" },
     { path: "./fonts/inter-600.woff2", weight: "600", style: "normal" },
   ],
   variable: "--font-inter",
+  display: "swap",
+});
+
+const barlowCondensed = localFont({
+  src: [
+    { path: "./fonts/barlow-condensed-600.ttf", weight: "600", style: "normal" },
+    { path: "./fonts/barlow-condensed-700.ttf", weight: "700", style: "normal" },
+  ],
+  variable: "--font-barlow-condensed",
   display: "swap",
 });
 
@@ -95,7 +101,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <html lang="es" className={`${inter.variable}`}>
+    <html lang="es" className={`${inter.variable} ${barlowCondensed.variable}`}>
       <head>
         <script
           type="application/ld+json"
