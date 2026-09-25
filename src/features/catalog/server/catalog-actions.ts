@@ -71,6 +71,27 @@ export async function updateLeagueAction(leagueId: string, formData: FormData) {
   redirect("/admin/ligas");
 }
 
+export async function updateAllLeaguesAction(formData: FormData) {
+  await requireAdmin();
+  const ids = formData.getAll("leagueId").filter((id): id is string => typeof id === "string");
+  const updates = ids.map((id) => ({
+    id,
+    parsed: leagueSchema.safeParse({
+      name: formData.get(`league.${id}.name`),
+      country: cleanNullable(formData.get(`league.${id}.country`)),
+      logoUrl: cleanNullable(formData.get(`league.${id}.logoUrl`)),
+    }),
+  }));
+  for (const update of updates) if (!update.parsed.success) throw new Error(update.parsed.error.issues[0].message);
+  const slugs = updates.map(({ parsed }) => slugify(parsed.success ? parsed.data.name : ""));
+  if (new Set(slugs).size !== slugs.length) throw new Error("No puede haber ligas con el mismo nombre.");
+  await prisma.$transaction(updates.map(({ id, parsed }) => {
+    if (!parsed.success) throw new Error("Liga inválida.");
+    return prisma.league.update({ where: { id }, data: { slug: slugify(parsed.data.name), ...parsed.data } });
+  }));
+  redirect("/admin/ligas");
+}
+
 export async function deleteLeagueAction(leagueId: string) {
   await requireAdmin();
   const league = await prisma.league.findUnique({
@@ -133,6 +154,30 @@ export async function updateTeamAction(teamId: string, formData: FormData) {
   if (clash) throw new Error("Ya existe otro equipo con ese nombre.");
 
   await prisma.team.update({ where: { id: teamId }, data: { slug, ...parsed.data } });
+  redirect("/admin/equipos");
+}
+
+export async function updateAllTeamsAction(formData: FormData) {
+  await requireAdmin();
+  const ids = formData.getAll("teamId").filter((id): id is string => typeof id === "string");
+  const updates = ids.map((id) => ({
+    id,
+    parsed: teamSchema.safeParse({
+      name: formData.get(`team.${id}.name`),
+      shortName: cleanNullable(formData.get(`team.${id}.shortName`)),
+      country: cleanNullable(formData.get(`team.${id}.country`)),
+      crestUrl: cleanNullable(formData.get(`team.${id}.crestUrl`)),
+      leagueId: formData.get(`team.${id}.leagueId`),
+    }),
+  }));
+  for (const update of updates) {
+    if (!update.parsed.success) throw new Error(update.parsed.error.issues[0].message);
+    if (!(await prisma.league.findUnique({ where: { id: update.parsed.data.leagueId } }))) throw new Error("La liga seleccionada no existe.");
+  }
+  await prisma.$transaction(updates.map(({ id, parsed }) => {
+    if (!parsed.success) throw new Error("Equipo inválido.");
+    return prisma.team.update({ where: { id }, data: { slug: slugify(parsed.data.name), ...parsed.data } });
+  }));
   redirect("/admin/equipos");
 }
 
@@ -431,6 +476,41 @@ export async function updateVariantAction(variantId: string, formData: FormData)
   redirect(`/admin/productos/${variant.product.slug}/variantes`);
 }
 
+export async function updateAllVariantsAction(productId: string, formData: FormData) {
+  await requireAdmin();
+  const variantIds = formData.getAll("variantId").filter((id): id is string => typeof id === "string" && id.length > 0);
+  const variants = await prisma.productVariant.findMany({
+    where: { id: { in: variantIds }, productId },
+    select: { id: true },
+  });
+  if (variants.length !== variantIds.length) throw new Error("Una o más variantes no pertenecen a este producto.");
+
+  const updates = variantIds.map((variantId) => ({
+    variantId,
+    parsed: variantEditSchema.safeParse({
+      costPrice: formData.get(`variant.${variantId}.costPrice`) ?? "0",
+      salePrice: formData.get(`variant.${variantId}.salePrice`),
+      compareAtPrice: cleanNullable(formData.get(`variant.${variantId}.compareAtPrice`)),
+      lowStockAt: cleanNullable(formData.get(`variant.${variantId}.lowStockAt`)),
+      weight: formData.get(`variant.${variantId}.weight`) ?? "400",
+      allowsBackorder: formData.get(`variant.${variantId}.allowsBackorder`),
+    }),
+  }));
+  for (const update of updates) {
+    if (!update.parsed.success) throw new Error(update.parsed.error.issues[0].message);
+  }
+
+  await prisma.$transaction(
+    updates.map(({ variantId, parsed }) => {
+      if (!parsed.success) throw new Error("Variante inválida.");
+      return prisma.productVariant.update({ where: { id: variantId }, data: parsed.data });
+    }),
+  );
+  const product = await prisma.product.findUnique({ where: { id: productId }, select: { slug: true } });
+  if (!product) throw new Error("El producto no existe.");
+  redirect(`/admin/productos/${product.slug}/variantes`);
+}
+
 export async function deleteVariantAction(variantId: string): Promise<AdminSaveResult> {
   const admin = await getSessionUser();
   if (!admin) return saveError("No autorizado.");
@@ -546,6 +626,29 @@ export async function updateSupplierAction(supplierId: string, formData: FormDat
   }
 
   await prisma.supplier.update({ where: { id: supplierId }, data: { slug, ...parsed.data } });
+  redirect("/admin/proveedores");
+}
+
+export async function updateAllSuppliersAction(formData: FormData) {
+  await requireAdmin();
+  const ids = formData.getAll("supplierId").filter((id): id is string => typeof id === "string");
+  const updates = ids.map((id) => ({
+    id,
+    parsed: parseSupplierForm(new FormData()),
+  }));
+  for (const update of updates) {
+    const input = new FormData();
+    for (const field of ["name", "contactName", "email", "phone", "country", "leadTimeDays", "priority", "purchaseNotes"]) {
+      input.set(field, formData.get(`supplier.${update.id}.${field}`) ?? "");
+    }
+    if (formData.get(`supplier.${update.id}.isActive`) === "on") input.set("isActive", "on");
+    update.parsed = parseSupplierForm(input);
+    if (!update.parsed.success) throw new Error(update.parsed.error.issues[0].message);
+  }
+  await prisma.$transaction(updates.map(({ id, parsed }) => {
+    if (!parsed.success) throw new Error("Proveedor inválido.");
+    return prisma.supplier.update({ where: { id }, data: { slug: slugify(parsed.data.name), ...parsed.data } });
+  }));
   redirect("/admin/proveedores");
 }
 
@@ -674,6 +777,25 @@ export async function updateSeasonAction(seasonId: string, formData: FormData) {
   redirect("/admin/temporadas");
 }
 
+export async function updateAllSeasonsAction(formData: FormData) {
+  await requireAdmin();
+  const ids = formData.getAll("seasonId").filter((id): id is string => typeof id === "string");
+  const updates = ids.map((id) => ({
+    id,
+    parsed: seasonSchema.safeParse({
+      name: formData.get(`season.${id}.name`),
+      year: cleanNullable(formData.get(`season.${id}.year`)),
+      isRetro: checkbox(formData.get(`season.${id}.isRetro`)),
+    }),
+  }));
+  for (const update of updates) if (!update.parsed.success) throw new Error(update.parsed.error.issues[0].message);
+  await prisma.$transaction(updates.map(({ id, parsed }) => {
+    if (!parsed.success) throw new Error("Temporada inválida.");
+    return prisma.season.update({ where: { id }, data: { slug: slugify(parsed.data.name), ...parsed.data } });
+  }));
+  redirect("/admin/temporadas");
+}
+
 export async function deleteSeasonAction(seasonId: string) {
   await requireAdmin();
   const season = await prisma.season.findUnique({
@@ -784,6 +906,24 @@ export async function updateVersionAction(versionId: string, formData: FormData)
   }
 
   await prisma.version.update({ where: { id: versionId }, data: { slug, ...parsed.data } });
+  redirect("/admin/versiones");
+}
+
+export async function updateAllVersionsAction(formData: FormData) {
+  await requireAdmin();
+  const ids = formData.getAll("versionId").filter((id): id is string => typeof id === "string");
+  const updates = ids.map((id) => ({
+    id,
+    parsed: versionSchema.safeParse({
+      name: formData.get(`version.${id}.name`),
+      priceAdjustment: formData.get(`version.${id}.priceAdjustment`) ?? "0",
+    }),
+  }));
+  for (const update of updates) if (!update.parsed.success) throw new Error(update.parsed.error.issues[0].message);
+  await prisma.$transaction(updates.map(({ id, parsed }) => {
+    if (!parsed.success) throw new Error("Versión inválida.");
+    return prisma.version.update({ where: { id }, data: { slug: slugify(parsed.data.name), ...parsed.data } });
+  }));
   redirect("/admin/versiones");
 }
 

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ArrowRight, Trophy } from "lucide-react";
 import {
   createLeagueAction,
-  updateLeagueAction,
+  updateAllLeaguesAction,
   deleteLeagueAction,
 } from "@/features/catalog/server/catalog-actions";
 
@@ -63,7 +63,11 @@ export default async function AdminLeaguesPage() {
         </div>
       </form>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <form action={updateAllLeaguesAction} className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="flex justify-end border-b border-border px-4 py-3">
+          <button type="submit" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">Guardar</button>
+        </div>
+        {leagues.map((league) => <input key={league.id} type="hidden" name="leagueId" value={league.id} />)}
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -91,42 +95,32 @@ export default async function AdminLeaguesPage() {
                 <td className="px-4 py-3 text-center tabular-nums">{league._count.teams}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap justify-end gap-2">
-                    <form
-                      action={updateLeagueAction.bind(null, league.id)}
-                      className="flex items-center gap-2"
-                    >
+                    <div className="flex items-center gap-2">
                       <input
-                        name="name"
+                        name={`league.${league.id}.name`}
                         defaultValue={league.name}
                         className="h-7 w-36 rounded-md border border-input bg-background px-2 text-xs"
                       />
                       <input
-                        name="country"
+                        name={`league.${league.id}.country`}
                         defaultValue={league.country ?? ""}
                         placeholder="País"
                         className="h-7 w-28 rounded-md border border-input bg-background px-2 text-xs"
                       />
                       <input
-                        name="logoUrl"
+                        name={`league.${league.id}.logoUrl`}
                         defaultValue={league.logoUrl ?? ""}
                         placeholder="Logo URL"
                         className="hidden"
                       />
+                    </div>
                       <button
                         type="submit"
-                        className="rounded-md border border-border px-2.5 py-1 text-xs hover:border-muted-foreground/40 transition-colors"
-                      >
-                        Guardar
-                      </button>
-                    </form>
-                    <form action={deleteLeagueAction.bind(null, league.id)}>
-                      <button
-                        type="submit"
+                        formAction={deleteLeagueAction.bind(null, league.id)}
                         className="rounded-md border border-destructive/30 px-2.5 py-1 text-xs text-destructive hover:bg-destructive/10 transition-colors"
                       >
                         Eliminar
                       </button>
-                    </form>
                     <Link
                       href={`/admin/equipos?liga=${league.slug}`}
                       className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs hover:border-muted-foreground/40 transition-colors"
@@ -139,7 +133,7 @@ export default async function AdminLeaguesPage() {
             ))}
           </tbody>
         </table>
-      </div>
+      </form>
     </div>
   );
 }

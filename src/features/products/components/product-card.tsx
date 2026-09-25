@@ -37,7 +37,7 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
       // Canonical jersey route: href={`/productos/${product.slug}`}
       href={href}
       className={cn(
-        "group flex flex-col rounded-xl border border-border bg-card overflow-hidden transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "group flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         isSoldOut && "opacity-70",
       )}
     >
@@ -63,8 +63,8 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
         <button type="button" aria-label={favorite ? `Quitar ${product.name} de favoritos` : `Guardar ${product.name} en favoritos`} aria-pressed={favorite} onClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleFavorite({ productId: product.id, slug: product.slug }); }} className="absolute right-2 top-2 rounded-full bg-background/90 p-2 shadow-sm hover:bg-background"><Heart className={`h-4 w-4 ${favorite ? "fill-current text-red-600" : ""}`} /></button>
       </div>
 
-      <div className="flex-1 flex flex-col p-3.5 gap-1.5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground truncate">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3.5">
+        <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground truncate">
           {isMystery ? "Camiseta sorpresa" : product.team.name}
           {!isMystery && product.team.league && (
             <>
@@ -74,11 +74,11 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
           )}
         </p>
 
-        <h3 className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-foreground transition-colors">
+        <h3 className="min-w-0 break-words text-sm font-medium leading-snug line-clamp-2 group-hover:text-foreground transition-colors">
           {product.name}
         </h3>
 
-        <p className="text-xs text-muted-foreground">
+        <p className="min-w-0 break-words text-xs leading-relaxed text-muted-foreground line-clamp-2">
           {isMystery ? "Básica, Estándar o Premium" : product.season.name}
           {!isMystery && product.versionNames.length > 0 && (
             <>
@@ -94,22 +94,22 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
               Agotada
             </p>
           ) : isBackorderOnly ? (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-warning">
+            <p className="max-w-full break-words text-[11px] font-semibold leading-relaxed tracking-[0.12em] text-warning">
               Bajo pedido · 15–20 días
             </p>
           ) : product.availableSizes.length > 0 ? (
-            <p className="text-[11px] tracking-wider text-muted-foreground">
+            <p className="max-w-full break-words text-[11px] leading-relaxed tracking-wider text-muted-foreground">
               Tallas: <span className="text-foreground">{product.availableSizes.join(" · ")}</span>
             </p>
           ) : null}
 
           {product.showPrice && product.displayPrice !== null && (
-          <div className="flex items-baseline gap-1.5 mt-1">
+          <div className="mt-2 flex w-full min-w-0 flex-col items-start gap-0.5 overflow-hidden">
             {!isSoldOut && <span className="text-sm text-muted-foreground">Desde</span>}
-            <span className="text-base font-bold">{formatPrice(product.displayPrice)}</span>
+            <span className="max-w-full break-words text-base font-bold">{formatPrice(product.displayPrice)}</span>
             {!isSoldOut && product.maxPrice > product.minPrice && (
-              <span className="text-xs text-muted-foreground">
-                hasta {formatPrice(product.maxPrice)}
+              <span className="max-w-full break-words text-xs leading-relaxed text-muted-foreground">
+                Hasta {formatPrice(product.maxPrice)}
               </span>
             )}
           </div>

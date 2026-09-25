@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import {
   createVariantAction,
-  updateVariantAction,
+  updateAllVariantsAction,
   adjustStockAction,
 } from "@/features/catalog/server/catalog-actions";
 import { VariantDeleteButton } from "@/features/catalog/components/variant-delete-button";
@@ -98,6 +98,17 @@ export default async function AdminProductVariantsPage({
           Este producto no tiene variantes todavía.
         </p>
       ) : (
+        <>
+          <form id="bulk-variants-form" action={updateAllVariantsAction.bind(null, product.id)}>
+            {product.variants.map((v) => (
+              <input key={v.id} form="bulk-variants-form" type="hidden" name="variantId" value={v.id} />
+            ))}
+            <div className="mb-3 flex justify-end">
+              <button type="submit" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-[hsl(var(--primary-hover))]">
+                Guardar
+              </button>
+            </div>
+          </form>
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -132,23 +143,20 @@ export default async function AdminProductVariantsPage({
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap justify-end gap-2">
-                        <form action={updateVariantAction.bind(null, v.id)} className="flex flex-wrap items-center gap-2">
-                          <input name="costPrice" type="number" min={0} defaultValue={v.costPrice} className="h-7 w-24 rounded-md border border-input bg-background px-2 text-xs" title="Costo" />
-                          <input name="salePrice" type="number" min={1} defaultValue={v.salePrice} className="h-7 w-24 rounded-md border border-input bg-background px-2 text-xs" title="Venta" />
-                          <input name="compareAtPrice" type="number" min={0} defaultValue={v.compareAtPrice ?? ""} placeholder="Tachado" className="h-7 w-20 rounded-md border border-input bg-background px-2 text-xs" />
-                          <input name="lowStockAt" type="number" min={0} defaultValue={v.lowStockAt ?? ""} placeholder="Alert.≤" className="h-7 w-16 rounded-md border border-input bg-background px-2 text-xs" />
-                          <input name="weight" type="number" min={1} defaultValue={v.weight} className="h-7 w-14 rounded-md border border-input bg-background px-2 text-xs" title="Peso (g)" />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input form="bulk-variants-form" name={`variant.${v.id}.costPrice`} type="number" min={0} defaultValue={v.costPrice} className="h-7 w-24 rounded-md border border-input bg-background px-2 text-xs" title="Costo" />
+                          <input form="bulk-variants-form" name={`variant.${v.id}.salePrice`} type="number" min={1} defaultValue={v.salePrice} className="h-7 w-24 rounded-md border border-input bg-background px-2 text-xs" title="Venta" />
+                          <input form="bulk-variants-form" name={`variant.${v.id}.compareAtPrice`} type="number" min={0} defaultValue={v.compareAtPrice ?? ""} placeholder="Tachado" className="h-7 w-20 rounded-md border border-input bg-background px-2 text-xs" />
+                          <input form="bulk-variants-form" name={`variant.${v.id}.lowStockAt`} type="number" min={0} defaultValue={v.lowStockAt ?? ""} placeholder="Alert.≤" className="h-7 w-16 rounded-md border border-input bg-background px-2 text-xs" />
+                          <input form="bulk-variants-form" name={`variant.${v.id}.weight`} type="number" min={1} defaultValue={v.weight} className="h-7 w-14 rounded-md border border-input bg-background px-2 text-xs" title="Peso (g)" />
                           <label
                             title="Permite vender esta talla sin stock físico (bajo pedido)"
                             className="flex items-center gap-1.5 text-xs cursor-pointer select-none px-1"
                           >
-                            <input name="allowsBackorder" type="checkbox" defaultChecked={v.allowsBackorder} className="h-3.5 w-3.5 accent-primary" />
+                            <input form="bulk-variants-form" name={`variant.${v.id}.allowsBackorder`} type="checkbox" defaultChecked={v.allowsBackorder} className="h-3.5 w-3.5 accent-primary" />
                             Bajo pedido
                           </label>
-                          <button type="submit" className="rounded-md border border-border px-2.5 py-1 text-xs hover:border-muted-foreground/40 transition-colors">
-                            Guardar
-                          </button>
-                        </form>
+                        </div>
                         <form action={adjustStockAction.bind(null, v.id)} className="flex items-center gap-2">
                           <input name="quantity" type="number" required placeholder="±cantidad" className="h-7 w-24 rounded-md border border-input bg-background px-2 text-xs" />
                           <input name="reason" placeholder="Motivo" className="h-7 w-24 rounded-md border border-input bg-background px-2 text-xs" />
@@ -169,6 +177,7 @@ export default async function AdminProductVariantsPage({
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

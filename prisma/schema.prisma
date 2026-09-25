@@ -303,6 +303,12 @@ model Customer {
   @@index([email])
 }
 
+model NewsletterSubscriber {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  subscribedAt DateTime @default(now())
+}
+
 model Address {
   id         String   @id @default(cuid())
   customerId String

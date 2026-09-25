@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { ChevronRight, Heart, MessageCircle, Truck, ShieldCheck, ArrowRight } from "lucide-react";
+import { ChevronRight, Heart, Truck, ShieldCheck, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -32,6 +32,14 @@ import { deriveProductDisplayPrice } from "../domain/product-price-display";
 import { resolveSelectedSize } from "../domain/size-selection";
 
 type CustomType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
+
+function WhatsappIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current">
+      <path d="M12 2a9.9 9.9 0 0 0-8.55 14.9L2 22l5.27-1.38A10 10 0 1 0 12 2Zm0 18a8 8 0 0 1-4.08-1.12l-.29-.17-3.13.82.84-3.05-.19-.31A8 8 0 1 1 12 20Zm4.39-5.87c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.55.12-.16.24-.63.78-.77.94-.14.16-.28.18-.52.06a6.57 6.57 0 0 1-1.93-1.19 7.28 7.28 0 0 1-1.34-1.66c-.14-.24-.01-.37.11-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.55-1.31-.75-1.8-.2-.47-.4-.41-.55-.42h-.47c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.69 2.58 4.1 3.62.57.25 1.02.4 1.37.51.58.18 1.11.16 1.53.1.47-.07 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28Z" />
+    </svg>
+  );
+}
 
 export function ProductDetailClient({ product, currencyContext }: { product: ProductDetailData; currencyContext?: CurrencyContext }) {
   const [selectedVersion, setSelectedVersion] = useState(product.variants[0]?.version.slug ?? "");
@@ -242,81 +250,90 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
               <div className="grid gap-2 sm:grid-cols-2">
                 <Button size="xl" variant="outline" className="w-full" asChild>
                   <a href={whatsappLink(`Hola Flashsport, quiero avisarme cuando vuelva a estar disponible ${product.name}.`)} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="h-5 w-5" />
+                    <WhatsappIcon />
                     Avisarme
                   </a>
                 </Button>
                 <Button size="xl" variant="outline" className="w-full" asChild>
                   <a href={whatsappLink(`Hola Flashsport, quiero pedir por encargo ${product.name}.`)} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="h-5 w-5" />
-                    Pedir por encargo
-                  </a>
-                </Button>
-              </div>
-            </div>
-          ) : currentVariant && availableModes.length > 0 ? (
-            <>
-              <ProductDeliveryMode stock={currentVariant.stock} allowsBackorder={currentVariant.allowsBackorder} selected={deliveryMode} onSelect={setDeliveryMode} />
-
-              <AddToCartButton
-                variantId={currentVariant.id}
-                productSlug={product.slug}
-                productName={product.name}
-                teamName={product.team.name}
-                versionName={currentVariant.version.name}
-                sizeName={currentVariant.size.name}
-                imageUrl={product.images[0]?.url ?? ""}
-                unitPrice={currentVariant.salePrice + surcharge}
-                customizationType={customType}
-                customizationName={customizationName}
-                customizationNumber={customizationNumber}
-                deliveryMode={deliveryMode}
-                immediateStock={currentVariant.stock ?? 0}
-                remainingImmediate={immediateRemaining}
-                disabled={!personalizationValidation.ok || !selectedSize}
-                sizeRequired={!selectedSize}
-                onMissingSize={handleMissingSize}
-              />
-              {!personalizationValidation.ok && <p role="alert" className="text-sm text-destructive">{personalizationValidation.message}</p>}
-            </>
-          ) : currentVariant && currentVariant.availability === "OUT_OF_STOCK" ? (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Esta talla está agotada.</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button size="xl" variant="outline" className="w-full" asChild>
-                  <a href={whatsappLink(`Hola Flashsport, quiero avisarme cuando esté disponible la talla ${currentVariant.size.name} de ${product.name}.`)} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="h-5 w-5" />
-                    Avisarme
-                  </a>
-                </Button>
-                <Button size="xl" variant="outline" className="w-full" asChild>
-                  <a href={whatsappLink(`Hola Flashsport, quiero pedir por encargo ${product.name} en talla ${currentVariant.size.name}.`)} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="h-5 w-5" />
+                    <WhatsappIcon />
                     Pedir por encargo
                   </a>
                 </Button>
               </div>
             </div>
           ) : (
-            <AddToCartButton
-              variantId={currentVariant?.id ?? ""}
-              productSlug={product.slug}
-              productName={product.name}
-              teamName={product.team.name}
-              versionName={selectedVersion ? product.variants.find((variant) => variant.version.slug === selectedVersion)?.version.name ?? "" : ""}
-              sizeName={selectedSize || ""}
-              imageUrl={product.images[0]?.url ?? ""}
-              unitPrice={currentVariant?.salePrice ?? 0}
-              customizationType={customType}
-              customizationName={customizationName}
-              customizationNumber={customizationNumber}
-              deliveryMode={deliveryMode}
-              immediateStock={currentVariant?.stock ?? 0}
-              remainingImmediate={immediateRemaining}
-              disabled={!personalizationValidation.ok}
-              sizeRequired={!selectedSize || !currentVariant}
-              onMissingSize={handleMissingSize}
-            />
+            <>
+              <ProductDeliveryMode
+                stock={currentVariant?.stock ?? null}
+                allowsBackorder={currentVariant?.allowsBackorder ?? true}
+                selected={deliveryMode}
+                onSelect={setDeliveryMode}
+              />
+
+              {currentVariant && availableModes.length > 0 ? (
+                <>
+                  <AddToCartButton
+                    variantId={currentVariant.id}
+                    productSlug={product.slug}
+                    productName={product.name}
+                    teamName={product.team.name}
+                    versionName={currentVariant.version.name}
+                    sizeName={currentVariant.size.name}
+                    imageUrl={product.images[0]?.url ?? ""}
+                    unitPrice={currentVariant.salePrice + surcharge}
+                    customizationType={customType}
+                    customizationName={customizationName}
+                    customizationNumber={customizationNumber}
+                    deliveryMode={deliveryMode}
+                    immediateStock={currentVariant.stock ?? 0}
+                    remainingImmediate={immediateRemaining}
+                    disabled={!personalizationValidation.ok || !selectedSize}
+                    sizeRequired={!selectedSize}
+                    onMissingSize={handleMissingSize}
+                  />
+                  {!personalizationValidation.ok && <p role="alert" className="text-sm text-destructive">{personalizationValidation.message}</p>}
+                </>
+              ) : currentVariant && currentVariant.availability === "OUT_OF_STOCK" ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Esta talla está agotada.</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button size="xl" variant="outline" className="w-full" asChild>
+                  <a href={whatsappLink(`Hola Flashsport, quiero avisarme cuando esté disponible la talla ${currentVariant.size.name} de ${product.name}.`)} target="_blank" rel="noopener noreferrer">
+                    <WhatsappIcon />
+                    Avisarme
+                  </a>
+                </Button>
+                <Button size="xl" variant="outline" className="w-full" asChild>
+                  <a href={whatsappLink(`Hola Flashsport, quiero pedir por encargo ${product.name} en talla ${currentVariant.size.name}.`)} target="_blank" rel="noopener noreferrer">
+                    <WhatsappIcon />
+                    Pedir por encargo
+                  </a>
+                </Button>
+              </div>
+            </div>
+              ) : (
+                <AddToCartButton
+                  variantId={currentVariant?.id ?? ""}
+                  productSlug={product.slug}
+                  productName={product.name}
+                  teamName={product.team.name}
+                  versionName={selectedVersion ? product.variants.find((variant) => variant.version.slug === selectedVersion)?.version.name ?? "" : ""}
+                  sizeName={selectedSize || ""}
+                  imageUrl={product.images[0]?.url ?? ""}
+                  unitPrice={currentVariant?.salePrice ?? 0}
+                  customizationType={customType}
+                  customizationName={customizationName}
+                  customizationNumber={customizationNumber}
+                  deliveryMode={deliveryMode}
+                  immediateStock={currentVariant?.stock ?? 0}
+                  remainingImmediate={immediateRemaining}
+                  disabled={!personalizationValidation.ok || !selectedSize || !currentVariant}
+                  sizeRequired={!selectedSize || !currentVariant}
+                  onMissingSize={handleMissingSize}
+                />
+              )}
+            </>
           )}
 
           {product.description && <p className="text-sm leading-relaxed text-muted-foreground">{product.description}</p>}

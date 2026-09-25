@@ -29,13 +29,13 @@ export function ProductDeliveryMode({
   const options: { mode: DeliveryMode; disabled: boolean; reason: string | null }[] = [
     {
       mode: "INMEDIATA",
-      disabled: !hasStock,
-      reason: !hasStock ? "Sin stock disponible" : null,
+      disabled: stock === null || !hasStock,
+      reason: stock === null ? "Selecciona versión y talla" : !hasStock ? "Sin stock disponible" : null,
     },
     {
       mode: "BAJO_PEDIDO",
-      disabled: !allowsBackorder,
-      reason: !allowsBackorder ? "No disponible en esta talla" : null,
+      disabled: stock === null || !allowsBackorder,
+      reason: stock === null ? "Selecciona versión y talla" : !allowsBackorder ? "No disponible en esta talla" : null,
     },
   ];
 
