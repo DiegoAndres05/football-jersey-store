@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, ArrowRight, CreditCard, Landmark, ShieldCheck, WalletCards } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, CreditCard, Landmark, ShieldCheck, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -358,6 +358,78 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
     }
   };
 
+  const summaryItems = (
+    <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+      {items.map((item) => (
+        <div key={item.lineId} className="flex min-w-0 gap-3">
+          {item.imageUrl ? (
+            <div className="relative h-16 w-14 shrink-0 overflow-hidden rounded-md bg-secondary">
+              <Image src={item.imageUrl} alt={item.productName} fill sizes="52px" className="object-cover" />
+            </div>
+          ) : (
+            <div className="h-16 w-14 shrink-0 rounded-md bg-secondary" />
+          )}
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="line-clamp-2 break-words font-medium leading-snug">{item.productName}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatPurchaseLineDetail(item)}
+            </p>
+            {item.customizationType !== "NONE" && (
+              <p className="text-xs text-muted-foreground">
+                Personalización ({item.customizationName || "—"}
+                {item.customizationNumber ? ` · ${item.customizationNumber}` : ""})
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {DELIVERY_MODE_INFO[item.deliveryMode].label} ·{" "}
+              {DELIVERY_MODE_INFO[item.deliveryMode].eta}
+            </p>
+          </div>
+          <p className="shrink-0 text-right text-sm font-medium tabular-nums">
+            {formatMoney({ amountCop: item.unitPrice * item.quantity, ...moneyContext })}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+
+  const summaryTotals = (
+    <dl className="space-y-2 text-sm">
+      <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+        <dt className="text-muted-foreground">Subtotal</dt>
+        <dd className="font-medium tabular-nums">{formatMoney({ amountCop: breakdown.productSubtotal, ...moneyContext })}</dd>
+      </div>
+      {personalizationFee > 0 && (
+        <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+          <dt className="text-muted-foreground">Personalización</dt>
+          <dd className="font-medium tabular-nums">{formatMoney({ amountCop: personalizationFee, ...moneyContext })}</dd>
+        </div>
+      )}
+      {appliedCouponDiscount > 0 && (
+        <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+          <dt className="text-muted-foreground">Descuento</dt>
+          <dd className="font-medium tabular-nums text-green-700">-{formatMoney({ amountCop: appliedCouponDiscount, ...moneyContext })}</dd>
+        </div>
+      )}
+      <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+        <dt className="text-muted-foreground">Envío ({shippingScope})</dt>
+        <dd className="font-medium tabular-nums">{fee === 0 ? "Gratis" : formatMoney({ amountCop: fee, ...moneyContext })}</dd>
+      </div>
+      {remaining > 0 && (
+        <p className="rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
+          Te faltan {formatMoney({ amountCop: remaining, ...moneyContext })} para envío gratis.
+        </p>
+      )}
+    </dl>
+  );
+
+  const continueButtonContent = (
+    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+      Continuar al pago
+      <ArrowRight className="h-4 w-4 shrink-0" />
+    </span>
+  );
+
   return (
     <div className="container-page py-6 sm:py-8">
       <div className="mb-6">
@@ -373,7 +445,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
       <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8">
         <div className="min-w-0 space-y-6">
           {step === "form" ? (
-            <form onSubmit={handleSubmit(onValid)} className="space-y-6" noValidate>
+            <form id="checkout-form" onSubmit={handleSubmit(onValid)} className="space-y-6" noValidate>
               <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
                 <h2 className="font-display text-lg font-bold uppercase tracking-tight mb-4">Contacto</h2>
                 <div className="grid sm:grid-cols-2 gap-3">
@@ -393,10 +465,6 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
                     {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
                   </div>
                 </div>
-              </section>
-
-              <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
-                <CheckoutConsents register={register} errors={errors} legal={legalConfig ?? null} />
               </section>
 
               <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
@@ -472,13 +540,10 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
 
               <Button
                 type="submit"
-                className="w-full !flex-nowrap !whitespace-nowrap sm:w-auto"
+                className="w-full !flex-nowrap !whitespace-nowrap max-lg:hidden sm:w-auto"
                 disabled={!isValid}
               >
-                <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                  Continuar al pago
-                  <ArrowRight className="h-4 w-4 shrink-0" />
-                </span>
+                {continueButtonContent}
               </Button>
             </form>
           ) : (
@@ -559,88 +624,73 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
         </div>
 
         {/* Summary */}
-        <aside className="min-w-0 rounded-xl border border-border bg-card p-4 space-y-4 sm:p-5 lg:sticky lg:top-24">
-          <h2 className="font-display text-lg font-bold uppercase tracking-tight">Resumen</h2>
-          {appliedCouponCode ? (
-            <p className="mt-3 text-sm text-green-700">
-              Cupón <strong>{appliedCouponCode}</strong> aplicado: -
-              {formatMoney({ amountCop: appliedCouponDiscount, currency: checkoutCurrency.currency, copPerUsd: checkoutCurrency.copPerUsd ?? undefined })}
-              <button type="button" className="ml-2 underline" onClick={() => { clearCoupon(); setPayError(""); }}>Quitar cupón</button>
-            </p>
-          ) : (
-            <p className="mt-3 text-xs text-muted-foreground">
-              El cupón se aplica en el carrito antes de continuar al pago.
-            </p>
-          )}
-          <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-            {items.map((item) => (
-              <div key={item.lineId} className="flex min-w-0 gap-3">
-                {item.imageUrl ? (
-                  <div className="relative h-16 w-14 shrink-0 overflow-hidden rounded-md bg-secondary">
-                    <Image src={item.imageUrl} alt={item.productName} fill sizes="52px" className="object-cover" />
-                  </div>
-                ) : (
-                  <div className="h-16 w-14 shrink-0 rounded-md bg-secondary" />
-                )}
-                <div className="min-w-0 flex-1 text-sm">
-                  <p className="truncate font-medium">{item.productName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatPurchaseLineDetail(item)}
-                  </p>
-                  {item.customizationType !== "NONE" && (
-                    <p className="text-xs text-muted-foreground">
-                      Personalización ({item.customizationName || "—"}
-                      {item.customizationNumber ? ` · ${item.customizationNumber}` : ""})
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {DELIVERY_MODE_INFO[item.deliveryMode].label} ·{" "}
-                    {DELIVERY_MODE_INFO[item.deliveryMode].eta}
-                  </p>
-                </div>
-                <p className="shrink-0 text-right text-sm font-medium tabular-nums">
-                  {formatMoney({ amountCop: item.unitPrice * item.quantity, ...moneyContext })}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <Separator />
-
-          <dl className="space-y-2 text-sm">
-            <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
-              <dt className="text-muted-foreground">Subtotal</dt>
-              <dd className="font-medium tabular-nums">{formatMoney({ amountCop: breakdown.productSubtotal, ...moneyContext })}</dd>
-            </div>
-            {personalizationFee > 0 && (
-              <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
-                <dt className="text-muted-foreground">Personalización</dt>
-                <dd className="font-medium tabular-nums">{formatMoney({ amountCop: personalizationFee, ...moneyContext })}</dd>
-              </div>
-            )}
-            {appliedCouponDiscount > 0 && (
-              <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
-                <dt className="text-muted-foreground">Descuento</dt>
-                <dd className="font-medium tabular-nums text-green-700">-{formatMoney({ amountCop: appliedCouponDiscount, ...moneyContext })}</dd>
-              </div>
-            )}
-            <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
-              <dt className="text-muted-foreground">Envío ({shippingScope})</dt>
-              <dd className="font-medium tabular-nums">{fee === 0 ? "Gratis" : formatMoney({ amountCop: fee, ...moneyContext })}</dd>
-            </div>
-            {remaining > 0 && (
-              <p className="rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
-                Te faltan {formatMoney({ amountCop: remaining, ...moneyContext })} para envío gratis.
+        <aside className="contents lg:sticky lg:top-24 lg:block lg:rounded-xl lg:border lg:border-border lg:bg-card lg:p-5">
+          <div className={`order-2 min-w-0 rounded-xl border border-border bg-card p-4 space-y-4 sm:p-5 lg:order-none lg:rounded-none lg:border-0 lg:p-0 ${step === "form" ? "max-[430px]:hidden" : ""}`}>
+            <h2 className="font-display text-lg font-bold uppercase tracking-tight">Resumen</h2>
+            {appliedCouponCode ? (
+              <p className="mt-3 text-sm text-green-700">
+                Cupón <strong>{appliedCouponCode}</strong> aplicado: -
+                {formatMoney({ amountCop: appliedCouponDiscount, currency: checkoutCurrency.currency, copPerUsd: checkoutCurrency.copPerUsd ?? undefined })}
+                <button type="button" className="ml-2 underline" onClick={() => { clearCoupon(); setPayError(""); }}>Quitar cupón</button>
+              </p>
+            ) : (
+              <p className="mt-3 text-xs text-muted-foreground">
+                El cupón se aplica en el carrito antes de continuar al pago.
               </p>
             )}
-          </dl>
+            {summaryItems}
 
-          <Separator />
+            <Separator />
 
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <span className="text-sm font-medium">Total</span>
-            <span className="text-xl font-bold tabular-nums sm:text-2xl">{formatMoney({ amountCop: total, ...moneyContext })}</span>
+            {summaryTotals}
+
+            <Separator />
+
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <span className="text-sm font-medium">Total</span>
+              <span className="text-xl font-bold tabular-nums sm:text-2xl">{formatMoney({ amountCop: total, ...moneyContext })}</span>
+            </div>
           </div>
+
+          <section className="order-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5 lg:order-none lg:mt-4 lg:border-0 lg:p-0">
+            <CheckoutConsents register={register} errors={errors} legal={legalConfig ?? null} />
+          </section>
+
+          {step === "form" && (
+            <div className="order-3 min-w-0 space-y-3 lg:hidden">
+              <details data-testid="checkout-mobile-summary" className="group min-w-0 rounded-xl border border-border bg-card min-[431px]:hidden">
+                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm [&::-webkit-details-marker]:hidden">
+                  <span className="min-w-0">
+                    <span className="block font-medium">Ver resumen</span>
+                    <span className="block text-xs text-muted-foreground">{items.length} {items.length === 1 ? "artículo" : "artículos"} · envío {fee === 0 ? "gratis" : formatMoney({ amountCop: fee, ...moneyContext })}</span>
+                  </span>
+                  <span className="inline-flex shrink-0 items-center gap-2 font-bold tabular-nums">
+                    {formatMoney({ amountCop: total, ...moneyContext })}
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+                  </span>
+                </summary>
+                <div className="space-y-4 border-t border-border px-4 pb-4 pt-3">
+                  {summaryItems}
+                  <Separator />
+                  {summaryTotals}
+                  <Separator />
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <span className="text-sm font-medium">Total</span>
+                    <span className="text-xl font-bold tabular-nums">{formatMoney({ amountCop: total, ...moneyContext })}</span>
+                  </div>
+                </div>
+              </details>
+              <Button
+                type="submit"
+                form="checkout-form"
+                size="lg"
+                className="w-full !flex-nowrap !whitespace-nowrap"
+                disabled={!isValid}
+              >
+                {continueButtonContent}
+              </Button>
+            </div>
+          )}
         </aside>
       </div>
     </div>

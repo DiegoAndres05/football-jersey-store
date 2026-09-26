@@ -24,13 +24,15 @@ export function CheckoutConsents({ register, errors, legal }: Props) {
         const error = errors[field];
         return (
           <div key={key}>
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" {...register(field)} className="mt-1 h-4 w-4" />
-              <span>
+            <label className="flex min-h-11 items-center gap-1 text-sm">
+              <span className="-ml-3 flex h-11 w-11 shrink-0 items-center justify-center">
+                <input type="checkbox" {...register(field)} className="h-5 w-5" />
+              </span>
+              <span className="py-1">
                 {doc.url ? <Link href={doc.url} target={doc.url.startsWith("http") ? "_blank" : undefined} rel={doc.url.startsWith("http") ? "noopener noreferrer" : undefined} className="underline">{label}</Link> : label}
               </span>
             </label>
-            {error && <p className="ml-6 text-xs text-destructive">{String(error.message || "Debes aceptar este documento.")}</p>}
+            {error && <p className="ml-9 text-xs text-destructive">{String(error.message || "Debes aceptar este documento.")}</p>}
           </div>
         );
       })}

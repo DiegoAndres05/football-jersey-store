@@ -157,17 +157,20 @@ export default async function ProductosPage({ searchParams }: PageProps) {
           <div className="lg:hidden my-6">
             <details className="group">
               <summary className="flex min-h-12 items-center justify-between rounded-lg border border-border bg-card p-3 text-sm font-medium cursor-pointer hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                <div className="flex items-center gap-2">
-                  <span id="mobile-filter-label">Filtros</span>
-                  {hasActiveFilters && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold text-background">
-                      {activeFilters.length}
-                    </span>
-                  )}
-                </div>
+                <span id="mobile-filter-label">
+                  {hasActiveFilters ? `Filtros (${activeFilters.length})` : "Filtros"}
+                </span>
                 <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
               </summary>
               <div className="mt-3" aria-labelledby="mobile-filter-label">
+                {hasActiveFilters && (
+                  <Link
+                    href="/productos"
+                    className="mb-4 inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4 hover:text-foreground"
+                  >
+                    Limpiar todo
+                  </Link>
+                )}
                 <ProductFilters
                   leagues={leagues.map((l) => ({ slug: l.slug, name: l.name, country: l.country }))}
                   teams={teams.map((t) => ({ slug: t.slug, name: t.name }))}
@@ -186,7 +189,7 @@ export default async function ProductosPage({ searchParams }: PageProps) {
                 <a
                   key={f.param}
                   href={f.removeHref}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:border-foreground/40 hover:bg-accent transition-colors"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium lg:min-h-0 hover:border-foreground/40 hover:bg-accent transition-colors"
                 >
                   {f.label}
                   <X className="h-3 w-3 text-muted-foreground" />
@@ -194,7 +197,7 @@ export default async function ProductosPage({ searchParams }: PageProps) {
               ))}
               <Link
                 href="/productos"
-                className="text-xs font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors"
+                className="hidden text-xs font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors lg:inline"
               >
                 Limpiar todo
               </Link>

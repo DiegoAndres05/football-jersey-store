@@ -6,11 +6,13 @@ import { usePathname } from "next/navigation";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { CartIcon } from "@/components/ui/cart-icon";
 import { shouldShowMobileCartFab } from "@/features/cart/domain/mobile-cart-fab";
+import { useViewportWidth } from "@/shared/hooks/use-viewport-width";
 
 export function MobileCartFab({ isMobileMenuOpen }: { isMobileMenuOpen: boolean }) {
   const pathname = usePathname();
   const itemCount = useCartStore((state) => state.items.reduce((acc, item) => acc + item.quantity, 0));
   const [hydrated, setHydrated] = useState(false);
+  const viewportWidth = useViewportWidth();
 
   useEffect(() => {
     const persist = useCartStore.persist;
@@ -31,6 +33,7 @@ export function MobileCartFab({ isMobileMenuOpen }: { isMobileMenuOpen: boolean 
     pathname,
     isCompactNav: true,
     isMobileMenuOpen,
+    viewportWidth,
   });
   if (!visible) return null;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, type ComponentProps } from "react";
 import Link from "next/link";
 import { ChevronRight, Heart, Truck, ShieldCheck, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,8 @@ import { ProductPrice } from "./product-price";
 import { ProductDeliveryMode } from "./product-delivery-mode";
 import { ProductAvailability } from "./product-availability";
 import { AddToCartButton } from "./add-to-cart-button";
+import { ProductPurchaseBar } from "./product-purchase-bar";
+import { formatMoney } from "@/shared/money/format";
 import type { ProductDetailData, VariantWithStock } from "@/features/products/types/product-types";
 import { SizeGuideDialog } from "./size-guide-dialog";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
@@ -168,6 +170,47 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
     setDeliveryMode((selected) => resolveDeliveryModeSelection(selected, modes) ?? selected);
   }, [currentVariant]);
 
+  const canAddVariant = Boolean(currentVariant && availableModes.length > 0);
+  const sizeSoldOut = Boolean(currentVariant && !canAddVariant && currentVariant.availability === "OUT_OF_STOCK");
+  const sharedAddToCartProps = {
+    productSlug: product.slug,
+    productName: product.name,
+    teamName: product.team.name,
+    imageUrl: product.images[0]?.url ?? "",
+    customizationType: customType,
+    customizationName,
+    customizationNumber,
+    deliveryMode,
+    remainingImmediate: immediateRemaining,
+    onMissingSize: handleMissingSize,
+  };
+  const addToCartProps: ComponentProps<typeof AddToCartButton> | null = product.availability === "OUT_OF_STOCK" || sizeSoldOut
+    ? null
+    : canAddVariant && currentVariant
+      ? {
+          ...sharedAddToCartProps,
+          variantId: currentVariant.id,
+          versionName: currentVariant.version.name,
+          sizeName: currentVariant.size.name,
+          unitPrice: currentVariant.salePrice + surcharge,
+          immediateStock: currentVariant.stock ?? 0,
+          disabled: !personalizationValidation.ok || !selectedSize,
+          sizeRequired: !selectedSize,
+        }
+      : {
+          ...sharedAddToCartProps,
+          variantId: currentVariant?.id ?? "",
+          versionName: selectedVersion ? product.variants.find((variant) => variant.version.slug === selectedVersion)?.version.name ?? "" : "",
+          sizeName: selectedSize || "",
+          unitPrice: currentVariant?.salePrice ?? 0,
+          immediateStock: currentVariant?.stock ?? 0,
+          disabled: !personalizationValidation.ok || !selectedSize || !currentVariant,
+          sizeRequired: !selectedSize || !currentVariant,
+        };
+  const barPrice = priceDisplay.showPrice && priceDisplay.displayPrice !== null
+    ? formatMoney({ amountCop: priceDisplay.displayPrice + surcharge, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })
+    : null;
+
   return (
     <div className="container-page py-8">
       <div className="mb-6 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -271,30 +314,12 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
                 onSelect={setDeliveryMode}
               />
 
-              {currentVariant && availableModes.length > 0 ? (
+              {canAddVariant && addToCartProps ? (
                 <>
-                  <AddToCartButton
-                    variantId={currentVariant.id}
-                    productSlug={product.slug}
-                    productName={product.name}
-                    teamName={product.team.name}
-                    versionName={currentVariant.version.name}
-                    sizeName={currentVariant.size.name}
-                    imageUrl={product.images[0]?.url ?? ""}
-                    unitPrice={currentVariant.salePrice + surcharge}
-                    customizationType={customType}
-                    customizationName={customizationName}
-                    customizationNumber={customizationNumber}
-                    deliveryMode={deliveryMode}
-                    immediateStock={currentVariant.stock ?? 0}
-                    remainingImmediate={immediateRemaining}
-                    disabled={!personalizationValidation.ok || !selectedSize}
-                    sizeRequired={!selectedSize}
-                    onMissingSize={handleMissingSize}
-                  />
+                  <AddToCartButton {...addToCartProps} />
                   {!personalizationValidation.ok && <p role="alert" className="text-sm text-destructive">{personalizationValidation.message}</p>}
                 </>
-              ) : currentVariant && currentVariant.availability === "OUT_OF_STOCK" ? (
+              ) : currentVariant && sizeSoldOut ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">Esta talla está agotada.</p>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -312,27 +337,9 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
                 </Button>
               </div>
             </div>
-              ) : (
-                <AddToCartButton
-                  variantId={currentVariant?.id ?? ""}
-                  productSlug={product.slug}
-                  productName={product.name}
-                  teamName={product.team.name}
-                  versionName={selectedVersion ? product.variants.find((variant) => variant.version.slug === selectedVersion)?.version.name ?? "" : ""}
-                  sizeName={selectedSize || ""}
-                  imageUrl={product.images[0]?.url ?? ""}
-                  unitPrice={currentVariant?.salePrice ?? 0}
-                  customizationType={customType}
-                  customizationName={customizationName}
-                  customizationNumber={customizationNumber}
-                  deliveryMode={deliveryMode}
-                  immediateStock={currentVariant?.stock ?? 0}
-                  remainingImmediate={immediateRemaining}
-                  disabled={!personalizationValidation.ok || !selectedSize || !currentVariant}
-                  sizeRequired={!selectedSize || !currentVariant}
-                  onMissingSize={handleMissingSize}
-                />
-              )}
+              ) : addToCartProps ? (
+                <AddToCartButton {...addToCartProps} />
+              ) : null}
             </>
           )}
 
@@ -353,6 +360,18 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
           </div>
         </div>
       </div>
+
+      {product.availability !== "OUT_OF_STOCK" && (
+        <ProductPurchaseBar
+          price={barPrice}
+          sizeLabel={selectedSize ? currentVariant?.size.name ?? selectedSize : null}
+          action={addToCartProps ? (
+            <AddToCartButton {...addToCartProps} className="h-12 w-auto px-4 text-sm" />
+          ) : (
+            <Button size="lg" disabled className="px-4 text-sm">Talla agotada</Button>
+          )}
+        />
+      )}
     </div>
   );
 }

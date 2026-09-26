@@ -58,7 +58,7 @@ function SocialIcon({ name }: { name: (typeof SOCIAL_LINKS)[number]["label"] }) 
 export function Footer() {
   return (
     <footer className="border-t border-border bg-card mt-16">
-      <div className="container-page py-12">
+      <div className="container-page pt-12 pb-28 lg:pb-12">
         <div className="grid grid-cols-2 gap-8 lg:grid-cols-5">
           <div className="col-span-2 lg:col-span-2">
             <Link href="/" className="font-display text-3xl font-bold uppercase tracking-[0.12em]">

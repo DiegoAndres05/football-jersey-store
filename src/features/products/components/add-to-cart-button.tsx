@@ -107,7 +107,7 @@ export function AddToCartButton({
     <Button
       size="xl"
       className={cn("w-full whitespace-nowrap", className)}
-      disabled={disabled}
+      disabled={disabled && !sizeRequired}
       onClick={handleClick}
       icon={added ? <Check className="h-5 w-5" /> : <CartIcon className="h-5 w-5" />}
     >

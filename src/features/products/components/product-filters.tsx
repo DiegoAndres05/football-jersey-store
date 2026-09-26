@@ -73,10 +73,10 @@ function Chip({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "min-h-10 rounded-md px-3 py-1.5 text-xs font-medium border transition-colors",
+        "min-h-11 rounded-md px-3 py-1.5 text-xs font-medium border transition-colors",
         "disabled:pointer-events-none disabled:opacity-50",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        square && "h-9 w-9 px-0 flex items-center justify-center",
+        square && "h-11 w-11 px-0 flex items-center justify-center",
         active
           ? "bg-foreground text-background border-foreground"
           : "bg-background text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground",
@@ -166,7 +166,7 @@ export function ProductFilters({
             type="button"
             onClick={() => setParam("q", "")}
             aria-label="Limpiar búsqueda"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="absolute right-0 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -182,7 +182,7 @@ export function ProductFilters({
           value={active.sort}
           disabled={isPending}
           onChange={(e) => setParam("sort", e.target.value)}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           {SORT_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -193,7 +193,7 @@ export function ProductFilters({
       {/* Availability */}
       <fieldset>
         <legend className="text-xs font-medium text-muted-foreground mb-2 block">Disponibilidad</legend>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {AVAILABILITY_OPTIONS.map((opt) => (
             <Chip
               key={opt.value}
@@ -212,7 +212,7 @@ export function ProductFilters({
       {/* Delivery mode */}
       <fieldset>
         <legend className="text-xs font-medium text-muted-foreground mb-2 block">Modalidad de entrega</legend>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {DELIVERY_MODE_OPTIONS.map((opt) => (
             <Chip
               key={opt.value}
@@ -237,7 +237,7 @@ export function ProductFilters({
           value={active.league}
           disabled={isPending}
           onChange={(event) => setParam("liga", event.target.value)}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           <option value="">Todas las ligas</option>
           {leagues.map((l) => (
@@ -250,7 +250,7 @@ export function ProductFilters({
       {active.league && teams.length > 0 && (
         <fieldset>
           <legend className="text-xs font-medium text-muted-foreground mb-2 block">Equipo</legend>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {teams.map((t) => (
               <Chip
                 key={t.slug}
@@ -274,7 +274,7 @@ export function ProductFilters({
           value={active.season}
           disabled={isPending}
           onChange={(event) => setParam("temporada", event.target.value)}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           <option value="">Todas las temporadas</option>
           {seasons.map((s) => (
@@ -288,7 +288,7 @@ export function ProductFilters({
       {/* Version */}
       <fieldset>
         <legend className="text-xs font-medium text-muted-foreground mb-2 block">Versión</legend>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {versions.map((v) => (
             <Chip
               key={v.slug}
@@ -305,7 +305,7 @@ export function ProductFilters({
       {/* Size */}
       <fieldset>
         <legend className="text-xs font-medium text-muted-foreground mb-2 block">Talla</legend>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {sizes.map((s) => (
             <Chip
               key={s.code}
@@ -324,7 +324,7 @@ export function ProductFilters({
         <button
           type="button"
           onClick={clearFilters}
-          className="flex min-h-10 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
+          className="flex min-h-11 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
         >
           <X className="h-3.5 w-3.5" />
           Limpiar filtros

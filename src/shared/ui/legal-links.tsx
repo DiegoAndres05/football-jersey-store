@@ -21,6 +21,7 @@ export function LegalLinks({ className = "" }: { className?: string }) {
     ["Términos y condiciones", links.terms.url],
     ["Privacidad", links.privacy.url],
     ["Cambios y devoluciones", links.returns.url],
+    ["Cookies", "/cookies"],
   ] as const;
   return (
     <nav aria-label="Información legal" className={`flex flex-wrap items-center gap-4 ${className}`}>

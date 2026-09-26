@@ -43,7 +43,7 @@ export function NavLinks({
             className={cn(
               mobile
                 ? cn(
-                    "whitespace-nowrap border-l-2 py-2.5 pl-4 text-sm font-semibold uppercase tracking-[0.14em] transition-colors",
+                    "flex min-h-11 items-center whitespace-nowrap border-l-2 pl-4 text-sm font-semibold uppercase tracking-[0.14em] transition-colors",
                     isActive
                       ? "border-foreground text-foreground"
                       : "border-transparent text-muted-foreground hover:text-foreground",

@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 
 export default function ContactoPage() {
   return (
-    <div className="container-page py-8 md:py-12 max-w-3xl">
+    <div className="container-page pt-8 pb-24 md:pt-12 lg:pb-12 max-w-3xl">
       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
         <Link href="/" className="hover:text-foreground transition-colors">Inicio</Link>
         <ChevronRight className="h-3.5 w-3.5" />

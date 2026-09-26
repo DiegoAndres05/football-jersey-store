@@ -106,6 +106,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
 
   const freeShippingThreshold = SHIPPING.freeThreshold;
   const remaining = Math.max(0, freeShippingThreshold - (subtotal + personalizationFee));
+  const freeShippingProgress = Math.min(100, Math.round(((subtotal + personalizationFee) / freeShippingThreshold) * 100));
 
   if (isEmpty) {
     return (
@@ -171,7 +172,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
                   <div className="min-w-0">
                     <Link
                       href={item.lineKind === "MYSTERY_BOX" ? "/caja-misteriosa" : `/productos/${item.productSlug}`}
-                      className="font-medium hover:underline line-clamp-1"
+                      className="break-words font-medium leading-snug hover:underline line-clamp-2"
                     >
                       {item.productName}
                     </Link>
@@ -207,6 +208,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="h-11 w-11 shrink-0"
                     onClick={() => removeItem(item.lineId)}
                     aria-label={`Quitar ${item.productName} del carrito`}
                   >
@@ -219,7 +221,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-11 w-11"
                       onClick={() => updateQuantity(item.lineId, item.quantity - 1)}
                       disabled={item.quantity <= 1}
                       aria-label="Disminuir cantidad"
@@ -232,7 +234,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-11 w-11"
                       onClick={() =>
                         updateQuantity(
                           item.lineId,
@@ -311,16 +313,29 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
             </div>
           )}
 
-          {remaining > 0 ? (
-            <p className="mt-3 rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
-              Te faltan {formatMoney({ amountCop: remaining, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })} para envío gratis desde{" "}
-              {formatMoney({ amountCop: freeShippingThreshold, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}.
-            </p>
-          ) : (
-            <p className="mt-3 rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
-              ¡Tienes envío gratis!
-            </p>
-          )}
+          <div className="mt-3 rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
+            {remaining > 0 ? (
+              <p>
+                Te faltan {formatMoney({ amountCop: remaining, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })} para envío gratis desde{" "}
+                {formatMoney({ amountCop: freeShippingThreshold, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}.
+              </p>
+            ) : (
+              <p>¡Tienes envío gratis!</p>
+            )}
+            <div
+              role="progressbar"
+              aria-label="Avance hacia el envío gratis"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={freeShippingProgress}
+              className="mt-2 h-1.5 overflow-hidden rounded-full bg-border"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
+                style={{ width: `${freeShippingProgress}%` }}
+              />
+            </div>
+          </div>
 
           <Separator className="my-4" />
 

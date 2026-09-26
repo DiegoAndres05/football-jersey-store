@@ -43,7 +43,7 @@ export function ProductVariantSelector({
                 aria-pressed={isSelected}
                 onClick={() => onVersionChange(v.slug)}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-xl border-2 px-4 py-2.5 text-sm transition-all",
+                  "flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl border-2 px-4 py-2.5 text-sm transition-all",
                   isSelected
                     ? "border-primary bg-primary/5 text-primary font-medium"
                     : "border-border hover:border-muted-foreground/40 text-foreground",
@@ -75,7 +75,7 @@ export function ProductVariantSelector({
                 onClick={() => !isDisabled && onSizeChange(s.code)}
                 disabled={isDisabled}
                 className={cn(
-                  "h-10 min-w-[3rem] rounded-xl border-2 text-sm font-medium transition-all flex items-center justify-center px-3",
+                  "min-h-11 min-w-11 rounded-xl border-2 text-sm font-medium transition-all flex items-center justify-center px-3",
                   isSelected
                     ? "border-primary bg-primary/5 text-primary"
                     : isDisabled

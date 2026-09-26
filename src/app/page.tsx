@@ -96,7 +96,7 @@ export default async function HomePage() {
     <div>
       {/* ── HERO ───────────────────────────────────────────────────── */}
       <section className="border-b border-border">
-        <div className="container-page grid items-center gap-10 pb-16 pt-10 md:pb-20 md:pt-14 lg:grid-cols-12 lg:gap-6">
+        <div className="container-page grid items-center gap-6 pb-12 pt-6 sm:gap-10 sm:pb-16 sm:pt-10 md:pb-20 md:pt-14 lg:grid-cols-12 lg:gap-6">
           {/* Texto */}
           <div className="lg:col-span-6 lg:pr-8">
             <HeroCopyAnimation>
@@ -108,7 +108,7 @@ export default async function HomePage() {
               </p>
               <h1
                 data-hero-title
-                className="mt-5 font-display text-5xl font-bold uppercase leading-[0.95] tracking-[-0.01em] md:text-6xl xl:text-7xl"
+                className="mt-3 font-display text-4xl font-bold uppercase leading-[0.95] tracking-[-0.01em] min-[390px]:text-5xl sm:mt-5 md:text-6xl xl:text-7xl"
               >
                 Camisetas de fútbol
                 <br />
@@ -116,14 +116,14 @@ export default async function HomePage() {
               </h1>
               <p
                 data-hero-description
-                className="mt-5 max-w-md text-muted-foreground leading-relaxed"
+                className="mt-4 max-w-md text-muted-foreground leading-relaxed sm:mt-5"
               >
                 Camisetas de fútbol de las mejores ligas del mundo. Equipos,
                 temporadas y tallas reales, con envío a todo el país.
               </p>
               <div
                 data-hero-actions
-                className="mt-8 flex flex-wrap items-center gap-4"
+                className="mt-6 flex flex-wrap items-center gap-3 sm:mt-8 sm:gap-4"
               >
                 <Button size="lg" asChild>
                   <Link href="/productos">
@@ -223,7 +223,7 @@ export default async function HomePage() {
 
         <Marquee
           className="mt-8"
-          pauseOnHover
+          pauseOnHover={false}
           speed={36}
           aria-label="Principales ligas de fútbol"
         >

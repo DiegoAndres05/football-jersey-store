@@ -87,7 +87,7 @@ export function Header({
           <div className="flex min-w-0 items-center gap-4 xl:gap-6">
             <Link
               href="/"
-              className="relative -ml-3 block translate-y-1 h-8 w-[11.75rem] shrink-0 md:h-9 md:w-[13.5rem]"
+              className="relative -ml-3 block translate-y-1 h-7 w-[8rem] shrink-0 min-[390px]:h-8 min-[390px]:w-[11.75rem] md:h-9 md:w-[13.5rem]"
             >
               <Image
                 src="/flashsport-logo.png"
@@ -105,7 +105,7 @@ export function Header({
             <NavLinks className="hidden justify-center lg:flex" />
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {currencySlot && (
               <div className="hidden border-l border-border pl-3 sm:ml-3 sm:block xl:ml-4 xl:pl-4">{currencySlot}</div>
             )}
@@ -130,14 +130,14 @@ export function Header({
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
+              className="h-11 w-11 md:hidden"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
               aria-label="Buscar"
             >
               <Search className="h-5 w-5" />
             </Button>
 
-            <Button variant="ghost" size="icon" asChild aria-label="Cuenta">
+            <Button variant="ghost" size="icon" asChild aria-label="Cuenta" className="hidden h-11 w-11 md:inline-flex">
               <Link href="/cuenta">
                 <User className="h-5 w-5" />
               </Link>
@@ -188,7 +188,7 @@ export function Header({
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden"
+              className="h-11 w-11 lg:hidden"
               onClick={() => setIsMobileOpen(true)}
               aria-label="Menú"
             >
@@ -243,20 +243,20 @@ export function Header({
           >
             {SITE.brand}
           </Link>
-          <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(false)} aria-label="Cerrar menú">
+          <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => setIsMobileOpen(false)} aria-label="Cerrar menú">
             <X className="h-5 w-5" />
           </Button>
         </div>
         <NavLinks mobile onNavClick={() => setIsMobileOpen(false)} />
 
-        <div className="mt-auto pt-4 border-t border-border space-y-1">
+        <div className="mt-4 pt-4 border-t border-border space-y-1">
           <div className="px-4 py-2">
             {currencySlot}
           </div>
           <Link
             href="/favoritos"
             onClick={() => setIsMobileOpen(false)}
-            className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground transition-colors"
+            className="flex min-h-11 items-center gap-3 px-4 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground transition-colors"
           >
             <Heart className="h-4 w-4" />
             Favoritos
@@ -264,10 +264,18 @@ export function Header({
           <Link
             href="/productos#vistos-recientemente"
             onClick={() => setIsMobileOpen(false)}
-            className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground transition-colors"
+            className="flex min-h-11 items-center gap-3 px-4 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground transition-colors"
           >
             <History className="h-4 w-4" />
             Vistos recientemente
+          </Link>
+          <Link
+            href="/cuenta"
+            onClick={() => setIsMobileOpen(false)}
+            className="flex min-h-11 items-center gap-3 px-4 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground transition-colors md:hidden"
+          >
+            <User className="h-4 w-4" />
+            Mi cuenta
           </Link>
         </div>
       </div>
@@ -280,7 +288,7 @@ function CartBadge() {
 
   return (
     <Link href="/carrito" className="relative">
-      <Button variant="ghost" size="icon" aria-label="Carrito">
+      <Button variant="ghost" size="icon" aria-label="Carrito" className="h-11 w-11">
         <CartIcon className="h-5 w-5" />
         {count > 0 && (
           <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
