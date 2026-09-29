@@ -12,6 +12,8 @@ import {
   type BoldPaymentSource,
 } from "@/features/orders/services/apply-bold-payment";
 
+const BOLD_BUTTON_CURRENCY = "COP";
+
 export type ReconcileBoldOrderInput = {
   orderCode: string;
   boldOrderId?: string | null;
@@ -102,11 +104,13 @@ export async function reconcileBoldOrder(
       }
     }
 
-    // Currency validation: Bold API currency must match order currency
+    // Currency validation: Bold API currency must match order currency.
+    // The payment-voucher API omits currency; the button only charges COP
+    // and the integrity hash already binds the currency.
     if (orderCurrency) {
-      const boldCurrency = txStatus?.currency?.trim().toUpperCase();
+      const boldCurrency = txStatus?.currency?.trim().toUpperCase() || BOLD_BUTTON_CURRENCY;
       const expectedCurrency = orderCurrency.trim().toUpperCase();
-      if (!boldCurrency || boldCurrency !== expectedCurrency) {
+      if (boldCurrency !== expectedCurrency) {
         validationErrors.push(
           `currency mismatch: Bold="${boldCurrency}" vs order="${expectedCurrency}"`,
         );

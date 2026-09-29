@@ -6,10 +6,35 @@ import {
   createOrder,
   type CreateOrderInput,
 } from "@/features/orders/repositories/order-repository";
+import { prepareBoldTransaction } from "@/features/payments/services/bold-service";
+import { toPublicBoldError } from "@/features/payments/domain/bold-public-error";
+
+export type BoldCheckoutPayload = {
+  orderId: string;
+  amount: string;
+  currency: string;
+  hash: string;
+  apiKey: string;
+};
 
 export async function submitOrder(input: CreateOrderInput) {
   const result = await createOrder(input);
-  return result;
+  if (!result.ok) return result;
+  try {
+    const payment = await prepareBoldTransaction(result.code);
+    const bold: BoldCheckoutPayload = {
+      orderId: payment.orderId,
+      amount: payment.amount,
+      currency: payment.currency,
+      hash: payment.hash,
+      apiKey: payment.apiKey,
+    };
+    return { ...result, bold, boldError: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    console.error("Error preparing Bold payment:", message);
+    return { ...result, bold: null, boldError: toPublicBoldError(message).message };
+  }
 }
 
 const MANAGED_STATUSES = [

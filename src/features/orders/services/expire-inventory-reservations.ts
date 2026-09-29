@@ -7,6 +7,9 @@ import {
 } from "../repositories/inventory-plan";
 import { lockOrderForUpdate } from "../repositories/order-repository";
 import { releaseReservedUsage } from "@/features/coupons/repositories/coupon-repository";
+import { decideBoldExpiration } from "@/features/payments/domain/bold-expiration";
+import { getBoldTransactionStatus } from "@/features/payments/services/bold-service";
+import { reconcileBoldOrder } from "@/features/payments/services/bold-payment-reconcile";
 import { getInventoryReservationTtlMinutes } from "./expiration-config";
 import { logExpirationBatch, logExpirationFailure, logExpirationResult } from "./expiration-logging";
 import type {
@@ -47,7 +50,13 @@ export async function expireInventoryReservations(
   }
 
   const results: ExpirationOrderResult[] = [];
-  for (const orderCode of candidates.keys()) {
+  for (const [orderCode, candidate] of candidates) {
+    const boldResult = await resolveWithBold(orderCode, now.getTime() - candidate.earliest.getTime());
+    if (boldResult) {
+      results.push(boldResult);
+      logExpirationResult(boldResult);
+      continue;
+    }
     const result = await expireOneOrder(orderCode, cutoff, now);
     results.push(result);
     logExpirationResult(result);
@@ -61,6 +70,35 @@ export async function expireInventoryReservations(
   };
   logExpirationBatch(summary);
   return summary;
+}
+
+/**
+ * Sandbox Bold sends no webhooks, so a paid order may still be PENDING_PAYMENT.
+ * Returns a result when the order must not be expired in this run, or null to expire it.
+ */
+async function resolveWithBold(orderCode: string, reservationAgeMs: number): Promise<ExpirationOrderResult | null> {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { code: orderCode },
+      select: { status: true, total: true, saleCurrency: true, boldTransaction: { select: { id: true } } },
+    });
+    if (!order || order.status !== "PENDING_PAYMENT" || !order.boldTransaction) return null;
+
+    const voucher = await getBoldTransactionStatus(orderCode);
+    const decision = decideBoldExpiration(voucher?.status ?? null, reservationAgeMs);
+    if (decision === "EXPIRE") return null;
+    if (decision === "KEEP") return emptyResult(orderCode, "skipped");
+
+    const reconciled = await reconcileBoldOrder({
+      orderCode,
+      orderTotal: order.total,
+      orderCurrency: order.saleCurrency ?? "COP",
+    });
+    return emptyResult(orderCode, reconciled.apply ? "resolved" : "skipped");
+  } catch (error) {
+    logExpirationFailure(orderCode, error);
+    return emptyResult(orderCode, "failed", "bold lookup failed; retryable");
+  }
 }
 
 async function expireOneOrder(orderCode: string, cutoff: Date, now: Date): Promise<ExpirationOrderResult> {

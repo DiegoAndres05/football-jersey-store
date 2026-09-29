@@ -145,6 +145,7 @@ export async function getBoldTransactionStatus(referenceId: string): Promise<{
     console.log(`[Bold API] Querying transaction status for ${referenceId}`);
     const res = await fetch(url, {
       headers: { Authorization: `x-api-key ${identityKey}` },
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!res.ok) {

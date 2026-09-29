@@ -85,6 +85,20 @@ test("webhook route uses the Bold event parser and the mode-aware key", () => {
   assert.doesNotMatch(route, /total_amount/);
 });
 
+test("reconcile accepts Bold vouchers without currency as COP but rejects other currencies", () => {
+  const reconcile = readFileSync("src/features/payments/services/bold-payment-reconcile.ts", "utf8");
+  assert.match(reconcile, /const BOLD_BUTTON_CURRENCY = "COP"/);
+  assert.match(reconcile, /txStatus\?\.currency\?\.trim\(\)\.toUpperCase\(\) \|\| BOLD_BUTTON_CURRENCY/);
+  assert.match(reconcile, /if \(boldCurrency !== expectedCurrency\)/);
+});
+
+test("confirmation page keeps checking Bold for several minutes", () => {
+  const component = readFileSync("src/app/pedido/confirmado/[code]/confirmation-payment-status.tsx", "utf8");
+  const delays = component.match(/RETRY_DELAYS_MS = \[([^\]]+)\]/)?.[1].split(",").map((value) => Number(value.trim())) ?? [];
+  const totalMs = delays.reduce((sum, value) => sum + value, 0);
+  assert.ok(totalMs >= 4 * 60_000, `expected at least 4 minutes of retries, got ${totalMs}ms`);
+});
+
 test("reservation expiration accepts Vercel cron GET with CRON_SECRET", () => {
   const route = readFileSync("src/app/api/inventory/expire-reservations/route.ts", "utf8");
   assert.match(route, /export async function GET/);

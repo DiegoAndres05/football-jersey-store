@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prepareBoldTransaction } from "@/features/payments/services/bold-service";
+import { toPublicBoldError } from "@/features/payments/domain/bold-public-error";
 
 export async function POST(request: Request) {
   try {
@@ -24,18 +25,8 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error generando hash.";
-    const isConfigError =
-      message.includes("order-id") ||
-      message.includes("monto") ||
-      message.includes("moneda") ||
-      message.includes("condiciones") ||
-      message.includes("sandbox") ||
-      message.includes("no encontrado") ||
-      message.includes("pendiente");
     console.error("Error generating Bold hash:", message);
-    return NextResponse.json(
-      { error: isConfigError ? message : "Error generando hash." },
-      { status: isConfigError ? 400 : 500 },
-    );
+    const publicError = toPublicBoldError(message);
+    return NextResponse.json({ error: publicError.message }, { status: publicError.status });
   }
 }

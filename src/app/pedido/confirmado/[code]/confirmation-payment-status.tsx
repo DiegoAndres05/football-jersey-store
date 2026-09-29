@@ -30,8 +30,9 @@ export function ConfirmationPaymentStatus({
   const mountedRef = useRef(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const MAX_ATTEMPTS = 6;
-  const RETRY_DELAY_MS = 2000;
+  // Bold can take minutes to expose a sale, and sandbox sends no webhooks.
+  const RETRY_DELAYS_MS = [2000, 3000, 5000, 5000, 10000, 10000, 15000, 20000, 30000, 30000, 30000, 30000, 30000, 30000, 30000];
+  const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
 
   const callReconcile = useCallback(async () => {
     try {
@@ -78,7 +79,7 @@ export function ConfirmationPaymentStatus({
       if (next < MAX_ATTEMPTS && mountedRef.current) {
         timerRef.current = setTimeout(() => {
           if (mountedRef.current) reconcile();
-        }, RETRY_DELAY_MS);
+        }, RETRY_DELAYS_MS[prev] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]);
       }
       return next;
     });
@@ -117,8 +118,7 @@ export function ConfirmationPaymentStatus({
     return (
       <p className="text-xs text-muted-foreground">
         <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
-        Verificando estado del pago con Bold…
-        <span className="ml-1">(intento {attempt + 1}/{MAX_ATTEMPTS})</span>
+        Verificando estado del pago con Bold… Puede tardar unos minutos.
       </p>
     );
   }

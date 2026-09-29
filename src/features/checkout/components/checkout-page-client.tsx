@@ -264,6 +264,8 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
     }
     setPaymentStatus("processing");
     setPayError("");
+    const boldScript = loadBoldCheckoutScript();
+    boldScript.catch(() => undefined);
 
     const current = useCartStore.getState();
     const ids = [...new Set(current.items.map((item) => item.variantId))];
@@ -307,22 +309,24 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
     }
 
     try {
-      await loadBoldCheckoutScript();
-
-      const hashRes = await fetch("/api/bold/hash", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: result.code,
-          amount: result.paymentAmount,
-          currency: result.saleCurrency,
-        }),
-      });
-
-      const payload = await hashRes.json();
-      if (!hashRes.ok) {
-        throw new Error(typeof payload.error === "string" ? payload.error : "Error al preparar el pago.");
-      }
+      const requestBoldHash = async () => {
+        const hashRes = await fetch("/api/bold/hash", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: result.code,
+            amount: result.paymentAmount,
+            currency: result.saleCurrency,
+          }),
+        });
+        const body = await hashRes.json();
+        if (!hashRes.ok) {
+          throw new Error(typeof body.error === "string" ? body.error : "Error al preparar el pago.");
+        }
+        return body;
+      };
+      const payload = result.bold ?? (await requestBoldHash());
+      await boldScript;
 
       const BoldCheckout = (window as Window & { BoldCheckout?: new (config: object) => { open: () => void } }).BoldCheckout;
 
