@@ -1,5 +1,4 @@
 import type { PrismaClient } from "@prisma/client";
-import { PrismaClient as PrismaClientCtor } from "@prisma/client";
 
 const PRICES = { fan: 90000, player: 140000, retro: 180000 } as const;
 const VERSION_SLUGS = ["fan", "player", "retro"] as const;
@@ -127,20 +126,4 @@ export async function seedMysteryBox(prisma: PrismaClient) {
       }
     }
   }
-}
-
-const entry = process.argv[1] ?? "";
-if (entry.includes("seed-mystery-box")) {
-  const prisma = new PrismaClientCtor();
-  seedMysteryBox(prisma)
-    .then(() => {
-      console.log("Caja misteriosa lista.");
-    })
-    .catch((error) => {
-      console.error(error);
-      process.exitCode = 1;
-    })
-    .finally(async () => {
-      await prisma.$disconnect();
-    });
 }

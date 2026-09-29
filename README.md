@@ -156,7 +156,8 @@ Excepciones: CANCELLED · REFUNDED · RETURNED · PAYMENT_FAILED
 | `npm run setup`     | Genera Prisma + crea DB + carga datos de ejemplo     |
 | `npm run db:push`   | Sincroniza el schema con la base de datos            |
 | `npm run db:seed`   | Ejecuta el seed (datos de ejemplo)                   |
-| `npm run db:reset`  | Borra la DB, recrea el schema y carga el seed        |
+| `npm run db:seed:mystery-box` | Carga únicamente la Caja Misteriosa y sus dependencias |
+| `npm run db:reset`  | Limpia los datos locales y conserva el usuario admin |
 | `npm run studio`    | Abre Prisma Studio (inspector visual de la DB)       |
 
 ---
@@ -253,5 +254,8 @@ Hecho con ⚽ para tiendas que quieren vender camisetas sin quebraderos de cabez
 El job `/api/inventory/expire-reservations` libera reservas de órdenes
 `PENDING_PAYMENT` vencidas. Usa un TTL de 30 minutos por defecto
 (`INVENTORY_RESERVATION_TTL_MINUTES`) y requiere
-`INVENTORY_RESERVATION_CRON_SECRET`. El scheduler de Vercel lo invoca cada
-cinco minutos; las ejecuciones son idempotentes y los logs no contienen PII.
+`INVENTORY_RESERVATION_CRON_SECRET` o, en su defecto, `CRON_SECRET`. El
+scheduler de Vercel lo invoca con `GET` y `Authorization: Bearer $CRON_SECRET`;
+las llamadas manuales pueden usar `POST`. Las ejecuciones son idempotentes y los
+logs no contienen PII. En el plan Hobby de Vercel los crons solo corren una vez
+al día.

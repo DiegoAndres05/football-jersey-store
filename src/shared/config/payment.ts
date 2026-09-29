@@ -5,12 +5,15 @@ export type PaymentConfig = {
   ready: boolean;
 };
 
+// Production Bold is a separate feature: "bold" is only an alias of sandbox.
+const BOLD_SANDBOX_ALIASES = new Set(["bold-sandbox", "bold"]);
+
 export function getPaymentConfig(env: NodeJS.ProcessEnv = process.env): PaymentConfig {
   const provider = env.PAYMENT_PROVIDER?.trim().toLowerCase();
-  if (provider === "bold-sandbox") {
+  if (provider && BOLD_SANDBOX_ALIASES.has(provider)) {
     const identityKey = env.BOLD_IDENTITY_KEY?.trim();
     const secretKey = env.BOLD_SECRET_KEY?.trim();
-    return { provider, identityKey, secretKey, ready: Boolean(identityKey && secretKey) };
+    return { provider: "bold-sandbox", identityKey, secretKey, ready: Boolean(identityKey && secretKey) };
   }
   if (provider === "mock") return { provider, ready: true };
   return { provider: "unavailable", ready: false };

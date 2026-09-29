@@ -41,10 +41,12 @@ export async function middleware(request: NextRequest) {
   const { headers, csp } = withReportOnlyCsp(request);
 
   if (pathname === "/admin/login") {
+    headers.set("x-admin-route", "true");
     return attachCsp(NextResponse.next({ request: { headers } }), csp);
   }
 
   if (pathname.startsWith("/admin")) {
+    headers.set("x-admin-route", "true");
     const ok = await isValidToken(request.cookies.get(COOKIE_NAME)?.value);
     if (!ok) {
       const url = request.nextUrl.clone();

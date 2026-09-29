@@ -3,6 +3,7 @@ import { SITE } from "../src/shared/config/site";
 import { seedMysteryBox } from "./seed-mystery-box";
 
 const prisma = new PrismaClient();
+const ADMIN_EMAIL = "admin@footballstore.co";
 
 const IMG = {
   white: "https://images.unsplash.com/photo-1606925797300-0b35e9d1794e?auto=format&fit=crop&w=900&q=80",
@@ -19,7 +20,11 @@ async function main() {
   // ── Cleanup ──
   await prisma.inventoryMovement.deleteMany();
   await prisma.notificationAttempt.deleteMany();
+  await prisma.couponUsage.deleteMany();
   await prisma.orderStatusHistory.deleteMany();
+  await prisma.legalConsentSnapshot.deleteMany();
+  await prisma.shippingRuleSnapshot.deleteMany();
+  await prisma.boldTransaction.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.supplierOrderItem.deleteMany();
@@ -37,7 +42,7 @@ async function main() {
   await prisma.size.deleteMany();
   await prisma.address.deleteMany();
   await prisma.customer.deleteMany();
-  await prisma.user.deleteMany();
+  await prisma.user.deleteMany({ where: { email: { not: ADMIN_EMAIL } } });
   await prisma.setting.deleteMany();
 
   // ── Versions ──
@@ -344,11 +349,13 @@ async function main() {
   }
 
   // ── Admin user + customer ──
-  const adminUser = await prisma.user.create({
-    data: { email: "admin@footballstore.co", name: "Administrador", role: "ADMIN", isActive: true },
+  const adminUser = await prisma.user.upsert({
+    where: { email: ADMIN_EMAIL },
+    update: { name: "Administrador", role: "ADMIN", isActive: true },
+    create: { email: ADMIN_EMAIL, name: "Administrador", role: "ADMIN", isActive: true },
   });
   await prisma.customer.create({
-    data: { email: "admin@footballstore.co", name: "Administrador", userId: adminUser.id },
+    data: { email: ADMIN_EMAIL, name: "Administrador", userId: adminUser.id },
   });
 
   // ── Sample guest customer ──

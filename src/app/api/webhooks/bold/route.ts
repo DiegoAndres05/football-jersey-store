@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { applyBoldPayment } from "@/features/orders/services/apply-bold-payment";
 import { normalizeWebhookEventType } from "@/features/payments/domain/bold-payment-outcome";
+import { parseBoldWebhookEvent } from "@/features/payments/domain/bold-webhook";
 import { verifyBoldWebhookSignature } from "@/features/payments/services/bold-service";
 import { getOrderByCode } from "@/features/orders/repositories/order-repository";
 
@@ -21,50 +22,47 @@ export async function POST(request: Request) {
     } catch {
       return NextResponse.json({ error: "Webhook unavailable" }, { status: 503 });
     }
-    const payload = JSON.parse(body);
+    let payload: unknown;
+    try {
+      payload = JSON.parse(body);
+    } catch {
+      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    }
+    const event = parseBoldWebhookEvent(payload);
 
     console.log("[Bold Webhook] Event received:", {
-      type: payload.type,
-      subject: payload.subject,
-      referenceId: payload.data?.reference_id,
+      type: event.type,
+      paymentId: event.paymentId,
+      reference: event.reference,
     });
 
-    const eventType = payload.type;
-    const data = payload.data ?? payload.payload ?? {};
-    const referenceId = data.reference_id ?? payload.reference_id;
-
-    if (!referenceId) {
-      console.warn("[Bold Webhook] Missing reference_id, ignoring.");
+    if (!event.reference) {
+      console.warn("[Bold Webhook] Missing metadata.reference, ignoring.");
       return NextResponse.json({ received: true });
     }
 
-    const order = await getOrderByCode(String(referenceId));
+    const outcome = normalizeWebhookEventType(event.type);
+    if (!outcome) {
+      console.warn(`[Bold Webhook] Unhandled event type: ${event.type}`);
+      return NextResponse.json({ received: true });
+    }
+
+    const order = await getOrderByCode(event.reference);
     if (!order) return NextResponse.json({ received: true });
-    const rawAmount = typeof data.amount === "object" ? data.amount?.total_amount : data.amount ?? data.total;
-    const amount = Number(rawAmount);
-    const currency = String(data.currency ?? (typeof data.amount === "object" ? data.amount?.currency : "") ?? "").toUpperCase();
-    if (!Number.isInteger(amount) || amount !== order.total || currency !== order.saleCurrency) {
+    if (!Number.isInteger(event.amount) || event.amount !== order.total || event.currency !== order.saleCurrency) {
       console.warn("[Bold Webhook] Integrity mismatch; event ignored.");
       return NextResponse.json({ received: true });
     }
 
-    const outcome = normalizeWebhookEventType(eventType);
-
-    if (!outcome) {
-      console.warn(`[Bold Webhook] Unknown event type: ${eventType}`);
-      return NextResponse.json({ received: true });
-    }
-
-    // At this point outcome is "APPROVED" | "REJECTED" (webhook only produces these)
     const result = await applyBoldPayment({
-      orderCode: referenceId,
+      orderCode: event.reference,
       outcome: outcome as "APPROVED" | "REJECTED",
       source: "webhook",
-      providerRef: payload.subject ?? undefined,
+      providerRef: event.paymentId ?? undefined,
     });
 
     if (!result.applied) {
-      console.log(`[Bold Webhook] No action: ${result.reason} (order: ${referenceId})`);
+      console.log(`[Bold Webhook] No action: ${result.reason} (order: ${event.reference})`);
     }
 
     return NextResponse.json({ received: true });

@@ -1,8 +1,8 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { canonicalizeBoldSale } from "@/features/payments/domain/bold-checkout-attrs";
 import { computeBoldIntegritySignature } from "@/features/payments/domain/bold-integrity";
+import { boldWebhookSigningKey, isValidBoldWebhookSignature } from "@/features/payments/domain/bold-webhook";
 import { canOpenBold, getPaymentConfig } from "@/shared/config/payment";
 
 const BOLD_API_BASE = "https://payments.api.bold.co";
@@ -106,15 +106,12 @@ export function getBoldPublicKey(): string {
 }
 
 /**
- * Verify a webhook signature from Bold.
- * Bold signs webhooks with HMAC-SHA256 using the secret key.
+ * Verify a webhook signature from Bold (header `x-bold-signature`).
  */
 export function verifyBoldWebhookSignature(payload: string, signature: string): boolean {
   const { secretKey } = getBoldConfig();
-  const expected = createHmac("sha256", secretKey).update(payload).digest("hex");
-  const received = signature.trim().toLowerCase();
-  if (!/^[a-f0-9]{64}$/.test(received)) return false;
-  return timingSafeEqual(Buffer.from(received, "hex"), Buffer.from(expected, "hex"));
+  const key = boldWebhookSigningKey({ mode: "sandbox", secretKey });
+  return isValidBoldWebhookSignature(payload, signature, key);
 }
 
 /**
