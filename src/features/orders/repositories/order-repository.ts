@@ -297,6 +297,9 @@ export async function createOrder(input: CreateOrderInput): Promise<
       });
 
       return created;
+    }, {
+      maxWait: 15_000,
+      timeout: 60_000,
     });
 
     return { ok: true, code: order.code, total: order.total, paymentAmount, saleCurrency };
