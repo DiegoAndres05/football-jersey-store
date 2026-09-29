@@ -216,6 +216,7 @@ model InventoryMovement {
   @@index([variantId])
   @@index([orderReference])
   @@index([createdAt])
+  @@index([type, createdAt, orderReference])
 }
 
 // =========================================================================

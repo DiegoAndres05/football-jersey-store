@@ -35,11 +35,11 @@ import { INDEXABLE } from "@/features/seo/domain/robots-policy";
 import { ProductImage } from "@/shared/ui/product-image";
 import { Suspense } from "react";
 import { appendKeywords } from "@/features/seo/domain/keywords";
-import { Marquee } from "@/components/ui/marquee";
 import { HeroCopyAnimation } from "@/components/home/hero-copy-animation";
+import { Marquee } from "@/components/ui/marquee";
 
 export const metadata: Metadata = {
-  title: "Camisetas de Fútbol en Colombia | Flashsport",
+  title: "Camisetas de Fútbol en Colombia | Envíos Flashsport",
   description:
     "Camisetas de fútbol de las principales ligas y equipos del mundo. Elige tu temporada, talla y versión, con envíos a toda Colombia.",
   keywords: appendKeywords(
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
   robots: INDEXABLE,
   alternates: { canonical: resolvePublicOrigin() },
   openGraph: {
-    title: "Camisetas de Fútbol en Colombia | Flashsport",
+    title: "Camisetas de Fútbol en Colombia | Envíos Flashsport",
     description:
       "Camisetas de fútbol de las principales ligas y equipos del mundo. Elige tu temporada, talla y versión, con envíos a toda Colombia.",
     url: resolvePublicOrigin(),
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Camisetas de Fútbol en Colombia | Flashsport",
+    title: "Camisetas de Fútbol en Colombia | Envíos Flashsport",
     description:
       "Camisetas de fútbol de las principales ligas y equipos del mundo. Elige tu temporada, talla y versión, con envíos a toda Colombia.",
   },

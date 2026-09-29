@@ -32,6 +32,18 @@ export async function reserveCoupon(tx: Prisma.TransactionClient, couponId: stri
   return tx.couponUsage.create({ data: { couponId, orderId, expiresAt: couponExpiry(now) } });
 }
 
+export async function releaseReservedUsage(
+  tx: Prisma.TransactionClient,
+  orderId: string,
+  now = new Date(),
+  releaseReason = "Reserva de inventario expirada",
+) {
+  return tx.couponUsage.updateMany({
+    where: { orderId, state: "RESERVED" },
+    data: { state: "RELEASED", releasedAt: now, releaseReason },
+  });
+}
+
 export async function createCoupon(input: CouponInput): Promise<Coupon> {
   return prisma.coupon.create({ data: { ...input, code: normalizeCouponCode(input.code), endsAt: input.endsAt ?? null, maxUses: input.maxUses ?? null } });
 }

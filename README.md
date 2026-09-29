@@ -248,3 +248,10 @@ MIT
 ---
 
 Hecho con ⚽ para tiendas que quieren vender camisetas sin quebraderos de cabeza.
+### Expiración de reservas de inventario
+
+El job `/api/inventory/expire-reservations` libera reservas de órdenes
+`PENDING_PAYMENT` vencidas. Usa un TTL de 30 minutos por defecto
+(`INVENTORY_RESERVATION_TTL_MINUTES`) y requiere
+`INVENTORY_RESERVATION_CRON_SECRET`. El scheduler de Vercel lo invoca cada
+cinco minutos; las ejecuciones son idempotentes y los logs no contienen PII.

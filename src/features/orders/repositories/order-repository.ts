@@ -322,3 +322,12 @@ export async function getOrderByCode(code: string) {
   });
   return order;
 }
+
+/** Serialize an order transition inside a Prisma transaction. */
+export async function lockOrderForUpdate(
+  tx: Prisma.TransactionClient,
+  orderId: string,
+) {
+  await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+  return tx.order.findUnique({ where: { id: orderId } });
+}

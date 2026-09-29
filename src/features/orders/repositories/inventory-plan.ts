@@ -65,6 +65,24 @@ export function planReservationCancellations(
   }));
 }
 
+/** Same as planReservationCancellations, but ignores already-compensated variants. */
+export function planMissingReservationCancellations(
+  reservations: readonly ReservationRow[],
+  existingCancellations: readonly ReservationRow[] = [],
+): PlannedMovement[] {
+  const planned = planReservationCancellations(reservations);
+  const existing = new Map<string, number>();
+  for (const row of existingCancellations) {
+    existing.set(row.variantId, (existing.get(row.variantId) ?? 0) + row.quantity);
+  }
+  return planned
+    .map((movement) => ({
+      ...movement,
+      quantity: movement.quantity - (existing.get(movement.variantId) ?? 0),
+    }))
+    .filter((movement) => movement.quantity > 0);
+}
+
 export function shouldReleaseReservations(input: {
   currentStatus: string;
   outcome: "APPROVED" | "REJECTED";

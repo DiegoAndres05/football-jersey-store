@@ -6,15 +6,14 @@ import { BIG_LEAGUE_SLUGS, leagueLogo } from "../src/features/products/domain/le
 const page = readFileSync("src/app/page.tsx", "utf8");
 const card = readFileSync("src/components/home/league-card.tsx", "utf8");
 
-test("the home maps every configured big league through LeagueCard", () => {
+test("the home maps every configured big league through the marquee", () => {
   assert.match(page, /BIG_LEAGUES\.map/);
-  assert.match(page, /<LeagueCard/);
-  assert.match(page, /slug=\{league\.slug\}/);
-  assert.match(page, /imageClassName="h-full w-full object-contain"/);
-  assert.match(page, /grid-cols-2/);
-  assert.match(page, /md:grid-cols-3/);
-  assert.match(page, /xl:grid-cols-5/);
-  assert.doesNotMatch(page, /href=\{`\/ligas\/\$\{league\.slug\}`\}/);
+  assert.match(page, /<Marquee/);
+  assert.match(page, /leagueLogoSrc/);
+  assert.match(page, /leagueMonogram/);
+  assert.match(page, /className="block h-full w-full object-contain/);
+  assert.match(page, /h-36 w-36/);
+  assert.match(page, /\/productos\?liga=\$\{league\.slug\}&sort=default/);
   assert.ok(BIG_LEAGUE_SLUGS.includes("serie-a"));
 });
 
