@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, ArrowRight, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, ArrowRight, XCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getOrderByCode } from "@/features/orders/repositories/order-repository";
+import {
+  ORDER_CONFIRMATION_COPY,
+  orderConfirmationView,
+  shouldReconcileOnConfirmation,
+} from "@/features/orders/domain/order-confirmation-view";
 import { ConfirmationPaymentStatus } from "./confirmation-payment-status";
 import { DELIVERY_MODE_INFO, type DeliveryMode } from "@/features/products/types/delivery-mode";
 import { formatPurchaseLineDetail } from "@/features/products/domain/mystery-box";
@@ -31,22 +36,14 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
   const orderCurrency = (order.saleCurrency ?? "COP") as SaleCurrency;
   const orderRate = order.exchangeRateCopPerUsd ?? undefined;
 
-  // Determine if Bold params were present (for confirming state)
-  const hasBoldParams =
+  // Bold's redirect params only tell us the shopper came back from Bold; the
+  // displayed result always comes from the persisted Order status.
+  const returnedFromBold =
     typeof sp["bold-tx-status"] === "string" || typeof sp["bold-order-id"] === "string";
-
   const boldOrderId = typeof sp["bold-order-id"] === "string" ? sp["bold-order-id"] : null;
 
-  // Determine UI mode — always start as "confirming" when Bold redirect params are present.
-  // The client component handles reconciliation via POST /api/bold/reconcile.
-  const uiMode =
-    order.status === "PAID"
-      ? "paid"
-      : order.status === "PAYMENT_FAILED"
-        ? "failed"
-        : hasBoldParams
-          ? "confirming"
-          : "pending";
+  const uiMode = orderConfirmationView(order.status);
+  const copy = ORDER_CONFIRMATION_COPY[uiMode];
 
   return (
     <div className="container-page py-16 max-w-2xl">
@@ -54,16 +51,13 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
         {/* Icon */}
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
           {uiMode === "paid" && <CheckCircle2 className="h-7 w-7" />}
-          {uiMode === "failed" && <XCircle className="h-7 w-7" />}
-          {(uiMode === "confirming" || uiMode === "pending") && <Loader2 className="h-7 w-7 animate-spin" />}
+          {(uiMode === "failed" || uiMode === "cancelled") && <XCircle className="h-7 w-7" />}
+          {uiMode === "pending" && <Clock className="h-7 w-7" />}
         </div>
 
         {/* Title */}
         <h1 className="mt-5 font-display text-2xl md:text-3xl font-bold uppercase tracking-tight">
-          {uiMode === "paid" && "Pago aprobado"}
-          {uiMode === "failed" && "Pago rechazado"}
-          {uiMode === "confirming" && "Confirmando pago…"}
-          {uiMode === "pending" && "Pedido recibido"}
+          {copy.title}
         </h1>
 
         {/* Description */}
@@ -81,42 +75,25 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
               procesado. Puedes intentar realizar un nuevo pedido.
             </>
           )}
-          {uiMode === "confirming" && (
+          {uiMode === "cancelled" && (
             <>
-              Estamos confirmando el pago de tu pedido{" "}
-              <span className="font-semibold text-foreground">{order.code}</span>. Esto puede
-              tomar unos segundos.
+              Tu pedido <span className="font-semibold text-foreground">{order.code}</span> fue
+              cancelado.
             </>
           )}
           {uiMode === "pending" && (
             <>
               Tu pedido <span className="font-semibold text-foreground">{order.code}</span> fue
-              registrado. Te notificaremos por correo con los detalles de entrega.
+              registrado. Te avisaremos por correo cuando el pago quede confirmado.
             </>
           )}
         </p>
 
         {/* Status banner */}
         <div className="mt-4 rounded-lg bg-secondary/60 px-4 py-3 text-xs text-muted-foreground leading-relaxed text-left">
-          {uiMode === "paid" && (
-            <p>Pago confirmado. Tu pedido está siendo preparado para envío.</p>
-          )}
-          {uiMode === "failed" && (
-            <p className="text-destructive">
-              El pago no fue procesado. Por favor, intenta de nuevo desde la tienda.
-            </p>
-          )}
-          {uiMode === "confirming" && (
-            <ConfirmationPaymentStatus
-              initialMode="confirming"
-              orderCode={order.code}
-              boldOrderId={boldOrderId}
-            />
-          )}
-          {uiMode === "pending" && (
-            <p>
-              Pago pendiente. Te notificaremos cuando se confirme el pago.
-            </p>
+          <p className={uiMode === "failed" ? "text-destructive" : undefined}>{copy.banner}</p>
+          {shouldReconcileOnConfirmation(uiMode, returnedFromBold) && (
+            <ConfirmationPaymentStatus orderCode={order.code} boldOrderId={boldOrderId} />
           )}
         </div>
 
@@ -124,12 +101,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
         <dl className="mt-6 grid grid-cols-2 gap-3 text-left text-sm">
           <div className="rounded-xl border border-border p-4">
             <dt className="text-xs text-muted-foreground uppercase tracking-wide">Estado</dt>
-            <dd className="mt-1 font-medium">
-              {uiMode === "paid" && "Pago aprobado"}
-              {uiMode === "failed" && "Pago rechazado"}
-              {uiMode === "confirming" && "Confirmando…"}
-              {uiMode === "pending" && "Pendiente de pago"}
-            </dd>
+            <dd className="mt-1 font-medium">{copy.statusLabel}</dd>
           </div>
           <div className="rounded-xl border border-border p-4">
             <dt className="text-xs text-muted-foreground uppercase tracking-wide">Total</dt>
@@ -184,7 +156,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
 
         {/* CTAs */}
         <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-          {uiMode === "failed" ? (
+          {uiMode === "failed" || uiMode === "cancelled" ? (
             <Button asChild>
               <Link href="/productos">
                 Volver a comprar <ArrowRight className="h-4 w-4" />

@@ -226,8 +226,8 @@ describe("ConfirmationPaymentStatus client component (source-level)", () => {
     assert.match(component, /boldOrderId/);
   });
 
-  it("has bounded retry (MAX_ATTEMPTS)", () => {
-    assert.match(component, /MAX_ATTEMPTS/);
+  it("has bounded automatic retry (MAX_AUTO_ATTEMPTS)", () => {
+    assert.match(component, /MAX_AUTO_ATTEMPTS/);
   });
 
   it("has manual retry button", () => {
@@ -235,14 +235,9 @@ describe("ConfirmationPaymentStatus client component (source-level)", () => {
     assert.match(component, /RotateCcw/);
   });
 
-  it("handles PAID response", () => {
-    assert.match(component, /status === "PAID"/);
-    assert.match(component, /setMode\("paid"\)/);
-  });
-
-  it("handles REJECTED response", () => {
-    assert.match(component, /status === "REJECTED"/);
-    assert.match(component, /setMode\("failed"\)/);
+  it("handles PAID and REJECTED responses by re-reading the Order, not by rendering a result", () => {
+    assert.match(component, /status === "PAID" \|\| status === "REJECTED"/);
+    assert.doesNotMatch(component, /setMode\(/);
   });
 
   it("refreshes the confirmation page after PAID or REJECTED", () => {

@@ -7,141 +7,110 @@ import { forgetPaymentRecovery } from "@/features/payments/recovery";
 
 type ReconcileStatus = "PAID" | "REJECTED" | "PENDING" | "ERROR";
 
+const MAX_AUTO_ATTEMPTS = 2;
+const AUTO_RETRY_DELAY_MS = 5000;
+
 /**
- * Client component that calls POST /api/bold/reconcile to verify payment
- * status with the Bold API. Uses bounded polling for PENDING states.
+ * Asks the server to reconcile a pending order with Bold a couple of times
+ * after the redirect, then leaves it to the shopper (manual retry), the
+ * webhook, and the expiration job. It never renders a payment result itself:
+ * when the server reports a final state, the page is refreshed and re-rendered
+ * from the persisted Order status.
  *
  * Security: Never sends bold-tx-status or any client-provided payment status.
  * Only sends orderCode + optional boldOrderId for server-side lookup.
  */
 export function ConfirmationPaymentStatus({
-  initialMode,
   orderCode,
   boldOrderId,
 }: {
-  initialMode: "paid" | "failed" | "confirming" | "pending";
   orderCode: string;
   boldOrderId?: string | null;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState(initialMode);
-  const [attempt, setAttempt] = useState(0);
-  const [isRetrying, setIsRetrying] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const inFlightRef = useRef(false);
   const mountedRef = useRef(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Bold can take minutes to expose a sale, and sandbox sends no webhooks.
-  const RETRY_DELAYS_MS = [2000, 3000, 5000, 5000, 10000, 10000, 15000, 20000, 30000, 30000, 30000, 30000, 30000, 30000, 30000];
-  const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
-
-  const callReconcile = useCallback(async () => {
+  const callReconcile = useCallback(async (): Promise<ReconcileStatus> => {
     try {
       const res = await fetch("/api/bold/reconcile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderCode, boldOrderId }),
       });
-
-      if (!res.ok) {
-        return "ERROR" as ReconcileStatus;
-      }
-
+      if (!res.ok) return "ERROR";
       const data = await res.json();
       return (data.status as ReconcileStatus) ?? "PENDING";
     } catch {
-      return "ERROR" as ReconcileStatus;
+      return "ERROR";
     }
   }, [orderCode, boldOrderId]);
 
-  const reconcile = useCallback(async () => {
-    if (!mountedRef.current) return;
-
+  const reconcileOnce = useCallback(async (): Promise<boolean> => {
+    if (inFlightRef.current) return false;
+    inFlightRef.current = true;
     const status = await callReconcile();
-
-    if (!mountedRef.current) return;
-
-    if (status === "PAID") {
-      forgetPaymentRecovery();
-      setMode("paid");
+    inFlightRef.current = false;
+    if (!mountedRef.current) return false;
+    if (status === "PAID" || status === "REJECTED") {
+      if (status === "PAID") forgetPaymentRecovery();
       router.refresh();
-      return;
+      return true;
     }
-
-    if (status === "REJECTED") {
-      setMode("failed");
-      router.refresh();
-      return;
-    }
-
-    // PENDING or ERROR — schedule next retry if budget remains
-    setAttempt((prev) => {
-      const next = prev + 1;
-      if (next < MAX_ATTEMPTS && mountedRef.current) {
-        timerRef.current = setTimeout(() => {
-          if (mountedRef.current) reconcile();
-        }, RETRY_DELAYS_MS[prev] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]);
-      }
-      return next;
-    });
+    return false;
   }, [callReconcile, router]);
 
-  // Start initial reconciliation on mount
   useEffect(() => {
     mountedRef.current = true;
-
-    if (mode === "confirming") {
-      reconcile();
-    }
-
+    let attempt = 0;
+    const run = async () => {
+      attempt += 1;
+      const settled = await reconcileOnce();
+      if (!mountedRef.current || settled) return;
+      if (attempt < MAX_AUTO_ATTEMPTS) {
+        timerRef.current = setTimeout(run, AUTO_RETRY_DELAY_MS);
+      } else {
+        setChecking(false);
+      }
+    };
+    void run();
     return () => {
       mountedRef.current = false;
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [mode, reconcile]);
+  }, [reconcileOnce]);
 
-  // Manual retry after exhaustion
   const handleManualRetry = async () => {
-    setIsRetrying(true);
-    setAttempt(0);
-    await reconcile();
-    setIsRetrying(false);
+    setChecking(true);
+    const settled = await reconcileOnce();
+    if (mountedRef.current && !settled) setChecking(false);
   };
 
-  // Update mode when parent re-renders (e.g., after webhook triggers page reload)
-  useEffect(() => {
-    setMode(initialMode);
-  }, [initialMode]);
-
-  const exhausted = attempt >= MAX_ATTEMPTS && mode === "confirming";
-
-  if (mode === "confirming" && !exhausted) {
+  if (checking) {
     return (
-      <p className="text-xs text-muted-foreground">
-        <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
-        Verificando estado del pago con Bold… Puede tardar unos minutos.
+      <p className="mt-2 text-xs text-muted-foreground">
+        <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
+        Verificando con Bold…
       </p>
     );
   }
 
-  if (exhausted) {
-    return (
-      <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">
-          No pudimos confirmar el pago automáticamente. El pago puede estar
-          procesándose. Te notificaremos por correo cuando se confirme.
-        </p>
-        <button
-          type="button"
-          onClick={handleManualRetry}
-          disabled={isRetrying}
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50"
-        >
-          <RotateCcw className="h-3 w-3" />
-          {isRetrying ? "Verificando…" : "Verificar de nuevo"}
-        </button>
-      </div>
-    );
-  }
-
-  return null;
+  return (
+    <div className="mt-2 space-y-2">
+      <p className="text-xs text-muted-foreground">
+        Bold aún no reporta el resultado. Puedes seguir navegando; tu pedido se
+        actualizará en cuanto se confirme y te avisaremos por correo.
+      </p>
+      <button
+        type="button"
+        onClick={handleManualRetry}
+        className="inline-flex min-h-11 items-center gap-1 text-xs font-medium text-primary hover:underline"
+      >
+        <RotateCcw className="h-3 w-3" />
+        Verificar de nuevo
+      </button>
+    </div>
+  );
 }
