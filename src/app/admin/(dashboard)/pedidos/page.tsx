@@ -5,6 +5,7 @@ import { normalizeAdminOrderDateFilter, normalizeAdminOrderFilter } from "./admi
 import { AdminEmptyState } from "../admin-page-states";
 import { getTelegramConfig } from "@/features/notifications/config/telegram-config";
 import { OrderListControls } from "./order-list-controls";
+import { PaymentStatusBadge } from "./payment-status-badge";
 
 export default async function AdminOrdersPage({ searchParams }: { searchParams: Promise<{ modalidad?: string; fecha?: string; mes?: string; desde?: string; hasta?: string }> }) {
   const params = await searchParams;
@@ -17,7 +18,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
     <div className="space-y-6">
       <div>
         <h2 className="font-display text-lg font-bold uppercase tracking-tight">Pedidos</h2>
-        <p className="text-sm text-muted-foreground">Consulta pedidos por modalidad, fecha y estado de notificación Telegram.</p>
+        <p className="text-sm text-muted-foreground">Consulta pedidos por modalidad y fecha, con su estado de pago y notificación Telegram.</p>
       </div>
 
       <OrderListControls active={mode} dateFilter={dateFilter} />
@@ -34,6 +35,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                 <th className="p-3">Cliente</th>
                 <th className="p-3">Modalidad</th>
                 <th className="p-3">Total</th>
+                <th className="p-3">Pago</th>
                 {telegramConfigured && <th className="p-3">Aviso</th>}
               </tr>
             </thead>
@@ -74,6 +76,9 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                     </div>
                   </td>
                   <td className="p-3 font-medium">{formatPrice(order.total)}</td>
+                  <td className="p-3">
+                    <PaymentStatusBadge order={order} />
+                  </td>
                   {telegramConfigured && (
                     <td className="p-3 text-xs">
                       {order.notificationAttempt?.status === "SENT"

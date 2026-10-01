@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/utils";
 import { getTelegramConfig } from "@/features/notifications/config/telegram-config";
 import { AdminErrorState, AdminNotFoundState } from "../../admin-page-states";
 import { NotificationRetryControl } from "../notification-retry-control";
+import { PaymentStatusBadge } from "../payment-status-badge";
 
 export default async function AdminOrderDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ modalidad?: string }> }) {
   const { id } = await params;
@@ -48,8 +49,16 @@ export default async function AdminOrderDetailPage({ params, searchParams }: { p
         <Link href={backHref} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-3 w-3" aria-hidden="true" /> Volver a pedidos
         </Link>
-        <h2 className="mt-2 font-display text-lg font-bold uppercase tracking-tight">Pedido {order.code}</h2>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <h2 className="font-display text-lg font-bold uppercase tracking-tight">Pedido {order.code}</h2>
+          <PaymentStatusBadge order={order} />
+        </div>
         <p className="text-sm text-muted-foreground">{order.customerName} · {order.customerEmail}</p>
+        {order.paidAt && (
+          <p className="text-xs text-muted-foreground">
+            Pagado el {new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeStyle: "short" }).format(order.paidAt)}
+          </p>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
