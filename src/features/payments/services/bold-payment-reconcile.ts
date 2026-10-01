@@ -1,5 +1,11 @@
 import "server-only";
+import { prisma } from "@/lib/prisma";
 import { getBoldTransactionStatus } from "@/features/payments/services/bold-service";
+import {
+  preparedTransactionCurrencyProblems,
+  type PreparedBoldTransaction,
+} from "@/features/payments/domain/bold-currency-evidence";
+import { getPaymentConfig } from "@/shared/config/payment";
 import {
   normalizeBoldOutcome,
   parseReturnTxHint,
@@ -12,7 +18,17 @@ import {
   type BoldPaymentSource,
 } from "@/features/orders/services/apply-bold-payment";
 
-const BOLD_BUTTON_CURRENCY = "COP";
+async function loadPreparedBoldTransaction(orderCode: string): Promise<PreparedBoldTransaction | null> {
+  const order = await prisma.order.findUnique({
+    where: { code: orderCode },
+    select: {
+      boldTransaction: {
+        select: { externalReference: true, amount: true, currency: true, signatureHash: true },
+      },
+    },
+  });
+  return order?.boldTransaction ?? null;
+}
 
 export type ReconcileBoldOrderInput = {
   orderCode: string;
@@ -104,16 +120,37 @@ export async function reconcileBoldOrder(
       }
     }
 
-    // Currency validation: Bold API currency must match order currency.
-    // The payment-voucher API omits currency; the button only charges COP
-    // and the integrity hash already binds the currency.
+    // Currency validation: an explicit Bold currency must match the order.
+    // The payment-voucher API omits currency; only then may the transaction we
+    // prepared and signed vouch for it. A missing currency is never assumed.
     if (orderCurrency) {
-      const boldCurrency = txStatus?.currency?.trim().toUpperCase() || BOLD_BUTTON_CURRENCY;
       const expectedCurrency = orderCurrency.trim().toUpperCase();
-      if (boldCurrency !== expectedCurrency) {
-        validationErrors.push(
-          `currency mismatch: Bold="${boldCurrency}" vs order="${expectedCurrency}"`,
-        );
+      const boldCurrency = txStatus?.currency?.trim().toUpperCase();
+      if (boldCurrency) {
+        if (boldCurrency !== expectedCurrency) {
+          validationErrors.push(
+            `currency mismatch: Bold="${boldCurrency}" vs order="${expectedCurrency}"`,
+          );
+        }
+      } else {
+        const currencyProblems = preparedTransactionCurrencyProblems({
+          orderCode,
+          orderCurrency: expectedCurrency,
+          boldStatus: rawStatus,
+          boldReference: txStatus?.referenceId,
+          boldAmount: txStatus?.amount,
+          transaction: await loadPreparedBoldTransaction(orderCode),
+          secretKey: getPaymentConfig().secretKey,
+        });
+        if (currencyProblems.length > 0) {
+          validationErrors.push(
+            `currency mismatch: Bold currency missing and prepared transaction not verifiable (${currencyProblems.join("; ")})`,
+          );
+        } else {
+          console.log(
+            `[Bold Reconcile] Order ${orderCode}: currency ${expectedCurrency} verified (currencySource=signed-transaction)`,
+          );
+        }
       }
     }
 
