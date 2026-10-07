@@ -279,6 +279,33 @@ export class FkaFetcher {
     if (!body) return null;
     return parseFkaTeamSearchResponse(body, query, searchUrl);
   }
+
+  async evaluateProducts(): Promise<{ title: string; imageUrl: string }[]> {
+    if (!this.session) throw new Error("Fetcher no conectado.");
+    const result = await this.session.evaluate<{ title: string; imageUrl: string }[]>(
+      `(() => {
+        const products = [];
+        const seen = new Set();
+        const images = document.querySelectorAll('img');
+        for (const img of images) {
+          const src = img.src || img.getAttribute('data-src') || '';
+          if (!src || seen.has(src)) continue;
+          const alt = img.alt || img.getAttribute('title') || '';
+          const parent = img.closest('a, article, .product, [class*="product"], [class*="kit"]');
+          const title = alt || (parent ? (parent.querySelector('h2, h3, h4, .title, [class*="title"]')?.textContent || '') : '');
+          if (title && src) {
+            seen.add(src);
+            products.push({ title: title.trim().slice(0, 200), imageUrl: src });
+          }
+          if (products.length >= 50) break;
+        }
+        return products;
+      })()`,
+      false,
+      this.cdpSessionId,
+    );
+    return result ?? [];
+  }
 }
 
 function emptyFetchedPage(url: string): FetchedPage {

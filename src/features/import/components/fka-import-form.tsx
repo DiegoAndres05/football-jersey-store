@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { searchFkaPreviewAction, type FkaPreviewResult } from "../server/import-actions";
 import type { FkaKitType } from "../fka/types";
 import { FkaImportResults } from "./fka-import-results";
+import { UrlImportForm } from "./url-import-form";
 
 const TYPE_OPTIONS: { value: FkaKitType; label: string }[] = [
   { value: "LOCAL", label: "Local" },
@@ -15,7 +16,10 @@ const TYPE_OPTIONS: { value: FkaKitType; label: string }[] = [
   { value: "TERCERA", label: "Tercera" },
 ];
 
+type Tab = "fka" | "url";
+
 export function FkaImportForm() {
+  const [tab, setTab] = useState<Tab>("fka");
   const [teams, setTeams] = useState("Real Madrid, Barcelona");
   const [season, setSeason] = useState("2026-27");
   const [types, setTypes] = useState<FkaKitType[]>(["LOCAL", "VISITANTE", "TERCERA"]);
@@ -53,6 +57,34 @@ export function FkaImportForm() {
 
   return (
     <div className="space-y-6">
+      <div className="flex gap-2 border-b border-border">
+        <button
+          type="button"
+          onClick={() => setTab("fka")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            tab === "fka"
+              ? "border-b-2 border-primary text-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Football Kit Archive
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("url")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            tab === "url"
+              ? "border-b-2 border-primary text-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Importar desde URL
+        </button>
+      </div>
+
+      {tab === "url" ? (
+        <UrlImportForm />
+      ) : (
       <form
         onSubmit={onSubmit}
         className="rounded-xl border border-border bg-card p-5 space-y-4"
@@ -119,8 +151,9 @@ export function FkaImportForm() {
           )}
         </div>
       </form>
+      )}
 
-      {result && <FkaImportResults result={result} />}
+      {tab === "fka" && result ? <FkaImportResults result={result} /> : null}
     </div>
   );
 }
