@@ -125,9 +125,12 @@ export default async function AdminOrderDetailPage({ params, searchParams }: { p
           <p className="mt-2 text-sm text-muted-foreground">
             Estado: {telegramAttempt?.status ?? "PENDIENTE"} · Intentos: {telegramAttempt?.attemptCount ?? 0}
           </p>
+          {telegramAttempt?.errorSummary && (
+            <p className="mt-1 text-sm text-red-700">{telegramAttempt.errorSummary}</p>
+          )}
           {telegramAttempt?.status !== "SENT" && (
             <div className="mt-3">
-              <NotificationRetryControl action={async () => { "use server"; await retryOrderNotification({ orderId: order.id }); }} />
+              <NotificationRetryControl action={retryOrderNotification.bind(null, { orderId: order.id })} />
             </div>
           )}
         </section>

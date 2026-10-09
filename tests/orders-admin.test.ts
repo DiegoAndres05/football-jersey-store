@@ -56,6 +56,30 @@ test("proyección admin deriva resumen mixto y filtros inclusivos", async () => 
   });
 });
 
+test("un intento PENDING colgado se puede reclamar y enviar", async () => {
+  await withOrder(async (orderId) => {
+    await prisma.notificationAttempt.create({
+      data: {
+        orderId,
+        channel: "TELEGRAM",
+        eventKey: "ORDER_CREATED_PAID",
+        idempotencyKey: `${orderId}:TELEGRAM:ORDER_CREATED_PAID`,
+        status: "PENDING",
+        attemptCount: 1,
+        lastAttemptAt: new Date(),
+      },
+    });
+    let sends = 0;
+    const transport = { sendMessage: async () => { sends += 1; return { status: "SENT" as const, providerMessageRef: "99" }; } };
+    const result = await sendOrderNotification(orderId, transport, "mensaje");
+    const attempt = await prisma.notificationAttempt.findUnique({ where: { idempotencyKey: `${orderId}:TELEGRAM:ORDER_CREATED_PAID` } });
+    assert.equal(result.status, "SENT");
+    assert.equal(sends, 1);
+    assert.equal(attempt?.status, "SENT");
+    assert.equal(attempt?.attemptCount, 2);
+  });
+});
+
 test("persistencia evita segundo envío cuando el intento ya está SENT", async () => {
   await withOrder(async (orderId) => {
     let sends = 0;

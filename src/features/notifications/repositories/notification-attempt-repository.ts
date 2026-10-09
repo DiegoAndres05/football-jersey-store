@@ -11,12 +11,12 @@ export async function sendOrderNotification(orderId: string, transport: { sendMe
   const idempotencyKey = keyFor(orderId);
   const existing = await prisma.notificationAttempt.findUnique({ where: { idempotencyKey } });
   if (existing?.status === "SENT") return { status: "ALREADY_SENT" as const };
-  if (existing?.status === "PENDING") return { status: "ALREADY_SENT" as const };
 
   let attempt = existing;
   if (existing) {
+    // PENDING is reclaimable: a serverless freeze can leave the row stuck after PAID.
     const claimed = await prisma.notificationAttempt.updateMany({
-      where: { id: existing.id, status: { in: ["FAILED", "NOT_CONFIGURED"] } },
+      where: { id: existing.id, status: { in: ["FAILED", "NOT_CONFIGURED", "PENDING"] } },
       data: { status: "PENDING", attemptCount: { increment: 1 }, lastAttemptAt: new Date(), errorSummary: null },
     });
     if (claimed.count === 0) return { status: "ALREADY_SENT" as const };

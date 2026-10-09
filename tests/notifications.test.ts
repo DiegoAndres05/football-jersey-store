@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { formatOrderNotification } from "../src/features/notifications/services/notification-formatter.ts";
 import { createTelegramTransport } from "../src/features/notifications/telegram/telegram-adapter.ts";
 import { notificationIdempotencyKey } from "../src/features/notifications/repositories/notification-attempt-repository.ts";
@@ -84,4 +85,16 @@ test("adaptador normaliza configuración ausente y errores HTTP sin secretos", a
 
 test("clave de idempotencia es estable por pedido y evento", () => {
   assert.equal(notificationIdempotencyKey("order-test"), "order-test:TELEGRAM:ORDER_CREATED_PAID");
+});
+
+test("pago aprobado espera notifyOrderPaid en lugar de cortarlo", () => {
+  const apply = readFileSync("src/features/orders/services/apply-bold-payment.ts", "utf8");
+  assert.match(apply, /await notifyOrderPaid\(order\.id\)/);
+  assert.doesNotMatch(apply, /void notifyOrderPaid/);
+});
+
+test("reintento del admin usa la server action exportada", () => {
+  const detail = readFileSync("src/app/admin/(dashboard)/pedidos/[id]/page.tsx", "utf8");
+  assert.match(detail, /retryOrderNotification\.bind\(null, \{ orderId: order\.id \}\)/);
+  assert.doesNotMatch(detail, /"use server"; await retryOrderNotification/);
 });

@@ -13,8 +13,20 @@ export function NotificationRetryControl({ action }: { action: () => Promise<unk
           if (!window.confirm("¿Reintentar el aviso de este pedido?")) return;
           setMessage("");
           startTransition(async () => {
-            try { await action(); setMessage("Aviso enviado o en proceso."); }
-            catch { setMessage("No fue posible reintentar el aviso. Intenta de nuevo."); }
+            try {
+              const result = (await action()) as { status?: string } | undefined;
+              if (result?.status === "SENT" || result?.status === "ALREADY_SENT") {
+                setMessage("Aviso enviado.");
+              } else if (result?.status === "NOT_CONFIGURED") {
+                setMessage("Telegram no está configurado en este servidor.");
+              } else if (result?.status === "FAILED") {
+                setMessage("Telegram rechazó el mensaje. Revisa token y chat id.");
+              } else {
+                setMessage("No fue posible reintentar el aviso. Intenta de nuevo.");
+              }
+            } catch {
+              setMessage("No fue posible reintentar el aviso. Intenta de nuevo.");
+            }
           });
         }}>
         {pending ? "Reintentando…" : "Reintentar aviso"}

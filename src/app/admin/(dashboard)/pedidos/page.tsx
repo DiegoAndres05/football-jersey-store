@@ -85,7 +85,9 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                         ? "Enviado"
                         : order.notificationAttempt?.status === "FAILED"
                           ? "Fallido"
-                          : "Pendiente"}
+                          : order.notificationAttempt?.status === "NOT_CONFIGURED"
+                            ? "Sin configurar"
+                            : "Pendiente"}
                     </td>
                   )}
                 </tr>

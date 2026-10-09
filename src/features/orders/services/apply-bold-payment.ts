@@ -30,7 +30,7 @@ export type ApplyBoldPaymentResult =
  * Shared idempotent transition for Bold payment resolution.
  *
  * - Only acts when order is in `PENDING_PAYMENT`.
- * - APPROVED → PAID + paidAt + history + notifyOrderPaid (fire-and-forget).
+ * - APPROVED → PAID + paidAt + history + notifyOrderPaid (awaited so the send finishes).
  *   Inventory is unchanged (no SALE in this change).
  * - REJECTED → PAYMENT_FAILED + history + CANCELLATION rows that reverse
  *   this order's RESERVATION movements (same Prisma transaction).
@@ -167,7 +167,11 @@ export async function applyBoldPayment(
   }
 
   if (toStatus === "PAID") {
-    void notifyOrderPaid(order.id).catch(() => undefined);
+    try {
+      await notifyOrderPaid(order.id);
+    } catch (err) {
+      console.error("[applyBoldPayment] notifyOrderPaid failed:", err);
+    }
   }
 
   if (toStatus === "PAYMENT_FAILED") {
