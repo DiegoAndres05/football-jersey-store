@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getOrderByCode } from "@/features/orders/repositories/order-repository";
 import { reconcileBoldOrder } from "@/features/payments/services/bold-payment-reconcile";
+import { sendPaidOrderEmail } from "@/features/notifications/services/order-paid-email";
 import { toUsdCents } from "@/shared/money/convert";
 
 export const runtime = "nodejs";
@@ -54,6 +55,11 @@ export async function POST(request: Request) {
     // 2. Check if already finalized
     if (order.status === "PAID") {
       console.log(`[Bold Reconcile API] Order ${orderCode}: already PAID`);
+      try {
+        await sendPaidOrderEmail(order.id);
+      } catch (err) {
+        console.error(`[Bold Reconcile API] Order ${orderCode}: sendPaidOrderEmail failed:`, err);
+      }
       return NextResponse.json({ status: "PAID" });
     }
 

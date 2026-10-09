@@ -1,5 +1,7 @@
 export const NOTIFICATION_CHANNEL = "TELEGRAM" as const;
 export const ORDER_CREATED_PAID_EVENT = "ORDER_CREATED_PAID" as const;
+export const EMAIL_CHANNEL = "EMAIL" as const;
+export const ORDER_PAID_CUSTOMER_EVENT = "ORDER_PAID_CUSTOMER" as const;
 
 export type NotificationStatus = "PENDING" | "SENT" | "FAILED" | "NOT_CONFIGURED";
 export type DeliveryMode = "INMEDIATA" | "BAJO_PEDIDO" | "NO_DISPONIBLE";

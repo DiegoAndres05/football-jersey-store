@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { applyBoldPayment } from "@/features/orders/services/apply-bold-payment";
+import { sendPaidOrderEmail } from "@/features/notifications/services/order-paid-email";
 import { normalizeWebhookEventType } from "@/features/payments/domain/bold-payment-outcome";
 import { parseBoldWebhookEvent } from "@/features/payments/domain/bold-webhook";
 import { verifyBoldWebhookSignature } from "@/features/payments/services/bold-service";
@@ -63,6 +64,16 @@ export async function POST(request: Request) {
 
     if (!result.applied) {
       console.log(`[Bold Webhook] No action: ${result.reason} (order: ${event.reference})`);
+      if (result.reason === "NOT_PENDING") {
+        const current = await getOrderByCode(event.reference);
+        if (current?.status === "PAID") {
+          try {
+            await sendPaidOrderEmail(current.id);
+          } catch (err) {
+            console.error("[Bold Webhook] sendPaidOrderEmail failed:", err);
+          }
+        }
+      }
     }
 
     return NextResponse.json({ received: true });

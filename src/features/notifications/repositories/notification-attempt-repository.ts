@@ -5,10 +5,30 @@ import {
   type NotificationResult,
 } from "../types/notification-types";
 
-const keyFor = (orderId: string) => `${orderId}:${NOTIFICATION_CHANNEL}:${ORDER_CREATED_PAID_EVENT}`;
+const keyFor = (orderId: string, channel: string, eventKey: string) => `${orderId}:${channel}:${eventKey}`;
+
+export async function sendNotificationAttempt(input: {
+  orderId: string;
+  channel: string;
+  eventKey: string;
+  transport: { sendMessage(message: string): Promise<NotificationResult> };
+  message: string;
+}) {
+  return deliverNotification(input.orderId, input.channel, input.eventKey, input.transport, input.message);
+}
 
 export async function sendOrderNotification(orderId: string, transport: { sendMessage(message: string): Promise<NotificationResult> }, message: string) {
-  const idempotencyKey = keyFor(orderId);
+  return deliverNotification(orderId, NOTIFICATION_CHANNEL, ORDER_CREATED_PAID_EVENT, transport, message);
+}
+
+async function deliverNotification(
+  orderId: string,
+  channel: string,
+  eventKey: string,
+  transport: { sendMessage(message: string): Promise<NotificationResult> },
+  message: string,
+) {
+  const idempotencyKey = keyFor(orderId, channel, eventKey);
   const existing = await prisma.notificationAttempt.findUnique({ where: { idempotencyKey } });
   if (existing?.status === "SENT") return { status: "ALREADY_SENT" as const };
 
@@ -24,7 +44,7 @@ export async function sendOrderNotification(orderId: string, transport: { sendMe
   } else {
     try {
       attempt = await prisma.notificationAttempt.create({
-        data: { orderId, channel: NOTIFICATION_CHANNEL, eventKey: ORDER_CREATED_PAID_EVENT, idempotencyKey, status: "PENDING", attemptCount: 1, lastAttemptAt: new Date() },
+        data: { orderId, channel, eventKey, idempotencyKey, status: "PENDING", attemptCount: 1, lastAttemptAt: new Date() },
       });
     } catch (error) {
       const concurrent = await prisma.notificationAttempt.findUnique({ where: { idempotencyKey } });
@@ -44,5 +64,5 @@ export async function sendOrderNotification(orderId: string, transport: { sendMe
 }
 
 export function notificationIdempotencyKey(orderId: string) {
-  return keyFor(orderId);
+  return keyFor(orderId, NOTIFICATION_CHANNEL, ORDER_CREATED_PAID_EVENT);
 }

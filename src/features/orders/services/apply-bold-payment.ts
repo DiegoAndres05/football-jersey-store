@@ -2,6 +2,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { notifyOrderPaid } from "@/features/notifications/services/notification-service";
+import { sendPaidOrderEmail } from "@/features/notifications/services/order-paid-email";
 import type { BoldPaymentOutcome } from "@/features/payments/domain/bold-payment-outcome";
 import {
   planReservationCancellations,
@@ -171,6 +172,11 @@ export async function applyBoldPayment(
       await notifyOrderPaid(order.id);
     } catch (err) {
       console.error("[applyBoldPayment] notifyOrderPaid failed:", err);
+    }
+    try {
+      await sendPaidOrderEmail(order.id);
+    } catch (err) {
+      console.error("[applyBoldPayment] sendPaidOrderEmail failed:", err);
     }
   }
 
