@@ -16,6 +16,17 @@ export type NotificationEvent = {
   status: string;
   total: number;
   customer: { name: string; email?: string; phone?: string };
+  shipping: {
+    recipient: string;
+    phone: string;
+    line1: string;
+    line2?: string | null;
+    city: string;
+    state: string;
+    zipCode?: string | null;
+    country: string;
+    notes?: string | null;
+  };
   lines: {
     product: string;
     variant?: string;

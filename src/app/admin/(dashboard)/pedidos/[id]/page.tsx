@@ -8,6 +8,15 @@ import { AdminErrorState, AdminNotFoundState } from "../../admin-page-states";
 import { NotificationRetryControl } from "../notification-retry-control";
 import { PaymentStatusBadge } from "../payment-status-badge";
 
+function AdminField({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="font-medium">{value?.trim() ? value : "—"}</dd>
+    </div>
+  );
+}
+
 export default async function AdminOrderDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ modalidad?: string }> }) {
   const { id } = await params;
   const filter = (await searchParams)?.modalidad;
@@ -75,6 +84,49 @@ export default async function AdminOrderDetailPage({ params, searchParams }: { p
           <p className="mt-1 text-xl font-semibold">{formatPrice(order.total)}</p>
         </div>
       </div>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h3 className="font-semibold">Cliente</h3>
+        <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <AdminField label="Nombre" value={order.customerName} />
+          <AdminField label="Correo" value={order.customerEmail} />
+          <AdminField label="Teléfono" value={order.customerPhone} />
+        </dl>
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h3 className="font-semibold">Envío</h3>
+        <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <AdminField label="Quién recibe" value={order.shippingFullName} />
+          <AdminField label="Teléfono de entrega" value={order.shippingPhone} />
+          <AdminField label="Dirección" value={order.shippingLine1} />
+          {order.shippingLine2 ? <AdminField label="Complemento" value={order.shippingLine2} /> : null}
+          <AdminField label="Ciudad" value={order.shippingCity} />
+          <AdminField label="Departamento" value={order.shippingState} />
+          <AdminField label="Código postal" value={order.shippingZipCode} />
+          <AdminField label="País" value={order.shippingCountry} />
+          <AdminField label="Método" value={order.shippingMethod} />
+        </dl>
+        {order.notes ? (
+          <div className="mt-4 text-sm">
+            <p className="text-muted-foreground">Notas del cliente</p>
+            <p className="font-medium whitespace-pre-wrap">{order.notes}</p>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h3 className="font-semibold">Cobro</h3>
+        <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <AdminField label="Subtotal" value={formatPrice(order.subtotal)} />
+          <AdminField label="Personalización" value={formatPrice(order.personalizationFee)} />
+          <AdminField label="Envío" value={formatPrice(order.shippingFee)} />
+          <AdminField label="Descuento" value={formatPrice(order.discountAmount)} />
+          <AdminField label="Total" value={formatPrice(order.total)} />
+          <AdminField label="Moneda" value={order.saleCurrency} />
+          <AdminField label="Método de pago" value={order.paymentMethod} />
+        </dl>
+      </section>
 
       <section className="rounded-xl border border-border bg-card p-5">
         <h3 className="font-semibold">Cupón</h3>

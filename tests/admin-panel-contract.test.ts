@@ -19,6 +19,8 @@ test("order filters and detail preserve URL context", () => {
   assert.match(list, /getTelegramConfig/);
   assert.match(detail, /backHref/);
   assert.match(detail, /couponSnapshot/);
+  assert.match(detail, /shippingFullName/);
+  assert.match(detail, /shippingLine1/);
   assert.match(detail, /errorSummary/);
 });
 

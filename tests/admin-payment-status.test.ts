@@ -43,3 +43,12 @@ test("admin order list and detail render the payment status badge", () => {
   assert.match(listPage, /<PaymentStatusBadge order=\{order\} \/>/);
   assert.match(detailPage, /<PaymentStatusBadge order=\{order\} \/>/);
 });
+
+test("admin order detail shows checkout customer and shipping fields", () => {
+  assert.match(detailPage, /Quién recibe/);
+  assert.match(detailPage, /order\.shippingFullName/);
+  assert.match(detailPage, /order\.shippingLine1/);
+  assert.match(detailPage, /order\.shippingCity/);
+  assert.match(detailPage, /order\.customerPhone/);
+  assert.match(detailPage, /order\.notes/);
+});

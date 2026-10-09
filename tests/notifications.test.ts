@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { formatOrderNotification } from "../src/features/notifications/services/notification-formatter.ts";
 import { createTelegramTransport } from "../src/features/notifications/telegram/telegram-adapter.ts";
+import { getTelegramConfig } from "../src/features/notifications/config/telegram-config.ts";
 import { notificationIdempotencyKey } from "../src/features/notifications/repositories/notification-attempt-repository.ts";
 import type { NotificationEvent } from "../src/features/notifications/types/notification-types.ts";
 
@@ -12,7 +13,18 @@ const event: NotificationEvent = {
   createdAt: new Date("2026-09-03T12:00:00.000Z"),
   status: "PAID",
   total: 104900,
-  customer: { name: "Cliente de prueba", email: "cliente@example.test" },
+  customer: { name: "Cliente de prueba", email: "cliente@example.test", phone: "3001112233" },
+  shipping: {
+    recipient: "Ana Destinataria",
+    phone: "3009998877",
+    line1: "Calle 1 # 2-3",
+    line2: "Apto 4",
+    city: "Bogotá",
+    state: "Cundinamarca",
+    zipCode: "110111",
+    country: "Colombia",
+    notes: "Portería",
+  },
   lines: [
     { product: "Camiseta Colombia", variant: "Local", size: "M", quantity: 2, deliveryMode: "INMEDIATA" },
     { product: "Camiseta Argentina", quantity: 1, deliveryMode: "BAJO_PEDIDO" },
@@ -27,6 +39,24 @@ test("formatter incluye datos del pedido y modalidad por línea", () => {
   assert.match(message, /Camiseta Colombia \(Local \/ M\) x2: Entrega inmediata/);
   assert.match(message, /Camiseta Argentina x1: Bajo pedido/);
   assert.match(message, /Camiseta histórica x1: No disponible/);
+  assert.match(message, /Teléfono cliente: 3001112233/);
+  assert.match(message, /Quién recibe: Ana Destinataria/);
+  assert.match(message, /Teléfono entrega: 3009998877/);
+  assert.match(message, /Calle 1 # 2-3/);
+  assert.match(message, /Apto 4/);
+  assert.match(message, /Bogotá, Cundinamarca/);
+  assert.match(message, /CP 110111/);
+  assert.match(message, /Colombia/);
+  assert.match(message, /Notas: Portería/);
+});
+
+test("notifyOrderPaid proyecta los campos de envío del pedido", () => {
+  const source = readFileSync("src/features/notifications/services/notification-service.ts", "utf8");
+  assert.match(source, /shippingFullName/);
+  assert.match(source, /shippingLine1/);
+  assert.match(source, /shippingCity/);
+  assert.match(source, /customerPhone/);
+  assert.match(source, /notes: order\.notes/);
 });
 
 test("adaptador Telegram envía sendMessage y referencia de proveedor", async () => {
@@ -75,6 +105,35 @@ test("adaptador normaliza configuración ausente y errores HTTP sin secretos", a
     const result = await createTelegramTransport(async () => new Response(JSON.stringify({ ok: false }), { status: 400 })).sendMessage("mensaje");
     assert.deepEqual(result, { status: "FAILED", errorCode: "TELEGRAM_REJECTED", errorMessage: "Telegram rechazó el mensaje." });
     assert.equal(JSON.stringify(result).includes("test-token"), false);
+
+    const described = await createTelegramTransport(async () =>
+      new Response(JSON.stringify({ ok: false, description: "Forbidden: bot can't initiate conversation with a user" }), { status: 403 }),
+    ).sendMessage("mensaje");
+    assert.equal(described.status, "FAILED");
+    if (described.status === "FAILED") {
+      assert.match(described.errorMessage, /can't initiate conversation/);
+    }
+
+    process.env.TELEGRAM_BOT_TOKEN = "secret-token-value";
+    const leaked = await createTelegramTransport(async () =>
+      new Response(JSON.stringify({ ok: false, description: "bad secret-token-value" }), { status: 401 }),
+    ).sendMessage("mensaje");
+    assert.equal(JSON.stringify(leaked).includes("secret-token-value"), false);
+  } finally {
+    if (previousToken === undefined) delete process.env.TELEGRAM_BOT_TOKEN;
+    else process.env.TELEGRAM_BOT_TOKEN = previousToken;
+    if (previousChatId === undefined) delete process.env.TELEGRAM_CHAT_ID;
+    else process.env.TELEGRAM_CHAT_ID = previousChatId;
+  }
+});
+
+test("config de Telegram recorta comillas y prefijo bot", () => {
+  const previousToken = process.env.TELEGRAM_BOT_TOKEN;
+  const previousChatId = process.env.TELEGRAM_CHAT_ID;
+  process.env.TELEGRAM_BOT_TOKEN = `"bot123456:AA-test"`;
+  process.env.TELEGRAM_CHAT_ID = `" -100123 "`;
+  try {
+    assert.deepEqual(getTelegramConfig(), { token: "123456:AA-test", chatId: "-100123" });
   } finally {
     if (previousToken === undefined) delete process.env.TELEGRAM_BOT_TOKEN;
     else process.env.TELEGRAM_BOT_TOKEN = previousToken;
