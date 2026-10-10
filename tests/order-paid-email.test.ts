@@ -10,6 +10,7 @@ import { sendNotificationAttempt } from "../src/features/notifications/repositor
 const sample = {
   code: "FS-MAIL-1",
   customerName: "Ana <Cliente>",
+  orderedAt: new Date("2026-10-09T18:00:00.000Z"),
   saleCurrency: "COP",
   exchangeRateCopPerUsd: null,
   subtotal: 100000,
@@ -24,7 +25,7 @@ const sample = {
   shippingState: "Cundinamarca",
   shippingZipCode: "110111",
   shippingCountry: "Colombia",
-  items: [{ productName: "Camiseta", versionName: "Local", sizeName: "M", quantity: 1, subtotal: 100000 }],
+  items: [{ productName: "Camiseta", versionName: "Local", sizeName: "M", quantity: 1, unitPrice: 100000, subtotal: 100000 }],
 };
 
 test("el correo de compra pagada incluye productos, totales y dirección", () => {
@@ -36,6 +37,11 @@ test("el correo de compra pagada incluye productos, totales y dirección", () =>
   assert.match(email.text, /COP/);
   assert.match(email.html, /Ana &lt;Cliente&gt;/);
   assert.equal(email.html.includes("<Cliente>"), false);
+  assert.match(email.text, /9 de octubre de 2026/);
+  assert.match(email.text, /Precio unitario/);
+  assert.match(email.html, /https:\/\/www\.flashsports\.shop\/flashsport-logo\.png/);
+  assert.match(email.html, /alt="Flashsport"/);
+  assert.equal(email.html.includes("localhost"), false);
 });
 
 test("un pedido en USD no se muestra como COP", () => {

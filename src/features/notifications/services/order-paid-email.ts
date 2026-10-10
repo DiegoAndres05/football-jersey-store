@@ -20,6 +20,7 @@ export async function sendPaidOrderEmail(orderId: string) {
   const formatted = formatPaidOrderEmail({
     code: order.code,
     customerName: order.customerName,
+    orderedAt: order.createdAt,
     saleCurrency: order.saleCurrency,
     exchangeRateCopPerUsd: order.exchangeRateCopPerUsd,
     subtotal: order.subtotal,
@@ -39,6 +40,7 @@ export async function sendPaidOrderEmail(orderId: string) {
       versionName: item.versionName,
       sizeName: item.sizeName,
       quantity: item.quantity,
+      unitPrice: item.unitPrice,
       subtotal: item.subtotal,
     })),
   });
