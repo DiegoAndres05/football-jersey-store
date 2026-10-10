@@ -18,7 +18,7 @@ export async function subscribeToNewsletterAction(
   try {
     await prisma.newsletterSubscriber.upsert({
       where: { email: parsed.data.email.toLowerCase() },
-      update: {},
+      update: { unsubscribedAt: null },
       create: { email: parsed.data.email.toLowerCase() },
     });
     return saveSuccess();
