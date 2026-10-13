@@ -176,18 +176,6 @@ function renderHtml(order: PaidOrderEmailInput, address: string[], orderedOn: st
     .container { width: 100% !important; }
     .pad { padding-left: 20px !important; padding-right: 20px !important; }
   }
-  @media (prefers-color-scheme: dark) {
-    .force-light, .force-light table, .force-light td, .force-light div, .force-light p { background-color: ${PAGE} !important; color: ${INK} !important; }
-    .force-wash, .force-wash td { background-color: ${WASH} !important; color: ${INK} !important; }
-    .force-muted { color: ${MUTED} !important; }
-    .force-ink { color: ${INK} !important; }
-  }
-  [data-ogsc] .force-light, [data-ogsc] .force-light td, [data-ogsc] .force-light p { background-color: ${PAGE} !important; color: ${INK} !important; }
-  [data-ogsb] .force-light { background-color: ${PAGE} !important; }
-  [data-ogsc] .force-wash, [data-ogsc] .force-wash td { background-color: ${WASH} !important; color: ${INK} !important; }
-  [data-ogsc] .force-muted { color: ${MUTED} !important; }
-  u + .body .gmail-blend-screen { background: #000000; mix-blend-mode: screen; }
-  u + .body .gmail-blend-difference { background: #000000; mix-blend-mode: difference; }
 </style>
 </head>
 <body class="body force-light" bgcolor="${PAGE}" style="margin:0;padding:0;background-color:${PAGE};color:${INK};">
@@ -195,8 +183,6 @@ function renderHtml(order: PaidOrderEmailInput, address: string[], orderedOn: st
 <table role="presentation" class="force-light" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${PAGE}" style="background-color:${PAGE};color:${INK};">
   <tr>
     <td class="force-light" align="center" bgcolor="${PAGE}" style="padding:32px 12px;background-color:${PAGE};color:${INK};">
-      <div class="gmail-blend-screen">
-      <div class="gmail-blend-difference">
       <table role="presentation" class="container force-light" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="${CARD}" style="width:600px;max-width:600px;background-color:${CARD};color:${INK};border:1px solid ${LINE};">
         <tr>
           <td class="pad force-light" align="left" bgcolor="${PAGE}" style="padding:28px 32px 20px;background-color:${PAGE};color:${INK};border-bottom:1px solid ${LINE};">
@@ -261,8 +247,6 @@ function renderHtml(order: PaidOrderEmailInput, address: string[], orderedOn: st
           </td>
         </tr>
       </table>
-      </div>
-      </div>
     </td>
   </tr>
 </table>

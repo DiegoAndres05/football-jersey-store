@@ -49,9 +49,8 @@ test("el HTML del correo pide esquema claro y fondo blanco explícito", () => {
   assert.match(html, /<meta name="color-scheme" content="light only">/);
   assert.match(html, /<meta name="supported-color-schemes" content="light">/);
   assert.match(html, /color-scheme: light only/);
-  assert.match(html, /@media \(prefers-color-scheme: dark\)/);
-  assert.match(html, /\[data-ogsc\]/);
-  assert.match(html, /mix-blend-mode: screen/);
+  assert.equal(html.includes("mix-blend-mode"), false);
+  assert.equal(html.includes("prefers-color-scheme"), false);
   assert.match(html, /bgcolor="#ffffff"/);
   assert.match(html, /background-color:#ffffff/);
   assert.match(html, /color:#141414/);
