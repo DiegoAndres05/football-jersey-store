@@ -66,6 +66,7 @@ interface CartState {
   setCoupon: (code: string, discount: number) => void;
   clearCoupon: () => void;
   clear: () => void;
+  replaceItems: (items: CartItem[]) => void;
   itemCount: () => number;
   subtotal: () => number;
 }
@@ -133,6 +134,7 @@ export const useCartStore = create<CartState>()(
       setCoupon: (couponCode, couponDiscount) => set({ couponCode, couponDiscount }),
       clearCoupon: () => set({ couponCode: null, couponDiscount: 0 }),
       clear: () => set({ items: [], couponCode: null, couponDiscount: 0 }),
+      replaceItems: (items) => set({ items, couponCode: null, couponDiscount: 0 }),
       itemCount: () => get().items.reduce((acc, i) => acc + i.quantity, 0),
       subtotal: () => get().items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0),
     }),

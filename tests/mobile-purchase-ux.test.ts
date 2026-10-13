@@ -101,7 +101,7 @@ test("checkout at 390 px has no fixed width and a collapsed summary next to the 
 
   assert.doesNotMatch(checkout, /\b(?:min-)?w-\[\d{3,}px\]/);
   assert.match(checkout, /lg:grid-cols-\[minmax\(0,1fr\)_380px\]/);
-  assert.match(checkout, /mode: "onBlur"/);
+  assert.match(checkout, /mode: "onChange"/);
   assert.match(checkout, /<details[^>]*data-testid="checkout-mobile-summary"/);
   assert.match(checkout, /min-\[431px\]:hidden/);
   assert.match(checkout, /Ver resumen/);

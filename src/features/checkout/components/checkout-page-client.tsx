@@ -32,7 +32,7 @@ import { buildBoldCheckoutPayload } from "@/features/payments/domain/bold-checko
 import { CheckoutConsents } from "@/app/checkout/consents";
 import type { LegalConfig } from "@/shared/config/legal";
 import { validateConsents } from "@/features/checkout/validation";
-import { createPaymentIdempotencyKey, rememberPaymentRecovery } from "@/features/payments/recovery";
+import { createPaymentIdempotencyKey, readRecoveredCartItems, rememberPaymentRecovery } from "@/features/payments/recovery";
 
 const BOLD_SCRIPT_SRC = "https://checkout.bold.co/library/boldPaymentButton.js";
 const DESTINATION_COUNTRIES = [
@@ -110,6 +110,34 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
   const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
   const clearCart = useCartStore((s) => s.clear);
 
+  useEffect(() => {
+    const restore = () => {
+      if (useCartStore.getState().items.length > 0) return;
+      const recovered = readRecoveredCartItems();
+      if (recovered.length === 0) return;
+      useCartStore.getState().replaceItems(recovered);
+    };
+    const persist = useCartStore.persist;
+    const unsubscribe = persist?.hasHydrated()
+      ? undefined
+      : persist?.onFinishHydration(restore);
+    if (!persist || persist.hasHydrated()) restore();
+    const onMessage = (event: MessageEvent) => {
+      const allowed = event.origin === "https://checkout.bold.co"
+        || event.origin === "https://stg.checkout.bold.co"
+        || event.origin === "https://qa.checkout.bold.co"
+        || event.origin === window.location.origin;
+      const data = event.data as { type?: string } | null;
+      if (!allowed || data?.type !== "BOLD_CHECKOUT_EVENT") return;
+      restore();
+    };
+    window.addEventListener("message", onMessage);
+    return () => {
+      unsubscribe?.();
+      window.removeEventListener("message", onMessage);
+    };
+  }, []);
+
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<"form" | "payment">("form");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
@@ -153,7 +181,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
 
   const { register, handleSubmit, setError, watch, formState: { errors, isValid } } = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema) as any,
-    mode: "onBlur",
+    mode: "onChange",
     defaultValues: {
       fullName: "",
       email: "",
@@ -656,9 +684,11 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
             </div>
           </div>
 
-          <section className="order-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5 lg:order-none lg:mt-4 lg:border-0 lg:p-0">
-            <CheckoutConsents register={register} errors={errors} legal={legalConfig ?? null} />
-          </section>
+          {step === "form" && (
+            <section className="order-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5 lg:order-none lg:mt-4 lg:border-0 lg:p-0">
+              <CheckoutConsents register={register} errors={errors} legal={legalConfig ?? null} />
+            </section>
+          )}
 
           {step === "form" && (
             <div className="order-3 min-w-0 space-y-3 lg:hidden">

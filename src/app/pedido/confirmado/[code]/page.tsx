@@ -10,6 +10,7 @@ import {
   shouldReconcileOnConfirmation,
 } from "@/features/orders/domain/order-confirmation-view";
 import { ConfirmationPaymentStatus } from "./confirmation-payment-status";
+import { RecoverCartUnlessPaid } from "./recover-cart";
 import { DELIVERY_MODE_INFO, type DeliveryMode } from "@/features/products/types/delivery-mode";
 import { formatPurchaseLineDetail } from "@/features/products/domain/mystery-box";
 import { formatMoney } from "@/shared/money/format";
@@ -47,6 +48,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
 
   return (
     <div className="container-page py-16 max-w-2xl">
+      <RecoverCartUnlessPaid paid={uiMode === "paid"} />
       <div className="rounded-xl border border-border bg-card p-8 text-center">
         {/* Icon */}
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -152,6 +154,15 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
               </div>
             );
           })}
+        </div>
+
+        <div className="mt-4 flex justify-between border-t border-border pt-4 text-left text-sm">
+          <span className="text-muted-foreground">Envío</span>
+          <span className="font-medium tabular-nums">
+            {order.shippingFee > 0
+              ? formatMoney({ amountCop: order.shippingFee, currency: orderCurrency, copPerUsd: orderRate })
+              : "Gratis"}
+          </span>
         </div>
 
         {/* CTAs */}
