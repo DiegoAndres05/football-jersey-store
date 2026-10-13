@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { formatPaidOrderEmail, isDeliverableEmail } from "../src/features/notifications/email/paid-order-email.ts";
+import { formatPaidOrderEmail, isDeliverableEmail, resolveEmailProductImageUrl } from "../src/features/notifications/email/paid-order-email.ts";
 import { createResendTransport } from "../src/features/notifications/email/resend-adapter.ts";
 import { EMAIL_CHANNEL, ORDER_PAID_CUSTOMER_EVENT } from "../src/features/notifications/types/notification-types.ts";
 import { prisma } from "../src/lib/prisma.ts";
@@ -44,10 +44,88 @@ test("el correo de compra pagada incluye productos, totales y dirección", () =>
   assert.equal(email.html.includes("localhost"), false);
 });
 
+test("el HTML del correo pide esquema claro y fondo blanco explícito", () => {
+  const html = formatPaidOrderEmail(sample).html;
+  assert.match(html, /<meta name="color-scheme" content="light only">/);
+  assert.match(html, /<meta name="supported-color-schemes" content="light">/);
+  assert.match(html, /color-scheme: light only/);
+  assert.match(html, /@media \(prefers-color-scheme: dark\)/);
+  assert.match(html, /\[data-ogsc\]/);
+  assert.match(html, /mix-blend-mode: screen/);
+  assert.match(html, /bgcolor="#ffffff"/);
+  assert.match(html, /background-color:#ffffff/);
+  assert.match(html, /color:#141414/);
+  assert.match(html, /background-color:#f6f4f2/);
+  assert.match(html, /flashsport-logo\.png/);
+  assert.equal((html.match(/<table/g) ?? []).length, (html.match(/<\/table>/g) ?? []).length);
+  assert.equal((html.match(/<td/g) ?? []).length, (html.match(/<\/td>/g) ?? []).length);
+  assert.ok(html.trimEnd().endsWith("</html>"));
+});
+
 test("un pedido en USD no se muestra como COP", () => {
   const email = formatPaidOrderEmail({ ...sample, saleCurrency: "USD", exchangeRateCopPerUsd: 4000, total: 400000, subtotal: 400000, items: [{ ...sample.items[0], subtotal: 400000 }] });
   assert.match(email.text, /USD/);
   assert.equal(email.text.includes("COP"), false);
+});
+
+test("la fila muestra la imagen pública del producto y sigue completa si falta", () => {
+  const withImage = formatPaidOrderEmail({
+    ...sample,
+    items: [{ ...sample.items[0], imageUrl: "https://cdn.example.test/jersey.png", imageAlt: "Camiseta local" }],
+  });
+  assert.match(withImage.html, /src="https:\/\/cdn\.example\.test\/jersey\.png"/);
+  assert.match(withImage.html, /alt="Camiseta local"/);
+  assert.match(withImage.html, /width="72" height="72"/);
+  assert.match(withImage.html, /Versión Local/);
+  assert.match(withImage.html, /Talla M/);
+  assert.match(withImage.html, /Cant\. 1/);
+  assert.match(withImage.html, /Precio unitario/);
+  assert.match(withImage.html, /Subtotal/);
+
+  const without = formatPaidOrderEmail(sample);
+  assert.equal(without.html.includes("cdn.example.test"), false);
+  assert.equal(without.html.includes('src=""'), false);
+  assert.match(without.html, />Camiseta</);
+  assert.match(without.html, /Talla M/);
+});
+
+test("la imagen del correo solo acepta una URL https pública", () => {
+  const previous = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://project.supabase.co";
+  try {
+    assert.equal(
+      resolveEmailProductImageUrl({ url: "http://insecure.example/a.jpg", storagePath: "products/1/a.jpg" }),
+      "https://project.supabase.co/storage/v1/object/public/product-images/products/1/a.jpg",
+    );
+    assert.equal(
+      resolveEmailProductImageUrl({ url: "https://images.example/a.jpg", storagePath: null }),
+      "https://images.example/a.jpg",
+    );
+    assert.equal(resolveEmailProductImageUrl({ url: "/relative.jpg", storagePath: null }), null);
+    assert.equal(resolveEmailProductImageUrl({ url: "https://localhost/a.jpg", storagePath: null }), null);
+    assert.equal(resolveEmailProductImageUrl(null), null);
+  } finally {
+    if (previous === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = previous;
+  }
+
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "http://localhost:54321";
+  try {
+    assert.equal(
+      resolveEmailProductImageUrl({ url: "https://images.example/fallback.jpg", storagePath: "products/1/a.jpg" }),
+      "https://images.example/fallback.jpg",
+    );
+  } finally {
+    if (previous === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = previous;
+  }
+});
+
+test("el envío toma la imagen principal guardada del producto", () => {
+  const source = readFileSync("src/features/notifications/services/order-paid-email.ts", "utf8");
+  assert.match(source, /productImage\.findMany/);
+  assert.match(source, /isPrimary: "desc"/);
+  assert.match(source, /resolveEmailProductImageUrl/);
 });
 
 test("sin correo válido no hay destinatario", () => {

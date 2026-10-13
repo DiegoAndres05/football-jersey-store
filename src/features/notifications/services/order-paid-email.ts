@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { createResendTransport } from "../email/resend-adapter";
-import { formatPaidOrderEmail, isDeliverableEmail } from "../email/paid-order-email";
+import { formatPaidOrderEmail, isDeliverableEmail, resolveEmailProductImageUrl } from "../email/paid-order-email";
 import { sendNotificationAttempt } from "../repositories/notification-attempt-repository";
 import { EMAIL_CHANNEL, ORDER_PAID_CUSTOMER_EVENT } from "../types/notification-types";
 
@@ -15,6 +15,19 @@ export async function sendPaidOrderEmail(orderId: string) {
   }
   if (order.status !== "PAID") {
     return { status: "FAILED" as const, errorCode: "NOT_PAID", errorMessage: "El pedido no está pagado." };
+  }
+
+  const productIds = [...new Set(order.items.map((item) => item.productId).filter((id): id is string => Boolean(id)))];
+  const catalogImages = productIds.length
+    ? await prisma.productImage.findMany({
+        where: { productId: { in: productIds } },
+        orderBy: [{ isPrimary: "desc" }, { order: "asc" }],
+        select: { productId: true, url: true, altText: true, storagePath: true },
+      })
+    : [];
+  const imageByProduct = new Map<string, (typeof catalogImages)[number]>();
+  for (const image of catalogImages) {
+    if (!imageByProduct.has(image.productId)) imageByProduct.set(image.productId, image);
   }
 
   const formatted = formatPaidOrderEmail({
@@ -35,14 +48,19 @@ export async function sendPaidOrderEmail(orderId: string) {
     shippingState: order.shippingState,
     shippingZipCode: order.shippingZipCode,
     shippingCountry: order.shippingCountry,
-    items: order.items.map((item) => ({
-      productName: item.productName,
-      versionName: item.versionName,
-      sizeName: item.sizeName,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      subtotal: item.subtotal,
-    })),
+    items: order.items.map((item) => {
+      const image = item.productId ? imageByProduct.get(item.productId) : undefined;
+      return {
+        productName: item.productName,
+        versionName: item.versionName,
+        sizeName: item.sizeName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        subtotal: item.subtotal,
+        imageUrl: resolveEmailProductImageUrl(image),
+        imageAlt: image?.altText || item.productName,
+      };
+    }),
   });
   const to = order.customerEmail.trim();
   const transport = isDeliverableEmail(to)
