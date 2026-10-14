@@ -24,6 +24,8 @@ export function AdminBreadcrumbs({ pathname: providedPathname }: { pathname?: st
       "/admin/inventario": "Inventario",
       "/admin/cupones": "Cupones",
       "/admin/newsletter": "Newsletter",
+      "/admin/newsletter/campanas": "Campañas",
+      "/admin/newsletter/campanas/nueva": "Nueva",
       "/admin/ligas": "Ligas",
       "/admin/equipos": "Equipos",
       "/admin/proveedores": "Proveedores",

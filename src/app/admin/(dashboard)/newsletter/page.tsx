@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { CampaignForm } from "./campaign-form";
 
@@ -17,6 +18,16 @@ export default async function AdminNewsletterPage() {
           {activeCount} activos · {subscribers.length - activeCount} dados de baja
         </p>
       </div>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h3 className="font-semibold">Campañas</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Todavía no hay campañas guardadas. Puedes diseñar una y ver cómo quedará el correo.
+        </p>
+        <Link href="/admin/newsletter/campanas/nueva" className="mt-4 inline-flex rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
+          Nueva campaña
+        </Link>
+      </section>
 
       <CampaignForm activeCount={activeCount} />
 
