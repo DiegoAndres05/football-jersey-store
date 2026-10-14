@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getSessionUser } from "@/features/auth/server/session";
 import { prisma } from "@/lib/prisma";
-import { getEmailConfig } from "@/features/notifications/config/email-config";
+import { getNewsletterConfig } from "../config/newsletter-from";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { campaignProblems, renderCampaignEmail, subscribedEmails } from "../domain/campaign-message";
 import { readUnsubscribeToken, unsubscribeUrl } from "../domain/unsubscribe-token";
@@ -28,8 +28,8 @@ export async function sendNewsletterCampaign(
   const problem = campaignProblems(draft);
   if (problem) return { ok: false, error: problem };
 
-  const config = getEmailConfig();
-  if (!config) return { ok: false, error: "El correo no está configurado en este servidor." };
+  const newsletter = getNewsletterConfig();
+  if (!newsletter.ok) return { ok: false, error: newsletter.error };
 
   const rows = await prisma.newsletterSubscriber.findMany({
     select: { email: true, unsubscribedAt: true },
@@ -52,8 +52,8 @@ export async function sendNewsletterCampaign(
     subject: draft.subject.trim(),
     body: draft.body.trim(),
     origin,
-    from: config.from,
-    apiKey: config.apiKey,
+    from: newsletter.from,
+    apiKey: newsletter.apiKey,
   });
   revalidatePath("/admin/newsletter");
   return { ok: true, sent: result.sent, failed: result.failed, skipped };
