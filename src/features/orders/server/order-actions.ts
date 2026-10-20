@@ -8,6 +8,7 @@ import {
 } from "@/features/orders/repositories/order-repository";
 import { prepareBoldTransaction } from "@/features/payments/services/bold-service";
 import { toPublicBoldError } from "@/features/payments/domain/bold-public-error";
+import { createPayPalCheckout } from "@/features/payments/services/paypal-service";
 
 export type BoldCheckoutPayload = {
   orderId: string;
@@ -20,6 +21,21 @@ export type BoldCheckoutPayload = {
 export async function submitOrder(input: CreateOrderInput) {
   const result = await createOrder(input);
   if (!result.ok) return result;
+  if (input.paymentMethod === "PAYPAL") {
+    try {
+      const paypal = await createPayPalCheckout(result.code);
+      return { ...result, bold: null, boldError: null, paypal, paypalError: null };
+    } catch (err) {
+      console.error("Error preparing PayPal payment:", err);
+      return {
+        ...result,
+        bold: null,
+        boldError: null,
+        paypal: null,
+        paypalError: "No pudimos abrir PayPal. Revisa la configuración e intenta de nuevo.",
+      };
+    }
+  }
   try {
     const payment = await prepareBoldTransaction(result.code);
     const bold: BoldCheckoutPayload = {
@@ -29,11 +45,11 @@ export async function submitOrder(input: CreateOrderInput) {
       hash: payment.hash,
       apiKey: payment.apiKey,
     };
-    return { ...result, bold, boldError: null };
+    return { ...result, bold, boldError: null, paypal: null, paypalError: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
     console.error("Error preparing Bold payment:", message);
-    return { ...result, bold: null, boldError: toPublicBoldError(message).message };
+    return { ...result, bold: null, boldError: toPublicBoldError(message).message, paypal: null, paypalError: null };
   }
 }
 

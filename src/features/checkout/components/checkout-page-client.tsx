@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, ArrowRight, ChevronDown, CreditCard, Landmark, ShieldCheck, WalletCards } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +26,6 @@ import { toast } from "@/components/ui/toast";
 import {
   checkoutFormSchema,
   type CheckoutFormValues,
-  type PaymentMethod,
 } from "@/features/checkout/schemas/checkout-schema";
 import { buildBoldCheckoutPayload } from "@/features/payments/domain/bold-checkout-attrs";
 import { CheckoutConsents } from "@/app/checkout/consents";
@@ -101,7 +100,7 @@ function loadBoldCheckoutScript(): Promise<void> {
   });
 }
 
-export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyContext?: CurrencyContext; legalConfig?: LegalConfig | null }) {
+export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice }: { currencyContext?: CurrencyContext; legalConfig?: LegalConfig | null; paypalNotice?: string | null }) {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
   const appliedCouponCode = useCartStore((s) => s.couponCode);
@@ -140,7 +139,6 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
 
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<"form" | "payment">("form");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
   const [payError, setPayError] = useState("");
   const formRef = useRef<CheckoutFormValues | null>(null);
@@ -153,13 +151,6 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
     // A cart mutation invalidates any previously validated promotion.
     setPayError("");
   }, [subtotal, cartItemsKey]);
-
-  useEffect(() => {
-    if (!mounted || step !== "payment") return;
-    void loadBoldCheckoutScript().catch((err) => {
-      console.error("Bold script load failed:", err);
-    });
-  }, [mounted, step]);
 
   useEffect(() => {
     if (!mounted || items.length === 0) return;
@@ -233,21 +224,17 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
   const shippingScope = normalizeCountry(destinationCountry) === normalizeCountry(SITE.country)
     ? SHIPPING.methodName
     : "Destino internacional";
-  const isPayPalCheckout = normalizeCountry(destinationCountry) !== normalizeCountry(SITE.country)
-    || checkoutCurrency.currency !== "COP";
-  const paymentMethods = [
-    { id: "CARD", label: "Tarjeta débito o crédito", icon: CreditCard, note: "Visa, Mastercard" },
-    { id: "PSE", label: "PSE", icon: Landmark, note: "Débito desde tu banco" },
-    ...(isPayPalCheckout
-      ? [{ id: "PAYPAL", label: "PayPal", icon: WalletCards, note: "Pago internacional" } as const]
-      : []),
-  ] as const;
-
-  const shippingCountryField = register("shippingCountry");
+  const isColombiaDestination = normalizeCountry(destinationCountry) === normalizeCountry(SITE.country);
+  const canPayInternational = Boolean(currencyContext?.copPerUsd && currencyContext.copPerUsd > 0);
 
   useEffect(() => {
-    setPaymentMethod(isPayPalCheckout ? "PAYPAL" : "CARD");
-  }, [isPayPalCheckout]);
+    if (!mounted || step !== "payment" || !isColombiaDestination) return;
+    void loadBoldCheckoutScript().catch((err) => {
+      console.error("Bold script load failed:", err);
+    });
+  }, [mounted, step, isColombiaDestination]);
+
+  const shippingCountryField = register("shippingCountry");
 
   if (!mounted) return null;
 
@@ -286,14 +273,15 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
 
   const payNow = async () => {
     if (paymentStatus !== "idle" || !formRef.current) return;
-    if (normalizeCountry(formRef.current.shippingCountry) !== normalizeCountry(SITE.country)) {
-      setPayError("Los destinos internacionales quedan pendientes de cotización; no se puede abrir el pago.");
+    const payingWithPayPal = normalizeCountry(formRef.current.shippingCountry) !== normalizeCountry(SITE.country);
+    if (payingWithPayPal && !canPayInternational) {
+      setPayError("No pudimos calcular el pago en dólares. Intenta de nuevo.");
       return;
     }
     setPaymentStatus("processing");
     setPayError("");
-    const boldScript = loadBoldCheckoutScript();
-    boldScript.catch(() => undefined);
+    const boldScript = payingWithPayPal ? null : loadBoldCheckoutScript();
+    boldScript?.catch(() => undefined);
 
     const current = useCartStore.getState();
     const ids = [...new Set(current.items.map((item) => item.variantId))];
@@ -321,7 +309,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
         customizationNumber: i.customizationNumber,
         deliveryMode: i.deliveryMode,
       })),
-      paymentMethod,
+      paymentMethod: payingWithPayPal ? "PAYPAL" : "CARD",
       paymentReference: paymentKeyRef.current,
       saleCurrency: checkoutCurrencyForCountry(formRef.current.shippingCountry, currencyContext).currency,
       couponCode: appliedCouponCode,
@@ -333,6 +321,16 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
         clearCoupon();
       }
       setPaymentStatus("failed");
+      return;
+    }
+
+    if (payingWithPayPal) {
+      if (!result.paypal?.approveUrl) {
+        setPayError(result.paypalError ?? "No pudimos abrir PayPal. Intenta de nuevo.");
+        setPaymentStatus("failed");
+        return;
+      }
+      window.location.assign(result.paypal.approveUrl);
       return;
     }
 
@@ -354,6 +352,11 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
         return body;
       };
       const payload = result.bold ?? (await requestBoldHash());
+      if (!boldScript) {
+        setPayError("El sistema de pago no está listo. Recarga la página e intenta de nuevo.");
+        setPaymentStatus("idle");
+        return;
+      }
       await boldScript;
 
       const BoldCheckout = (window as Window & { BoldCheckout?: new (config: object) => { open: () => void } }).BoldCheckout;
@@ -469,6 +472,12 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
           <ArrowLeft className="h-3.5 w-3.5" /> Volver al carrito
         </Link>
         <h1 className="text-2xl md:text-3xl font-bold">Pago</h1>
+        {paypalNotice === "cancelled" && (
+          <p className="mt-3 text-sm text-amber-700">Cancelaste el pago con PayPal. Puedes intentarlo de nuevo.</p>
+        )}
+        {paypalNotice === "error" && (
+          <p className="mt-3 text-sm text-destructive">No pudimos confirmar el pago con PayPal. Si se debitó, espera unos minutos o escríbenos.</p>
+        )}
         <p className="text-sm text-muted-foreground mt-1">
           Paso {step === "form" ? "1 de 2" : "2 de 2"} · {items.length} {items.length === 1 ? "artículo" : "artículos"}
         </p>
@@ -580,33 +589,10 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
             </form>
           ) : (
             <div className="space-y-6">
-              <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
-                <h2 className="font-display text-lg font-bold uppercase tracking-tight mb-4">Medio de pago</h2>
-                <div className="space-y-2">
-                  {paymentMethods.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      aria-pressed={paymentMethod === m.id}
-                      onClick={() => setPaymentMethod(m.id)}
-                      className={`flex w-full min-w-0 items-center gap-2 whitespace-nowrap rounded-xl border-2 px-3 py-3 text-left transition-all sm:gap-3 sm:px-4 ${
-                        paymentMethod === m.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-muted-foreground/40"
-                      }`}
-                    >
-                      <m.icon className="h-5 w-5 shrink-0 text-primary" />
-                      <span className="min-w-0 truncate text-sm font-medium">{m.label}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">· {m.note}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-
               {paymentStatus === "processing" && (
                 <div className="rounded-xl border border-border bg-card p-6 text-center sm:p-8">
                   <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
-                  <p className="mt-4 text-sm font-medium">Conectando con Bold…</p>
+                  <p className="mt-4 text-sm font-medium">{isColombiaDestination ? "Conectando con Bold…" : "Conectando con PayPal…"}</p>
                   <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
                     Abriendo la pasarela de pago segura. No cierres esta página.
                   </p>
@@ -639,17 +625,17 @@ export function CheckoutPageClient({ currencyContext, legalConfig }: { currencyC
               {paymentStatus === "idle" && (
                 <Button
                   onClick={payNow}
-                  disabled={normalizeCountry(destinationCountry) !== normalizeCountry(SITE.country)}
+                  disabled={!isColombiaDestination && !canPayInternational}
                   className="w-full !flex-nowrap !whitespace-nowrap sm:w-auto"
                 >
                   <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                    Pagar {formatMoney({ amountCop: total, ...moneyContext })}
+                    {isColombiaDestination ? "Pagar con Bold" : "Pagar con PayPal"}
                     <ShieldCheck className="h-4 w-4 shrink-0" />
                   </span>
                 </Button>
               )}
-              {normalizeCountry(destinationCountry) !== normalizeCountry(SITE.country) && (
-                <p className="text-sm text-amber-700">Este destino está en cotización pendiente. No se abrirá Bold.</p>
+              {!isColombiaDestination && (
+                <p className="text-sm text-muted-foreground">El cobro se hace en dólares con PayPal.</p>
               )}
             </div>
           )}

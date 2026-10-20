@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   cashSaleHasStock,
   cashSaleMovementQuantity,
+  filterCashCatalog,
   isCashOrderHiddenFromPublic,
   orderVisibleToStaff,
   quoteCashSale,
@@ -38,6 +39,19 @@ test("el pedido en efectivo no aparece en la confirmación pública", () => {
   assert.equal(isCashOrderHiddenFromPublic("CASH"), true);
   assert.equal(isCashOrderHiddenFromPublic("CARD"), false);
   assert.equal(isCashOrderHiddenFromPublic("PSE"), false);
+});
+
+test("el mostrador filtra por liga y temporada y encuentra el equipo sin acentos", () => {
+  const items = [
+    { productName: "Local", teamName: "Atlético Nacional", leagueName: "BetPlay", seasonName: "2026", versionName: "Fan", sizeName: "M" },
+    { productName: "Visita", teamName: "Millonarios", leagueName: "BetPlay", seasonName: "2025", versionName: "Jugador", sizeName: "L" },
+  ];
+  const byLeague = filterCashCatalog(items, { query: "", league: "BetPlay", team: "", season: "2026", version: "", size: "" });
+  assert.deepEqual(byLeague.items.map((item) => item.teamName), ["Atlético Nacional"]);
+  const byName = filterCashCatalog(items, { query: "atletico", league: "", team: "", season: "", version: "", size: "" });
+  assert.equal(byName.items.length, 1);
+  const many = Array.from({ length: 50 }, (_, index) => ({ ...items[0], productName: `Prenda ${index}`, teamName: `Equipo ${index}` }));
+  assert.equal(filterCashCatalog(many, { query: "", league: "", team: "", season: "", version: "", size: "" }).mode, "prompt");
 });
 
 test("el vendedor ve ventas en efectivo y no pedidos de tarjeta o PSE", () => {

@@ -10,7 +10,13 @@ export const metadata: Metadata = {
   robots: NOINDEX_NOFOLLOW,
 };
 
-export default async function CheckoutPage() {
+export default async function CheckoutPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ paypal?: string }>;
+}) {
   const currencyCtx = await getCurrencyContext();
-  return <CheckoutPageClient currencyContext={currencyCtx} legalConfig={getLegalConfig()} />;
+  const params = await searchParams;
+  const paypalNotice = params.paypal === "cancelled" || params.paypal === "error" ? params.paypal : null;
+  return <CheckoutPageClient currencyContext={currencyCtx} legalConfig={getLegalConfig()} paypalNotice={paypalNotice} />;
 }

@@ -363,7 +363,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
           </Button>
 
           <p className="mt-3 text-[11px] text-muted-foreground text-center leading-relaxed">
-            Aceptamos tarjeta y PSE. Pago seguro procesado en el siguiente paso.
+            En Colombia el pago se completa con Bold. Fuera de Colombia, con PayPal.
           </p>
         </aside>
       </div>

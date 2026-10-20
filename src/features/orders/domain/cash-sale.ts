@@ -59,6 +59,67 @@ export function cashCounterEmail(code: string): string {
   return `mostrador+${code}@flashsports.invalid`;
 }
 
+export const CASH_CATALOG_RESULT_LIMIT = 40;
+
+export type CashCatalogItem = {
+  productName: string;
+  teamName: string;
+  leagueName: string;
+  seasonName: string;
+  versionName: string;
+  sizeName: string;
+};
+
+export type CashCatalogFilter = {
+  query: string;
+  league: string;
+  team: string;
+  season: string;
+  version: string;
+  size: string;
+};
+
+function foldCashSearch(value: string): string {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
+}
+
+export function filterCashCatalog<T extends CashCatalogItem>(
+  items: T[],
+  filter: CashCatalogFilter,
+): { mode: "all" | "prompt" | "search"; items: T[]; matchCount: number } {
+  const needle = foldCashSearch(filter.query);
+  const hasChoice = Boolean(filter.league || filter.team || filter.season || filter.version || filter.size || needle.length >= 2);
+  if (!hasChoice && items.length <= CASH_CATALOG_RESULT_LIMIT) {
+    return { mode: "all", items, matchCount: items.length };
+  }
+  if (!hasChoice) return { mode: "prompt", items: [], matchCount: 0 };
+
+  const matches = items.filter((item) => {
+    if (filter.league && item.leagueName !== filter.league) return false;
+    if (filter.team && item.teamName !== filter.team) return false;
+    if (filter.season && item.seasonName !== filter.season) return false;
+    if (filter.version && item.versionName !== filter.version) return false;
+    if (filter.size && item.sizeName !== filter.size) return false;
+    if (needle.length >= 2) {
+      const haystack = foldCashSearch([
+        item.productName,
+        item.teamName,
+        item.leagueName,
+        item.seasonName,
+        item.versionName,
+        item.sizeName,
+      ].join(" "));
+      if (!haystack.includes(needle)) return false;
+    }
+    return true;
+  });
+  return {
+    mode: "search",
+    items: matches.slice(0, CASH_CATALOG_RESULT_LIMIT),
+    matchCount: matches.length,
+  };
+}
+
 export function orderVisibleToStaff(role: string, paymentMethod: string): boolean {
   if (isAdminRole(role)) return true;
   if (isVendorRole(role)) return paymentMethod === "CASH";

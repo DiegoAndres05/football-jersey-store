@@ -6,11 +6,17 @@ export default async function CashSalePage() {
   const variants = await prisma.productVariant.findMany({
     where: { product: { isActive: true } },
     include: {
-      product: { select: { name: true } },
+      product: {
+        select: {
+          name: true,
+          team: { select: { name: true, league: { select: { name: true } } } },
+          season: { select: { name: true } },
+        },
+      },
       size: { select: { name: true } },
       version: { select: { name: true } },
     },
-    orderBy: [{ product: { name: "asc" } }],
+    orderBy: [{ product: { team: { name: "asc" } } }, { product: { name: "asc" } }, { size: { position: "asc" } }],
   });
   const stock = await getImmediateStockByVariantIds(variants.map((variant) => variant.id));
   const stockById = new Map(stock.map((row) => [row.variantId, row.stock]));
@@ -19,7 +25,12 @@ export default async function CashSalePage() {
     if (available <= 0) return [];
     return [{
       id: variant.id,
-      label: `${variant.product.name} · ${variant.version.name} · ${variant.size.name}`,
+      productName: variant.product.name,
+      teamName: variant.product.team.name,
+      leagueName: variant.product.team.league?.name ?? "",
+      seasonName: variant.product.season.name,
+      versionName: variant.version.name,
+      sizeName: variant.size.name,
       price: variant.salePrice,
       stock: available,
     }];

@@ -17,6 +17,7 @@ import { availableCouponUses, reserveCoupon } from "@/features/coupons/repositor
 import { getLegalConfig } from "@/shared/config/legal";
 import { quoteShipping } from "@/features/checkout/shipping";
 import { normalizeCountry, validateConsents } from "@/features/checkout/validation";
+import { resolveCheckoutPayment } from "@/features/payments/domain/checkout-payment-route";
 
 export type OrderLineInput = {
   variantId: string;
@@ -65,10 +66,8 @@ export async function createOrder(input: CreateOrderInput): Promise<
     return { ok: false, error: "El carrito está vacío." };
   }
   const destination = normalizeCountry(parsed.data.shippingCountry);
-  const shippingQuote = quoteShipping(destination, 0);
-  if (!shippingQuote.chargeable) {
-    return { ok: false, error: "Los destinos internacionales quedan pendientes de cotización y no pueden pagar en línea." };
-  }
+  const paymentRoute = resolveCheckoutPayment(destination, input.paymentMethod);
+  if (!paymentRoute.ok) return paymentRoute;
   const consentErrors = validateConsents({
     TERMS: parsed.data.consentTerms,
     PRIVACY: parsed.data.consentPrivacy,
@@ -154,7 +153,7 @@ export async function createOrder(input: CreateOrderInput): Promise<
   const code = orderCode();
 
   const currencyCtx = await getCurrencyContext();
-  const saleCurrency = input.saleCurrency === "USD" ? "USD" : "COP";
+  const saleCurrency = paymentRoute.saleCurrency;
   const exchangeRateCopPerUsd = saleCurrency === "USD" ? currencyCtx.copPerUsd : null;
   if (saleCurrency === "USD" && (!exchangeRateCopPerUsd || exchangeRateCopPerUsd <= 0)) {
     return { ok: false, error: "No pudimos calcular el pago en USD. Intenta de nuevo o elige Colombia como país de destino." };
@@ -231,7 +230,7 @@ export async function createOrder(input: CreateOrderInput): Promise<
           couponEligibleBase: couponSnapshot?.eligibleBase ?? null,
           couponDiscountAmount: couponSnapshot ? discountAmount : null,
           couponAppliedAt: couponSnapshot ? new Date() : null,
-          shippingMethod: "Nacional",
+          shippingMethod: paymentRoute.route === "PAYPAL" ? "Internacional" : "Nacional",
           shippingFullName: f.shippingFullName,
           shippingPhone: f.shippingPhone,
           shippingLine1: f.shippingLine1,
@@ -267,7 +266,9 @@ export async function createOrder(input: CreateOrderInput): Promise<
           history: {
             create: {
               toStatus: "PENDING_PAYMENT",
-              note: "Pedido creado. Pago simulado (demo, sin pasarela conectada).",
+              note: paymentRoute.route === "PAYPAL"
+                ? "Pedido creado. Pago pendiente en PayPal."
+                : "Pedido creado. Pago pendiente en Bold.",
               createdBy: input.paymentReference,
             },
           },
