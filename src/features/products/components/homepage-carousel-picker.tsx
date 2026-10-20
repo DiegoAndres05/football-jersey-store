@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import {
@@ -31,6 +31,7 @@ export function HomepageCarouselPicker({
   const [maxWarning, setMaxWarning] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [pending, startTransition] = useTransition();
+  const detailsRef = useRef<HTMLDetailsElement>(null);
   const router = useRouter();
 
   function handleToggle(imageId: string) {
@@ -59,6 +60,7 @@ export function HomepageCarouselPicker({
       const result = await saveHomepageCarouselAction(selectedIds);
       if (result.ok) {
         toast({ title: "Carrusel guardado", variant: "success" });
+        if (detailsRef.current) detailsRef.current.open = false;
         router.refresh();
         return;
       }
@@ -67,17 +69,28 @@ export function HomepageCarouselPicker({
   }
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5 space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+    <details
+      ref={detailsRef}
+      className="group rounded-xl border border-border bg-card"
+      defaultOpen={selectedIds.length === 0}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
           <h3 className="font-display text-sm font-bold uppercase tracking-tight">
             Fotos del carrusel de inicio
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Elige hasta {HOMEPAGE_CAROUSEL_MAX} fotos de productos visibles y pulsa Guardar.
-            {photos.length > CAROUSEL_PICKER_BROWSE_LIMIT ? " Busca por equipo, liga o producto para no recorrer toda la lista." : ""}
+            {selectedIds.length} de {HOMEPAGE_CAROUSEL_MAX} elegidas
           </p>
-        </div>
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className="space-y-4 border-t border-border px-5 pb-5 pt-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          Elige hasta {HOMEPAGE_CAROUSEL_MAX} fotos de productos visibles y pulsa Guardar.
+          {photos.length > CAROUSEL_PICKER_BROWSE_LIMIT ? " Busca por equipo, liga o producto para no recorrer toda la lista." : ""}
+        </p>
         <Button type="button" onClick={handleSave} disabled={pending}>
           {pending ? "Guardando…" : "Guardar"}
         </Button>
@@ -152,7 +165,8 @@ export function HomepageCarouselPicker({
           {maxWarning}
         </p>
       )}
-    </section>
+      </div>
+    </details>
   );
 }
 
