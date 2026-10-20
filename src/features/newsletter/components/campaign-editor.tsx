@@ -20,7 +20,7 @@ import {
   type CampaignImage,
 } from "../domain/campaign-document";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { sendDesignedNewsletterCampaign, type CampaignSendResult } from "../server/campaign-actions";
+import type { CampaignSendResult } from "../server/campaign-actions";
 
 const fieldClass = "mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm";
 
@@ -123,8 +123,20 @@ export function CampaignEditor({
     setSending(true);
     setSendResult(null);
     try {
-      const result = await sendDesignedNewsletterCampaign(document);
-      setSendResult(result);
+      const response = await fetch("/api/admin/newsletter/campaign", {
+        method: "POST",
+        headers: { accept: "application/json", "content-type": "application/json" },
+        body: JSON.stringify(document),
+      });
+      const payload: unknown = await response.json().catch(() => null);
+      setSendResult(isCampaignSendResult(payload)
+        ? payload
+        : {
+            ok: false,
+            error: response.status === 403
+              ? "El servidor bloqueó el envío. Recarga la página e intenta de nuevo."
+              : "No pudimos enviar la campaña. Intenta de nuevo.",
+          });
     } catch {
       setSendResult({ ok: false, error: "No pudimos enviar la campaña. Intenta de nuevo." });
     } finally {
@@ -354,6 +366,17 @@ export function CampaignEditor({
       </Dialog>
     </div>
   );
+}
+
+function isCampaignSendResult(value: unknown): value is CampaignSendResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as CampaignSendResult;
+  if (result.ok === true) {
+    return Number.isInteger(result.sent) && result.sent >= 0
+      && Number.isInteger(result.failed) && result.failed >= 0
+      && Number.isInteger(result.skipped) && result.skipped >= 0;
+  }
+  return result.ok === false && typeof result.error === "string" && result.error.length > 0 && result.error.length <= 400;
 }
 
 function blockName(block: CampaignBlock): string {

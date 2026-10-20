@@ -191,8 +191,11 @@ test("el editor envía la campaña diseñada sin usar el remitente de compras", 
   assert.match(list, /\/admin\/newsletter\/campanas\/nueva/);
   assert.match(page, /loadCampaignCatalog/);
   assert.match(catalog, /getSessionUser/);
-  assert.match(editor, /sendDesignedNewsletterCampaign/);
-  assert.doesNotMatch(editor, /RESEND_API_KEY|EMAIL_FROM|fetch\(/);
+  const route = readFileSync("src/app/api/admin/newsletter/campaign/route.ts", "utf8");
+  assert.match(editor, /\/api\/admin\/newsletter\/campaign/);
+  assert.doesNotMatch(editor, /RESEND_API_KEY|EMAIL_FROM|api\.resend\.com|sendDesignedNewsletterCampaign/);
+  assert.match(route, /sendDesignedNewsletterCampaign/);
+  assert.doesNotMatch(route, /EMAIL_FROM|RESEND_API_KEY/);
   assert.match(editor, /beforeunload/);
   assert.match(editor, /hasCampaignChanges/);
   assert.match(editor, /disabled=\{atLimit\}/);
