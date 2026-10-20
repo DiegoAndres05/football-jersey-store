@@ -52,6 +52,10 @@ test("la vista previa incluye logo, imagen, botón y baja, y escapa el texto", (
   assert.match(html, /newsletter\/baja/);
   assert.equal(html.includes("<script>"), false);
   assert.match(html, /Camisetas &lt;nuevas&gt;/);
+  assert.match(html, /<meta name="color-scheme" content="light only">/);
+  assert.match(html, /background-color:#FBF9F8/);
+  assert.match(html, /color:#141414/);
+  assert.match(html, /prefers-color-scheme: dark/);
   assert.equal(documentProblems(draft, origin).length, 0);
 });
 

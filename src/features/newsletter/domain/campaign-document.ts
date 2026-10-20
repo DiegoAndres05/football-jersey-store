@@ -313,6 +313,15 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
+const STORE_PAGE = "#FBF9F8";
+const STORE_CARD = "#FFFFFF";
+const STORE_INK = "#141414";
+const STORE_MUTED = "#616161";
+const STORE_LINE = "#E9E4E1";
+const STORE_BUTTON = "#141414";
+const STORE_BUTTON_INK = "#FFFFFF";
+const STORE_FONT = "Inter, Arial, Helvetica, sans-serif";
+
 function paragraphHtml(value: string): string {
   return value
     .trim()
@@ -320,7 +329,7 @@ function paragraphHtml(value: string): string {
     .filter(Boolean)
     .map(
       (paragraph) =>
-        `<p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#111111;">${escapeHtml(paragraph).replaceAll("\n", "<br>")}</p>`,
+        `<p class="fs-ink" style="margin:0 0 16px;font-family:${STORE_FONT};font-size:16px;line-height:1.6;color:${STORE_INK};">${escapeHtml(paragraph).replaceAll("\n", "<br>")}</p>`,
     )
     .join("");
 }
@@ -374,24 +383,24 @@ export function renderCampaignPreview(document: CampaignDocument, origin: string
     .map((block) => {
       if (block.type === "logo" && block.visible) {
         const src = `${site}${CAMPAIGN_LOGO_PATH}`;
-        return `<tr><td align="center" style="padding:28px 24px 12px;background:#ffffff;"><img src="${escapeHtml(src)}" alt="Flashsport" width="220" style="display:block;width:220px;max-width:100%;height:auto;border:0;background:#ffffff;"></td></tr>`;
+        return `<tr><td class="fs-card" align="center" bgcolor="${STORE_CARD}" style="padding:28px 24px 12px;background-color:${STORE_CARD};color:${STORE_INK};"><img src="${escapeHtml(src)}" alt="Flashsport" width="220" style="display:block;width:220px;max-width:100%;height:auto;border:0;background-color:${STORE_CARD};"></td></tr>`;
       }
       if (block.type === "image" && block.image && isPublicImageUrl(block.image.url)) {
-        return `<tr><td style="padding:12px 24px;background:#ffffff;"><img src="${escapeHtml(block.image.url)}" alt="${escapeHtml(block.image.alt || block.image.name)}" width="552" style="display:block;width:100%;max-width:552px;height:auto;border:0;"></td></tr>`;
+        return `<tr><td class="fs-card" bgcolor="${STORE_CARD}" style="padding:12px 24px;background-color:${STORE_CARD};"><img src="${escapeHtml(block.image.url)}" alt="${escapeHtml(block.image.alt || block.image.name)}" width="552" style="display:block;width:100%;max-width:552px;height:auto;border:0;"></td></tr>`;
       }
       if (block.type === "heading" && block.text.trim()) {
-        return `<tr><td style="padding:8px 24px 4px;background:#ffffff;"><h1 style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:0.02em;color:#111111;">${escapeHtml(block.text.trim())}</h1></td></tr>`;
+        return `<tr><td class="fs-card fs-ink" bgcolor="${STORE_CARD}" style="padding:8px 24px 4px;background-color:${STORE_CARD};color:${STORE_INK};"><h1 class="fs-ink" style="margin:0;font-family:${STORE_FONT};font-size:28px;line-height:1.2;font-weight:700;letter-spacing:0.02em;color:${STORE_INK};">${escapeHtml(block.text.trim())}</h1></td></tr>`;
       }
       if (block.type === "text" && block.text.trim()) {
-        return `<tr><td style="padding:8px 24px 0;background:#ffffff;">${paragraphHtml(block.text)}</td></tr>`;
+        return `<tr><td class="fs-card fs-ink" bgcolor="${STORE_CARD}" style="padding:8px 24px 0;background-color:${STORE_CARD};color:${STORE_INK};">${paragraphHtml(block.text)}</td></tr>`;
       }
       if (block.type === "button" && block.label.trim()) {
         const href = campaignHref(block.destination, site);
         const label = escapeHtml(block.label.trim());
         const control = href
-          ? `<a href="${escapeHtml(href)}" style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;letter-spacing:0.08em;color:#ffffff;text-decoration:none;">${label}</a>`
-          : `<span style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;letter-spacing:0.08em;color:#ffffff;">${label}</span>`;
-        return `<tr><td align="center" style="padding:8px 24px 20px;background:#ffffff;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#111111" style="background:#111111;border-radius:4px;">${control}</td></tr></table></td></tr>`;
+          ? `<a href="${escapeHtml(href)}" style="display:inline-block;padding:14px 28px;font-family:${STORE_FONT};font-size:14px;font-weight:700;letter-spacing:0.08em;color:${STORE_BUTTON_INK};text-decoration:none;">${label}</a>`
+          : `<span style="display:inline-block;padding:14px 28px;font-family:${STORE_FONT};font-size:14px;font-weight:700;letter-spacing:0.08em;color:${STORE_BUTTON_INK};">${label}</span>`;
+        return `<tr><td class="fs-card" align="center" bgcolor="${STORE_CARD}" style="padding:8px 24px 20px;background-color:${STORE_CARD};"><table role="presentation" class="fs-button" cellpadding="0" cellspacing="0" border="0" bgcolor="${STORE_BUTTON}" style="background-color:${STORE_BUTTON};"><tr><td class="fs-button" bgcolor="${STORE_BUTTON}" style="background-color:${STORE_BUTTON};border-radius:4px;">${control}</td></tr></table></td></tr>`;
       }
       return "";
     })
@@ -403,8 +412,9 @@ export function renderCampaignPreview(document: CampaignDocument, origin: string
     : "";
   const unsubscribe = safeUnsubscribeHref(unsubscribeHref, site);
   const unsubscribeControl = unsubscribe
-    ? `<a href="${escapeHtml(unsubscribe)}" style="color:#111111;">Dejar de recibir ofertas</a>`
+    ? `<a class="fs-ink" href="${escapeHtml(unsubscribe)}" style="color:${STORE_INK};">Dejar de recibir ofertas</a>`
     : "Dejar de recibir ofertas";
+  const title = escapeHtml(document.subject.trim() || "Flashsport");
 
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(document.subject.trim() || "Flashsport")}</title></head><body style="margin:0;padding:0;background:#f4f4f4;">${hidden}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;">${rows}<tr><td style="padding:24px;background:#ffffff;border-top:1px solid #e5e5e5;"><p style="margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#444444;">Flashsport · flashsport.col@gmail.com</p><p style="margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;"><a href="${escapeHtml(`${site}/privacidad`)}" style="color:#111111;">Privacidad</a></p><p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;">${unsubscribeControl}</p></td></tr></table></td></tr></table></body></html>`;
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${title}</title><style>:root { color-scheme: light only; supported-color-schemes: light; } @media (prefers-color-scheme: dark) { .fs-page, .fs-page td.fs-page { background-color:${STORE_PAGE} !important; } .fs-card { background-color:${STORE_CARD} !important; color:${STORE_INK} !important; } .fs-ink, .fs-ink p, .fs-ink h1, .fs-ink a { color:${STORE_INK} !important; } .fs-muted { color:${STORE_MUTED} !important; } .fs-button, .fs-button td { background-color:${STORE_BUTTON} !important; } .fs-button a, .fs-button span { color:${STORE_BUTTON_INK} !important; } }</style></head><body class="body fs-page" bgcolor="${STORE_PAGE}" style="margin:0;padding:0;background-color:${STORE_PAGE};color:${STORE_INK};">${hidden}<table role="presentation" class="fs-page" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${STORE_PAGE}" style="background-color:${STORE_PAGE};color:${STORE_INK};"><tr><td class="fs-page" align="center" bgcolor="${STORE_PAGE}" style="padding:24px 12px;background-color:${STORE_PAGE};"><table role="presentation" class="fs-card" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="${STORE_CARD}" style="width:100%;max-width:600px;background-color:${STORE_CARD};color:${STORE_INK};">${rows}<tr><td class="fs-card" bgcolor="${STORE_CARD}" style="padding:24px;background-color:${STORE_CARD};border-top:1px solid ${STORE_LINE};color:${STORE_INK};"><p class="fs-muted" style="margin:0 0 8px;font-family:${STORE_FONT};font-size:12px;line-height:1.5;color:${STORE_MUTED};">Flashsport · flashsport.col@gmail.com</p><p class="fs-ink" style="margin:0 0 8px;font-family:${STORE_FONT};font-size:12px;line-height:1.5;color:${STORE_INK};"><a class="fs-ink" href="${escapeHtml(`${site}/privacidad`)}" style="color:${STORE_INK};">Privacidad</a></p><p class="fs-ink" style="margin:0;font-family:${STORE_FONT};font-size:12px;line-height:1.5;color:${STORE_INK};">${unsubscribeControl}</p></td></tr></table></td></tr></table></body></html>`;
 }
