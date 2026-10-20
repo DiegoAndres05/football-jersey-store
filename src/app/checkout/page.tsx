@@ -3,6 +3,7 @@ import { CheckoutPageClient } from "@/features/checkout/components/checkout-page
 import { getCurrencyContext } from "@/shared/money/server-helpers";
 import { NOINDEX_NOFOLLOW } from "@/features/seo/domain/robots-policy";
 import { getLegalConfig } from "@/shared/config/legal";
+import { getShippingRates } from "@/features/system/repositories/shipping-rates-repository";
 
 export const metadata: Metadata = {
   title: "Pago",
@@ -15,8 +16,8 @@ export default async function CheckoutPage({
 }: {
   searchParams: Promise<{ paypal?: string }>;
 }) {
-  const currencyCtx = await getCurrencyContext();
+  const [currencyCtx, shippingRates] = await Promise.all([getCurrencyContext(), getShippingRates()]);
   const params = await searchParams;
   const paypalNotice = params.paypal === "cancelled" || params.paypal === "error" ? params.paypal : null;
-  return <CheckoutPageClient currencyContext={currencyCtx} legalConfig={getLegalConfig()} paypalNotice={paypalNotice} />;
+  return <CheckoutPageClient currencyContext={currencyCtx} legalConfig={getLegalConfig()} paypalNotice={paypalNotice} shippingRates={shippingRates} />;
 }

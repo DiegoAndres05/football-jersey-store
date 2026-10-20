@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { shippingFee } from "@/shared/config/site";
+import { getShippingRates } from "@/features/system/repositories/shipping-rates-repository";
 import {
   checkoutFormSchema,
   type PaymentMethod,
@@ -135,7 +135,7 @@ export async function createOrder(input: CreateOrderInput): Promise<
     });
   }
 
-  const quote = quoteShipping(destination, subtotal);
+  const quote = quoteShipping(destination, subtotal, await getShippingRates());
   const fee = quote.fee;
   let discountAmount = 0;
   let couponSnapshot: { code: string; discountType: "PERCENTAGE" | "FIXED"; value: number; eligibleBase: number } | null = null;

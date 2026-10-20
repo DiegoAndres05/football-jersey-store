@@ -1,7 +1,8 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { shippingFee } from "@/shared/config/site";
+import { quoteShipping } from "@/features/checkout/shipping";
+import { getShippingRates } from "@/features/system/repositories/shipping-rates-repository";
 import { getSessionUser } from "@/features/auth/server/session";
 import { publicCouponSchema, couponInputSchema, type CouponInput } from "../schemas/coupon-schema";
 import { calculateCouponTotals } from "../domain/discount";
@@ -33,7 +34,7 @@ export async function validateCoupon(input: unknown): Promise<CouponValidationRe
       base += (variant.salePrice + surcharge) * line.quantity;
     }
     if (base <= 0) return safeCouponError("NOT_APPLICABLE");
-    const shipping = shippingFee(base);
+    const shipping = quoteShipping("CO", base, await getShippingRates()).fee;
     const totals = calculateCouponTotals(base, shipping, coupon.discountType, coupon.value);
     return { ok: true, code: normalizeCouponCode(coupon.code), discountType: coupon.discountType, ...totals, message: "Cupón aplicado correctamente." };
   } catch (error) {

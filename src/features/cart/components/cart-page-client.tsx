@@ -22,8 +22,9 @@ import { toast } from "@/components/ui/toast";
 import { validateCoupon } from "@/features/coupons/server/coupon-actions";
 import { SHIPPING } from "@/shared/config/site";
 import { calculateOrderBreakdown } from "@/features/checkout/domain/order-breakdown";
+import type { ShippingRates } from "@/features/checkout/shipping";
 
-export function CartPageClient({ currencyContext }: { currencyContext?: CurrencyContext }) {
+export function CartPageClient({ currencyContext, shippingRates }: { currencyContext?: CurrencyContext; shippingRates?: ShippingRates }) {
   const items = useCartStore((s) => s.items);
   const itemCount = useCartStore((s) => s.items.reduce((acc, i) => acc + i.quantity, 0));
   const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
@@ -47,8 +48,9 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
       personalizationFee,
       discount: appliedCouponDiscount,
       country: "Colombia",
+      shippingRates,
     }),
-    [subtotal, personalizationFee, appliedCouponDiscount],
+    [subtotal, personalizationFee, appliedCouponDiscount, shippingRates],
   );
   const shipping = orderBreakdown.shipping;
   const variantKey = useMemo(
@@ -314,7 +316,7 @@ export function CartPageClient({ currencyContext }: { currencyContext?: Currency
           )}
 
           <div className="mt-3 rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
-            {remaining > 0 ? (
+            {shipping > 0 && remaining > 0 ? (
               <p>
                 Te faltan {formatMoney({ amountCop: remaining, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })} para envío gratis desde{" "}
                 {formatMoney({ amountCop: freeShippingThreshold, currency: currencyContext?.currency ?? "COP", copPerUsd: currencyContext?.copPerUsd ?? undefined })}.

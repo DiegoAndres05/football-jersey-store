@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { SHIPPING, SITE } from "@/shared/config/site";
 import { calculateOrderBreakdown } from "@/features/checkout/domain/order-breakdown";
+import type { ShippingRates } from "@/features/checkout/shipping";
 import { DELIVERY_MODE_INFO } from "@/features/products/types/delivery-mode";
 import { formatPurchaseLineDetail } from "@/features/products/domain/mystery-box";
 import { formatMoney } from "@/shared/money/format";
@@ -100,7 +101,7 @@ function loadBoldCheckoutScript(): Promise<void> {
   });
 }
 
-export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice }: { currencyContext?: CurrencyContext; legalConfig?: LegalConfig | null; paypalNotice?: string | null }) {
+export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice, shippingRates }: { currencyContext?: CurrencyContext; legalConfig?: LegalConfig | null; paypalNotice?: string | null; shippingRates?: ShippingRates }) {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
   const appliedCouponCode = useCartStore((s) => s.couponCode);
@@ -207,8 +208,9 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice 
       personalizationFee,
       discount: appliedCouponDiscount,
       country: destinationCountry,
+      shippingRates,
     }),
-    [productSubtotal, personalizationFee, appliedCouponDiscount, destinationCountry],
+    [productSubtotal, personalizationFee, appliedCouponDiscount, destinationCountry, shippingRates],
   );
   const fee = useMemo(() => (mounted ? breakdown.shipping : 0), [mounted, breakdown.shipping]);
   const total = breakdown.total;
@@ -512,7 +514,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice 
                 <h2 className="font-display text-lg font-bold uppercase tracking-tight mb-1">Envío</h2>
                 <p className="text-xs text-muted-foreground mb-4">
                   {destinationCountry} · {shippingScope} ·{" "}
-                  {fee === 0 ? "Gratis en este pedido" : formatMoney({ amountCop: SHIPPING.flatFee, ...moneyContext })}
+                  {fee === 0 ? "Gratis en este pedido" : formatMoney({ amountCop: fee, ...moneyContext })}
                 </p>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">

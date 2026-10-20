@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CartPageClient } from "@/features/cart/components/cart-page-client";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
+import { getShippingRates } from "@/features/system/repositories/shipping-rates-repository";
 import { NOINDEX_NOFOLLOW } from "@/features/seo/domain/robots-policy";
 
 export const metadata: Metadata = {
@@ -10,6 +11,6 @@ export const metadata: Metadata = {
 };
 
 export default async function CartPage() {
-  const currencyCtx = await getCurrencyContext();
-  return <CartPageClient currencyContext={currencyCtx} />;
+  const [currencyCtx, shippingRates] = await Promise.all([getCurrencyContext(), getShippingRates()]);
+  return <CartPageClient currencyContext={currencyCtx} shippingRates={shippingRates} />;
 }
