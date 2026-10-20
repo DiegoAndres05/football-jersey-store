@@ -28,7 +28,39 @@ export type EligibleCarouselPhoto = {
   url: string;
   altText: string | null;
   productName: string;
+  teamName: string;
+  leagueName: string;
 };
+
+/** Por debajo de este número se pueden ver todas las fotos sin buscar. */
+export const CAROUSEL_PICKER_BROWSE_LIMIT = 48;
+
+export function foldCarouselSearch(value: string): string {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
+}
+
+export function carouselPhotoHaystack(photo: EligibleCarouselPhoto): string {
+  return foldCarouselSearch([photo.productName, photo.teamName, photo.leagueName, photo.altText ?? ""].join(" "));
+}
+
+export function visibleCarouselPhotos(
+  photos: EligibleCarouselPhoto[],
+  query: string,
+): { mode: "all" | "search" | "prompt"; photos: EligibleCarouselPhoto[]; matchCount: number } {
+  const needle = foldCarouselSearch(query);
+  if (photos.length <= CAROUSEL_PICKER_BROWSE_LIMIT) {
+    if (!needle) return { mode: "all", photos, matchCount: photos.length };
+    const matches = photos.filter((photo) => carouselPhotoHaystack(photo).includes(needle));
+    return { mode: "search", photos: matches, matchCount: matches.length };
+  }
+  if (needle.length < 2) return { mode: "prompt", photos: [], matchCount: 0 };
+  const matches = photos.filter((photo) => carouselPhotoHaystack(photo).includes(needle));
+  return {
+    mode: "search",
+    photos: matches.slice(0, CAROUSEL_PICKER_BROWSE_LIMIT),
+    matchCount: matches.length,
+  };
+}
 
 export function toggleCarouselImageId(
   current: string[],

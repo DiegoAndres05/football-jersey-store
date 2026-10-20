@@ -48,7 +48,12 @@ export async function listEligibleCarouselPhotos(): Promise<EligibleCarouselPhot
       id: true,
       url: true,
       altText: true,
-      product: { select: { name: true } },
+      product: {
+        select: {
+          name: true,
+          team: { select: { name: true, league: { select: { name: true } } } },
+        },
+      },
     },
   });
 
@@ -57,6 +62,8 @@ export async function listEligibleCarouselPhotos(): Promise<EligibleCarouselPhot
     url: image.url,
     altText: image.altText,
     productName: image.product.name,
+    teamName: image.product.team.name,
+    leagueName: image.product.team.league?.name ?? "",
   }));
 }
 

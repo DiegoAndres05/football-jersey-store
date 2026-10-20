@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   HOMEPAGE_CAROUSEL_MAX,
   toggleCarouselImageId,
+  visibleCarouselPhotos,
+  type EligibleCarouselPhoto,
 } from "@/features/products/domain/homepage-carousel-slides";
 
 describe("toggleCarouselImageId", () => {
@@ -34,5 +36,27 @@ describe("toggleCarouselImageId", () => {
     const result = toggleCarouselImageId(current, "z");
     assert.equal(result.ok, false);
     assert.deepEqual(result.ids, ["a", "b", "c", "d", "e"]);
+  });
+});
+
+function photo(id: string, productName: string, teamName: string, leagueName = "Liga"): EligibleCarouselPhoto {
+  return { id, url: "https://cdn.example.test/a.jpg", altText: null, productName, teamName, leagueName };
+}
+
+describe("visibleCarouselPhotos", () => {
+  it("muestra todas las fotos cuando todavía son pocas", () => {
+    const photos = [photo("1", "Local", "Millonarios")];
+    const result = visibleCarouselPhotos(photos, "");
+    assert.equal(result.mode, "all");
+    assert.equal(result.photos.length, 1);
+  });
+
+  it("con un catálogo grande pide una búsqueda y encuentra por equipo sin acentos", () => {
+    const photos = Array.from({ length: 60 }, (_, index) => photo(String(index), `Camiseta ${index}`, index === 7 ? "Atlético Nacional" : `Equipo ${index}`));
+    assert.equal(visibleCarouselPhotos(photos, "").mode, "prompt");
+    assert.equal(visibleCarouselPhotos(photos, "a").mode, "prompt");
+    const found = visibleCarouselPhotos(photos, "atletico");
+    assert.equal(found.mode, "search");
+    assert.deepEqual(found.photos.map((item) => item.id), ["7"]);
   });
 });

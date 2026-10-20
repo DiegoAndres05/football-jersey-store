@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import {
+  CAROUSEL_PICKER_BROWSE_LIMIT,
   HOMEPAGE_CAROUSEL_MAX,
   toggleCarouselImageId,
+  visibleCarouselPhotos,
   type EligibleCarouselPhoto,
 } from "@/features/products/domain/homepage-carousel-slides";
 import { saveHomepageCarouselAction } from "@/features/products/server/homepage-carousel-actions";
@@ -27,6 +29,7 @@ export function HomepageCarouselPicker({
     initialSelectedIds.filter((id) => eligibleIds.has(id)),
   );
   const [maxWarning, setMaxWarning] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -44,6 +47,12 @@ export function HomepageCarouselPicker({
     setMaxWarning(null);
     setSelectedIds(result.ids);
   }
+
+  const visible = useMemo(() => visibleCarouselPhotos(photos, query), [photos, query]);
+  const selectedPhotos = selectedIds.flatMap((id) => {
+    const photo = photos.find((item) => item.id === id);
+    return photo ? [photo] : [];
+  });
 
   function handleSave() {
     startTransition(async () => {
@@ -65,8 +74,8 @@ export function HomepageCarouselPicker({
             Fotos del carrusel de inicio
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Haz clic en las fotos de productos visibles (hasta {HOMEPAGE_CAROUSEL_MAX}) y pulsa
-            Guardar. El inicio muestra exactamente esas fotos.
+            Elige hasta {HOMEPAGE_CAROUSEL_MAX} fotos de productos visibles y pulsa Guardar.
+            {photos.length > CAROUSEL_PICKER_BROWSE_LIMIT ? " Busca por equipo, liga o producto para no recorrer toda la lista." : ""}
           </p>
         </div>
         <Button type="button" onClick={handleSave} disabled={pending}>
@@ -79,51 +88,63 @@ export function HomepageCarouselPicker({
           No hay fotos de productos visibles. Sube imágenes y muestra el producto en la tienda.
         </p>
       ) : (
-        <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-          {photos.map((photo) => {
-            const selected = selectedIds.includes(photo.id);
-            const order = selected ? selectedIds.indexOf(photo.id) + 1 : null;
+        <>
+          <label className="block text-sm">
+            Buscar foto
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Equipo, liga o producto"
+              className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            />
+          </label>
 
-            return (
-              <li key={photo.id}>
-                <button
-                  type="button"
-                  onClick={() => handleToggle(photo.id)}
-                  aria-pressed={selected}
-                  className={`relative block w-full overflow-hidden rounded-lg border bg-secondary text-left transition-colors ${
+          {selectedPhotos.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Elegidas ({selectedPhotos.length} de {HOMEPAGE_CAROUSEL_MAX})
+              </p>
+              <ul className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+                {selectedPhotos.map((photo) => (
+                  <PhotoChoice
+                    key={photo.id}
+                    photo={photo}
                     selected
-                      ? "border-primary ring-2 ring-primary"
-                      : "border-border hover:border-muted-foreground/40"
-                  }`}
-                >
-                  <span className="relative block aspect-square">
-                    <Image
-                      src={photo.url}
-                      alt={photo.altText ?? photo.productName}
-                      fill
-                      sizes="160px"
-                      className="object-cover"
-                    />
-                    {selected && (
-                      <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                        <Check className="h-3.5 w-3.5" aria-hidden />
-                        <span className="sr-only">Seleccionada</span>
-                      </span>
-                    )}
-                    {order !== null && (
-                      <span className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-xs font-semibold">
-                        {order}
-                      </span>
-                    )}
-                  </span>
-                  <span className="block truncate px-2 py-1.5 text-[11px] text-muted-foreground">
-                    {photo.productName}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                    order={selectedIds.indexOf(photo.id) + 1}
+                    onToggle={() => handleToggle(photo.id)}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {visible.mode === "prompt" ? (
+            <p className="text-sm text-muted-foreground">
+              Hay {photos.length} fotos. Escribe al menos dos letras para encontrar un equipo, una liga o un producto.
+            </p>
+          ) : visible.photos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Ninguna foto coincide con esa búsqueda.</p>
+          ) : (
+            <>
+              <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
+                {visible.photos.map((photo) => (
+                  <PhotoChoice
+                    key={photo.id}
+                    photo={photo}
+                    selected={selectedIds.includes(photo.id)}
+                    order={selectedIds.includes(photo.id) ? selectedIds.indexOf(photo.id) + 1 : null}
+                    onToggle={() => handleToggle(photo.id)}
+                  />
+                ))}
+              </ul>
+              {visible.matchCount > visible.photos.length && (
+                <p className="text-sm text-muted-foreground">
+                  Hay {visible.matchCount} coincidencias. Afina la búsqueda para ver el resto.
+                </p>
+              )}
+            </>
+          )}
+        </>
       )}
 
       {maxWarning && (
@@ -132,5 +153,53 @@ export function HomepageCarouselPicker({
         </p>
       )}
     </section>
+  );
+}
+
+function PhotoChoice({
+  photo,
+  selected,
+  order,
+  onToggle,
+}: {
+  photo: EligibleCarouselPhoto;
+  selected: boolean;
+  order: number | null;
+  onToggle: () => void;
+}) {
+  const caption = photo.teamName ? `${photo.productName} · ${photo.teamName}` : photo.productName;
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={selected}
+        className={`relative block w-full overflow-hidden rounded-lg border bg-secondary text-left transition-colors ${
+          selected ? "border-primary ring-2 ring-primary" : "border-border hover:border-muted-foreground/40"
+        }`}
+      >
+        <span className="relative block aspect-square">
+          <Image
+            src={photo.url}
+            alt={photo.altText ?? photo.productName}
+            fill
+            sizes="160px"
+            className="object-cover"
+          />
+          {selected && (
+            <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <Check className="h-3.5 w-3.5" aria-hidden />
+              <span className="sr-only">Seleccionada</span>
+            </span>
+          )}
+          {order !== null && (
+            <span className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-xs font-semibold">
+              {order}
+            </span>
+          )}
+        </span>
+        <span className="block truncate px-2 py-1.5 text-[11px] text-muted-foreground">{caption}</span>
+      </button>
+    </li>
   );
 }
