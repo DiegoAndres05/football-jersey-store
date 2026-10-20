@@ -59,6 +59,7 @@ export async function sendPaidOrderEmail(orderId: string) {
         subtotal: item.subtotal,
         imageUrl: resolveEmailProductImageUrl(image),
         imageAlt: image?.altText || item.productName,
+        deliveryMode: item.deliveryMode,
       };
     }),
   });

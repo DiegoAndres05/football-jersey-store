@@ -1,5 +1,5 @@
 import { formatMoney, type Currency } from "@/shared/money/format";
-import { SITE } from "@/shared/config/site";
+import { SITE, whatsappLink } from "@/shared/config/site";
 
 export type PaidOrderEmailLine = {
   productName: string;
@@ -10,6 +10,7 @@ export type PaidOrderEmailLine = {
   subtotal: number;
   imageUrl?: string | null;
   imageAlt?: string | null;
+  deliveryMode?: string | null;
 };
 
 export type PaidOrderEmailInput = {
@@ -101,6 +102,28 @@ function formatOrderDate(date: Date): string {
   }).format(date);
 }
 
+function addCalendarDays(date: Date, days: number): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+  const [year, month, day] = parts.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days, 17, 0, 0));
+}
+
+/** 15–20 días desde la compra, en fechas de calendario de Bogotá. */
+export function backorderEstimateLabel(orderedAt: Date): string {
+  const from = formatOrderDate(addCalendarDays(orderedAt, 15));
+  const to = formatOrderDate(addCalendarDays(orderedAt, 20));
+  return `Tiempo estimado: ${from} – ${to}`;
+}
+
+function trackingMessage(code: string): string {
+  return `Hola Flashsport, quiero el seguimiento de mi pedido ${code}.`;
+}
+
 function shippingAddress(order: PaidOrderEmailInput): string[] {
   return [
     order.shippingLine1,
@@ -114,10 +137,11 @@ function shippingAddress(order: PaidOrderEmailInput): string[] {
 export function formatPaidOrderEmail(order: PaidOrderEmailInput): { subject: string; text: string; html: string } {
   const address = shippingAddress(order);
   const orderedOn = formatOrderDate(order.orderedAt);
-  const lines = order.items.map(
-    (item) =>
-      `${item.productName} · ${item.versionName} · Talla ${item.sizeName} · x${item.quantity} · Precio unitario ${money(item.unitPrice, order)} · Subtotal ${money(item.subtotal, order)}`,
-  );
+  const lines = order.items.map((item) => {
+    const estimate = item.deliveryMode === "BAJO_PEDIDO" ? ` · ${backorderEstimateLabel(order.orderedAt)}` : "";
+    return `${item.productName} · ${item.versionName} · Talla ${item.sizeName} · x${item.quantity} · Precio unitario ${money(item.unitPrice, order)} · Subtotal ${money(item.subtotal, order)}${estimate}`;
+  });
+  const trackingUrl = whatsappLink(trackingMessage(order.code));
   const subject = `Pedido ${order.code} confirmado`;
   const text = [
     `Hola ${order.customerName},`,
@@ -140,6 +164,10 @@ export function formatPaidOrderEmail(order: PaidOrderEmailInput): { subject: str
     `Teléfono: ${order.shippingPhone}`,
     ...address,
     "",
+    "Seguimiento de tu compra:",
+    "Por ahora el seguimiento se hace por WhatsApp. Escribe con el número de tu pedido.",
+    trackingUrl,
+    "",
     "Flashsport",
     SITE.tagline,
     SITE.email,
@@ -147,11 +175,11 @@ export function formatPaidOrderEmail(order: PaidOrderEmailInput): { subject: str
     STORE_URL,
   ].join("\n");
 
-  const html = renderHtml(order, address, orderedOn);
+  const html = renderHtml(order, address, orderedOn, trackingUrl);
   return { subject, text, html };
 }
 
-function renderHtml(order: PaidOrderEmailInput, address: string[], orderedOn: string): string {
+function renderHtml(order: PaidOrderEmailInput, address: string[], orderedOn: string, trackingUrl: string): string {
   const name = escapeHtml(order.customerName);
   const code = escapeHtml(order.code);
   const date = escapeHtml(orderedOn);
@@ -239,6 +267,13 @@ function renderHtml(order: PaidOrderEmailInput, address: string[], orderedOn: st
           </td>
         </tr>
         <tr>
+          <td class="pad force-light" bgcolor="${CARD}" style="padding:0 32px 32px;background-color:${CARD};color:${INK};">
+            <p class="force-ink" style="margin:0 0 8px;font-family:${DISPLAY};font-size:12px;line-height:16px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${INK};">Seguimiento de tu compra</p>
+            <p class="force-muted" style="margin:0;font-family:${FONT};font-size:14px;line-height:22px;color:${MUTED};">Por ahora el seguimiento se hace por WhatsApp. Escribe con el número de tu pedido <strong class="force-ink" style="color:${INK};">${code}</strong>.</p>
+            <p style="margin:12px 0 0;font-family:${FONT};font-size:14px;line-height:22px;"><a href="${escapeHtml(trackingUrl)}" style="color:${INK};text-decoration:underline;">Escribir por WhatsApp</a></p>
+          </td>
+        </tr>
+        <tr>
           <td class="pad force-light" bgcolor="${PAGE}" style="padding:20px 32px 28px;background-color:${PAGE};color:${INK};border-top:1px solid ${LINE};">
             <p class="force-ink" style="margin:0;font-family:${DISPLAY};font-size:12px;line-height:16px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${INK};">Flashsport</p>
             <p class="force-muted" style="margin:8px 0 0;font-family:${FONT};font-size:13px;line-height:20px;color:${MUTED};">${escapeHtml(SITE.tagline)}</p>
@@ -268,6 +303,7 @@ function renderItem(item: PaidOrderEmailLine, order: PaidOrderEmailInput): strin
           <td class="force-ink" valign="top" bgcolor="${CARD}" style="font-family:${FONT};font-size:15px;line-height:22px;background-color:${CARD};color:${INK};">
             <div class="force-ink" style="font-family:${FONT};font-size:15px;line-height:22px;font-weight:600;color:${INK};">${escapeHtml(item.productName)}</div>
             <div class="force-muted" style="padding-top:4px;font-family:${FONT};font-size:13px;line-height:20px;color:${MUTED};">Versión ${escapeHtml(item.versionName)} · Talla ${escapeHtml(item.sizeName)} · Cant. ${item.quantity}</div>
+            ${item.deliveryMode === "BAJO_PEDIDO" ? `<div class="force-ink" style="padding-top:4px;font-family:${FONT};font-size:13px;line-height:20px;font-weight:600;color:${INK};">${escapeHtml(backorderEstimateLabel(order.orderedAt))}</div>` : ""}
             <div class="force-muted" style="padding-top:2px;font-family:${FONT};font-size:13px;line-height:20px;color:${MUTED};">Precio unitario ${escapeHtml(money(item.unitPrice, order))}</div>
             <div class="force-ink" style="padding-top:2px;font-family:${FONT};font-size:14px;line-height:20px;font-weight:600;color:${INK};">Subtotal ${escapeHtml(money(item.subtotal, order))}</div>
           </td>
