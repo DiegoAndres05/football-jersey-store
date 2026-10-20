@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/features/auth/server/session";
+import { getStaffUser } from "@/features/auth/server/session";
 import { AdminLoginForm } from "@/features/auth/components/admin-login-form";
 
 export const metadata: Metadata = {
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminLoginPage() {
-  const user = await getSessionUser();
+  const user = await getStaffUser();
   if (user) redirect("/admin");
 
   return (

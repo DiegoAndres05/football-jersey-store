@@ -18,11 +18,15 @@ export function deriveDeliverySummary(items: { deliveryMode: unknown }[]): Deliv
 export async function listAdminOrders(
   deliveryMode?: "INMEDIATA" | "BAJO_PEDIDO",
   dateFilter?: AdminOrderDateFilter,
+  scope?: { paymentMethod?: string },
 ) {
   const orders = await prisma.order.findMany({
-    where: dateFilter?.from || dateFilter?.to
-      ? { createdAt: { ...(dateFilter.from ? { gte: dateFilter.from } : {}), ...(dateFilter.to ? { lte: dateFilter.to } : {}) } }
-      : undefined,
+    where: {
+      ...(dateFilter?.from || dateFilter?.to
+        ? { createdAt: { ...(dateFilter.from ? { gte: dateFilter.from } : {}), ...(dateFilter.to ? { lte: dateFilter.to } : {}) } }
+        : {}),
+      ...(scope?.paymentMethod ? { paymentMethod: scope.paymentMethod } : {}),
+    },
     orderBy: { createdAt: "desc" },
     include: { items: true, notificationAttempts: true },
   });

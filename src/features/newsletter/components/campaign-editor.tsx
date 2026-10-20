@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
+  CAMPAIGN_BLOCK_LIMIT,
   appendCampaignBlock,
   campaignHref,
   clearBlockImage,
   documentProblems,
   emptyCampaignDocument,
+  hasCampaignChanges,
   moveCampaignBlock,
   removeCampaignBlock,
   renderCampaignPreview,
@@ -37,13 +40,69 @@ export function CampaignEditor({
   images: CampaignImage[];
   destinations: CampaignDestinationOption[];
 }) {
-  const [document, setDocument] = useState<CampaignDocument>(emptyCampaignDocument);
+  const router = useRouter();
+  const initialDocument = useRef(emptyCampaignDocument());
+  const allowLeave = useRef(false);
+  const [document, setDocument] = useState<CampaignDocument>(initialDocument.current);
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
   const [libraryFor, setLibraryFor] = useState<string | null>(null);
   const sequence = useRef(1);
+  const dirty = hasCampaignChanges(document, initialDocument.current);
   const problems = useMemo(() => documentProblems(document, origin), [document, origin]);
-  const preview = useMemo(() => renderCampaignPreview(document, origin), [document, origin]);
+  const previewHref = `${new URL(origin).origin}/newsletter/baja`;
+  const preview = useMemo(
+    () => renderCampaignPreview(document, origin, previewHref),
+    [document, origin, previewHref],
+  );
   const hasLogo = document.blocks.some((block) => block.type === "logo");
+  const atLimit = document.blocks.length >= CAMPAIGN_BLOCK_LIMIT;
+
+  useEffect(() => {
+    if (!dirty) return;
+    // App Router no ofrece un bloqueo de navegación. beforeunload cubre recarga,
+    // cierre y salida del documento. Los clics en enlaces de la propia app se
+    // confirman aquí. El botón atrás del navegador no se puede interceptar.
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (allowLeave.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const confirmLeave = () => window.confirm("Hay cambios sin guardar. Si sales, se perderá esta campaña.");
+    const onClick = (event: MouseEvent) => {
+      if (allowLeave.current || event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const target = event.target;
+      const anchor = target instanceof Element ? target.closest("a") : null;
+      if (!anchor || anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+      const raw = anchor.getAttribute("href");
+      if (!raw || raw.startsWith("#")) return;
+      const url = new URL(anchor.href, window.location.href);
+      if (url.href === window.location.href) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!confirmLeave()) return;
+      allowLeave.current = true;
+      if (url.origin === window.location.origin) router.push(`${url.pathname}${url.search}${url.hash}`);
+      else window.location.assign(url.href);
+    };
+    const onSubmit = (event: SubmitEvent) => {
+      if (allowLeave.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!confirmLeave()) return;
+      allowLeave.current = true;
+      const form = event.target;
+      if (form instanceof HTMLFormElement) form.submit();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.document.addEventListener("click", onClick, true);
+    window.document.addEventListener("submit", onSubmit, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.document.removeEventListener("click", onClick, true);
+      window.document.removeEventListener("submit", onSubmit, true);
+    };
+  }, [dirty, router]);
 
   function update(blockId: string, patch: (block: CampaignBlock) => CampaignBlock) {
     setDocument((current) => ({
@@ -103,13 +162,13 @@ export function CampaignEditor({
                 {block.type === "button" && "Botón"}
               </h3>
               <div className="flex gap-2">
-                <button type="button" className="text-xs text-muted-foreground" onClick={() => setDocument((current) => moveCampaignBlock(current, block.id, -1))} disabled={index === 0}>
+                <button type="button" className="text-xs text-muted-foreground" aria-label={`Subir bloque de ${blockName(block)}`} onClick={() => setDocument((current) => moveCampaignBlock(current, block.id, -1))} disabled={index === 0}>
                   Subir
                 </button>
-                <button type="button" className="text-xs text-muted-foreground" onClick={() => setDocument((current) => moveCampaignBlock(current, block.id, 1))} disabled={index === document.blocks.length - 1}>
+                <button type="button" className="text-xs text-muted-foreground" aria-label={`Bajar bloque de ${blockName(block)}`} onClick={() => setDocument((current) => moveCampaignBlock(current, block.id, 1))} disabled={index === document.blocks.length - 1}>
                   Bajar
                 </button>
-                <button type="button" className="text-xs text-destructive" onClick={() => setDocument((current) => removeCampaignBlock(current, block.id))}>
+                <button type="button" className="text-xs text-destructive" aria-label={`Quitar bloque de ${blockName(block)}`} onClick={() => setDocument((current) => removeCampaignBlock(current, block.id))}>
                   Quitar
                 </button>
               </div>
@@ -130,6 +189,8 @@ export function CampaignEditor({
               <div className="space-y-3">
                 {block.image ? (
                   <div className="flex items-center gap-3">
+                    {/* La miniatura puede venir de un host que next/image no tiene configurado. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={block.image.url} alt={block.image.alt} className="h-16 w-16 rounded-md border border-border object-cover" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{block.image.name}</p>
@@ -140,11 +201,11 @@ export function CampaignEditor({
                   <p className="text-sm text-muted-foreground">Sin imagen seleccionada.</p>
                 )}
                 <div className="flex gap-2">
-                  <button type="button" className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground" onClick={() => setLibraryFor(block.id)}>
+                  <button type="button" className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground" aria-label={`${block.image ? "Cambiar" : "Elegir"} imagen del bloque de imagen`} onClick={() => setLibraryFor(block.id)}>
                     {block.image ? "Cambiar imagen" : "Elegir imagen"}
                   </button>
                   {block.image && (
-                    <button type="button" className="rounded-md border border-border px-3 py-2 text-sm" onClick={() => setDocument((current) => clearBlockImage(current, block.id))}>
+                    <button type="button" className="rounded-md border border-border px-3 py-2 text-sm" aria-label="Quitar imagen del bloque de imagen" onClick={() => setDocument((current) => clearBlockImage(current, block.id))}>
                       Quitar imagen
                     </button>
                   )}
@@ -180,20 +241,25 @@ export function CampaignEditor({
         ))}
 
         <div className="flex flex-wrap gap-2">
-          {!hasLogo && <button type="button" className="rounded-md border border-border px-3 py-2 text-sm" onClick={() => add("logo")}>Añadir logo</button>}
-          <button type="button" className="rounded-md border border-border px-3 py-2 text-sm" onClick={() => add("image")}>Añadir imagen</button>
-          <button type="button" className="rounded-md border border-border px-3 py-2 text-sm" onClick={() => add("heading")}>Añadir título</button>
-          <button type="button" className="rounded-md border border-border px-3 py-2 text-sm" onClick={() => add("text")}>Añadir texto</button>
-          <button type="button" className="rounded-md border border-border px-3 py-2 text-sm" onClick={() => add("button")}>Añadir botón</button>
+          {!hasLogo && <button type="button" className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-60" onClick={() => add("logo")} disabled={atLimit}>Añadir logo</button>}
+          <button type="button" className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-60" onClick={() => add("image")} disabled={atLimit}>Añadir imagen</button>
+          <button type="button" className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-60" onClick={() => add("heading")} disabled={atLimit}>Añadir título</button>
+          <button type="button" className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-60" onClick={() => add("text")} disabled={atLimit}>Añadir texto</button>
+          <button type="button" className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-60" onClick={() => add("button")} disabled={atLimit}>Añadir botón</button>
         </div>
-        {document.blocks.length >= 8 && <p className="text-sm text-muted-foreground">Esta campaña ya tiene el máximo de 8 bloques.</p>}
+        {atLimit && <p className="text-sm text-muted-foreground">Esta campaña ya tiene el máximo de 8 bloques.</p>}
 
         {problems.length > 0 && (
           <ul className="space-y-1 text-sm text-destructive">
-            {problems.map((problem) => (
-              <li key={problem}>{problem}</li>
+            {problems.map((problem, index) => (
+              <li key={`${index}-${problem}`}>{problem}</li>
             ))}
           </ul>
+        )}
+        {dirty && (
+          <p className="text-sm text-amber-700" role="status">
+            Hay cambios sin guardar. Si sales o recargas, se perderán.
+          </p>
         )}
         <p className="text-sm text-muted-foreground">
           El guardado y el envío quedan para la fase siguiente. Esta pantalla no manda correos.
@@ -237,6 +303,8 @@ export function CampaignEditor({
                       setLibraryFor(null);
                     }}
                   >
+                    {/* La miniatura puede venir de un host que next/image no tiene configurado. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={image.url} alt={image.alt} className="aspect-square w-full rounded-md object-cover" />
                     <span className="mt-2 block truncate text-sm font-medium">{image.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">{image.alt}</span>
@@ -249,6 +317,14 @@ export function CampaignEditor({
       </Dialog>
     </div>
   );
+}
+
+function blockName(block: CampaignBlock): string {
+  if (block.type === "logo") return "logo";
+  if (block.type === "image") return "imagen";
+  if (block.type === "heading") return "título";
+  if (block.type === "text") return "texto";
+  return "botón";
 }
 
 function ButtonFields({

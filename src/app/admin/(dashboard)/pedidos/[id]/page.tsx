@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { redirect } from "next/navigation";
 import { getAdminOrder } from "@/features/orders/repositories/admin-order-repository";
+import { getStaffUser } from "@/features/auth/server/session";
+import { orderVisibleToStaff } from "@/features/orders/domain/cash-sale";
 import { retryOrderNotification } from "@/features/orders/server/admin-order-actions";
 import { formatPrice } from "@/lib/utils";
 import { getTelegramConfig } from "@/features/notifications/config/telegram-config";
@@ -19,11 +22,14 @@ function AdminField({ label, value }: { label: string; value: string | null | un
 
 export default async function AdminOrderDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ modalidad?: string }> }) {
   const { id } = await params;
+  const staff = await getStaffUser();
+  if (!staff) redirect("/admin/login");
   const filter = (await searchParams)?.modalidad;
   const backHref = filter === "INMEDIATA" || filter === "BAJO_PEDIDO" ? `/admin/pedidos?modalidad=${filter}` : "/admin/pedidos";
   let order;
   try {
     order = await getAdminOrder(id);
+    if (order && !orderVisibleToStaff(staff.role, order.paymentMethod)) order = null;
   } catch {
     return (
       <AdminErrorState

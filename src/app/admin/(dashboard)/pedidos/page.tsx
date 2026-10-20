@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { listAdminOrders } from "@/features/orders/repositories/admin-order-repository";
+import { getStaffUser } from "@/features/auth/server/session";
+import { isVendorRole } from "@/features/auth/domain/staff-role";
 import { formatPrice } from "@/lib/utils";
 import { normalizeAdminOrderDateFilter, normalizeAdminOrderFilter } from "./admin-order-filters";
 import { AdminEmptyState } from "../admin-page-states";
@@ -9,9 +12,15 @@ import { PaymentStatusBadge } from "./payment-status-badge";
 
 export default async function AdminOrdersPage({ searchParams }: { searchParams: Promise<{ modalidad?: string; fecha?: string; mes?: string; desde?: string; hasta?: string }> }) {
   const params = await searchParams;
+  const staff = await getStaffUser();
+  if (!staff) redirect("/admin/login");
   const mode = normalizeAdminOrderFilter(params.modalidad);
   const dateFilter = normalizeAdminOrderDateFilter(params);
-  const orders = await listAdminOrders(mode === "TODOS" ? undefined : mode, dateFilter);
+  const orders = await listAdminOrders(
+    mode === "TODOS" ? undefined : mode,
+    dateFilter,
+    isVendorRole(staff.role) ? { paymentMethod: "CASH" } : undefined,
+  );
   const telegramConfigured = Boolean(getTelegramConfig());
 
   return (

@@ -1,4 +1,6 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isStaffAuthCutoverEnabled } from "@/features/auth/domain/staff-role";
 import { buildContentSecurityPolicy } from "@/shared/security/content-security-policy";
 
 const COOKIE_NAME = "fs_admin_session";
@@ -36,19 +38,39 @@ function attachCsp(response: NextResponse, csp: string): NextResponse {
   return response;
 }
 
+async function hasSupabaseSession(request: NextRequest, response: NextResponse): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return false;
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      },
+    },
+  });
+  const { data } = await supabase.auth.getUser();
+  return Boolean(data.user);
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const { headers, csp } = withReportOnlyCsp(request);
-
-  if (pathname === "/admin/login") {
-    headers.set("x-admin-route", "true");
-    return attachCsp(NextResponse.next({ request: { headers } }), csp);
-  }
+  headers.set("x-pathname", pathname);
 
   if (pathname.startsWith("/admin")) {
     headers.set("x-admin-route", "true");
-    const ok = await isValidToken(request.cookies.get(COOKIE_NAME)?.value);
-    if (!ok) {
+  }
+
+  const response = NextResponse.next({ request: { headers } });
+  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+    const legacyOk = !isStaffAuthCutoverEnabled() && await isValidToken(request.cookies.get(COOKIE_NAME)?.value);
+    const supabaseOk = await hasSupabaseSession(request, response);
+    if (!legacyOk && !supabaseOk) {
       const url = request.nextUrl.clone();
       url.pathname = "/admin/login";
       url.search = "";
@@ -56,7 +78,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return attachCsp(NextResponse.next({ request: { headers } }), csp);
+  return attachCsp(response, csp);
 }
 
 export const config = {

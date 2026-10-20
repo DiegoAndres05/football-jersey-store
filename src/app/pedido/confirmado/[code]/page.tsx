@@ -16,6 +16,7 @@ import { formatPurchaseLineDetail } from "@/features/products/domain/mystery-box
 import { formatMoney } from "@/shared/money/format";
 import type { SaleCurrency } from "@/shared/currency/sale-currency";
 import { NOINDEX_NOFOLLOW } from "@/features/seo/domain/robots-policy";
+import { isCashOrderHiddenFromPublic } from "@/features/orders/domain/cash-sale";
 
 interface PageProps {
   params: Promise<{ code: string }>;
@@ -32,7 +33,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
   const sp = await searchParams;
   const order = await getOrderByCode(code);
 
-  if (!order) notFound();
+  if (!order || isCashOrderHiddenFromPublic(order.paymentMethod)) notFound();
 
   const orderCurrency = (order.saleCurrency ?? "COP") as SaleCurrency;
   const orderRate = order.exchangeRateCopPerUsd ?? undefined;

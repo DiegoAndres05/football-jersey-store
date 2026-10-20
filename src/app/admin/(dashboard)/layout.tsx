@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { ExternalLink, LogOut } from "lucide-react";
-import { getSessionUser } from "@/features/auth/server/session";
+import { getStaffUser } from "@/features/auth/server/session";
 import { logoutAction } from "@/features/auth/server/actions";
+import { isAdminRole, isVendorRole, vendorMayOpen } from "@/features/auth/domain/staff-role";
 import { isFkaImporterEnabled } from "@/features/import/fka/browser-provider";
 import { AdminNavigation } from "./admin-navigation";
 import { AdminBreadcrumbs } from "./admin-breadcrumbs";
@@ -12,16 +15,16 @@ export const metadata = {
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const user = await getSessionUser();
-  if (!user) {
-    const { redirect } = await import("next/navigation");
-    redirect("/admin/login");
-  }
+  const user = await getStaffUser();
+  if (!user) redirect("/admin/login");
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  if (isVendorRole(user.role) && !vendorMayOpen(pathname)) redirect("/admin/venta-efectivo");
 
-  const userEmail = user?.email ?? "";
-
-  const navItems = [
+  const userEmail = user.email ?? "";
+  const adminNav = [
     { href: "/admin", label: "Panel", exact: true },
+    { href: "/admin/venta-efectivo", label: "Venta en efectivo" },
+    { href: "/admin/personal", label: "Personal" },
     { href: "/admin/inventario", label: "Inventario" },
     { href: "/admin/pedidos", label: "Pedidos" },
     { href: "/admin/cupones", label: "Cupones" },
@@ -36,6 +39,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     ...(isFkaImporterEnabled() ? [{ href: "/admin/importar", label: "Importar" }] : []),
     { href: "/admin/ajustes", label: "Ajustes" },
   ];
+  const navItems = isAdminRole(user.role)
+    ? adminNav
+    : [
+        { href: "/admin/venta-efectivo", label: "Venta en efectivo" },
+        { href: "/admin/pedidos", label: "Pedidos" },
+      ];
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-secondary/30 md:grid md:grid-cols-[13rem_minmax(0,1fr)]">

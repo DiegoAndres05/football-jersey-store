@@ -7,12 +7,14 @@ import {
   clearBlockImage,
   documentProblems,
   emptyCampaignDocument,
+  hasCampaignChanges,
   isAllowedCampaignUrl,
   renderCampaignPreview,
   setBlockImage,
 } from "../src/features/newsletter/domain/campaign-document.ts";
 
 const origin = "https://www.flashsports.shop";
+const previewUnsubscribe = `${origin}/newsletter/baja`;
 const photo = {
   sourceId: "img-1",
   name: "Camiseta local",
@@ -37,7 +39,7 @@ test("la vista previa incluye logo, imagen, botón y baja, y escapa el texto", (
     "hero",
     photo,
   );
-  const html = renderCampaignPreview(draft, origin);
+  const html = renderCampaignPreview(draft, origin, previewUnsubscribe);
   assert.match(html, /flashsport-logo\.png/);
   assert.match(html, /alt="Flashsport"/);
   assert.match(html, /cdn\.example\.test\/camiseta\.jpg/);
@@ -56,15 +58,15 @@ test("ocultar el logo lo saca de la vista previa y cambiar la imagen sustituye l
     ...emptyCampaignDocument(),
     blocks: emptyCampaignDocument().blocks.map((block) => (block.type === "logo" ? { ...block, visible: false } : block)),
   };
-  assert.equal(renderCampaignPreview(hidden, origin).includes("flashsport-logo.png"), false);
+  assert.equal(renderCampaignPreview(hidden, origin, previewUnsubscribe).includes("flashsport-logo.png"), false);
 
   const selected = setBlockImage(emptyCampaignDocument(), "hero", photo);
   const replaced = setBlockImage(selected, "hero", { ...photo, url: "https://cdn.example.test/otra.jpg", name: "Otra" });
-  const html = renderCampaignPreview(replaced, origin);
+  const html = renderCampaignPreview(replaced, origin, previewUnsubscribe);
   assert.match(html, /otra\.jpg/);
   assert.equal(html.includes("camiseta.jpg"), false);
   const cleared = clearBlockImage(replaced, "hero");
-  assert.equal(renderCampaignPreview(cleared, origin).includes("cdn.example.test"), false);
+  assert.equal(renderCampaignPreview(cleared, origin, previewUnsubscribe).includes("cdn.example.test"), false);
 });
 
 test("rechaza destinos inseguros y acepta rutas internas de la tienda", () => {
@@ -83,7 +85,7 @@ test("rechaza destinos inseguros y acepta rutas internas de la tienda", () => {
     ),
   };
   assert.match(documentProblems(unsafe, origin).join(" "), /destino no permitido/);
-  assert.equal(renderCampaignPreview(unsafe, origin).includes("javascript:"), false);
+  assert.equal(renderCampaignPreview(unsafe, origin, previewUnsubscribe).includes("javascript:"), false);
 });
 
 test("no se añade un segundo logo ni se pasa de ocho bloques", () => {
@@ -105,7 +107,72 @@ test("una imagen sin https no entra en el documento ni en el html", () => {
       block.type === "image" ? { ...block, image: { ...photo, url: "javascript:alert(1)" } } : block,
     ),
   };
-  assert.equal(renderCampaignPreview(forced, origin).includes("javascript:"), false);
+  assert.equal(renderCampaignPreview(forced, origin, previewUnsubscribe).includes("javascript:"), false);
+});
+
+test("los cambios se detectan solo frente al documento inicial y desaparecen al restablecerlo", () => {
+  const initial = emptyCampaignDocument();
+  assert.equal(hasCampaignChanges(initial, initial), false);
+  const edited = { ...initial, name: "Octubre" };
+  assert.equal(hasCampaignChanges(edited, initial), true);
+  assert.equal(hasCampaignChanges({ ...edited, name: "" }, initial), false);
+});
+
+test("el botón libre usa la URL canónica y rechaza puertos, admin, saltos de línea, credenciales y tokens", () => {
+  assert.equal(
+    campaignHref({ kind: "url", url: "https://WWW.FLASHSPORTS.SHOP/productos" }, origin),
+    "https://www.flashsports.shop/productos",
+  );
+  assert.equal(
+    campaignHref({ kind: "url", url: "https://www.flashsports.shop/productos?liga=la-liga&page=2" }, origin),
+    "https://www.flashsports.shop/productos?liga=la-liga&page=2",
+  );
+  const rejected = [
+    "javascript:alert(1)",
+    "http://flashsports.shop/productos",
+    "https://evil.test",
+    "https://flashsports.shop.evil.test",
+    "https://flashsports.shop:8443/admin",
+    "https://flashsports.shop/admin",
+    "https://user:pass@www.flashsports.shop/productos",
+    "https://www.flashsports.shop/productos\nSet-Cookie:a",
+    "https://www.flashsports.shop/productos/../admin",
+    "https://www.flashsports.shop/newsletter/baja?token=abc",
+    "https://www.flashsports.shop/productos?token=abc",
+  ];
+  for (const url of rejected) {
+    assert.equal(campaignHref({ kind: "url", url }, origin), null, url);
+    assert.equal(isAllowedCampaignUrl(url), false, url);
+  }
+  assert.equal(campaignHref({ kind: "internal", path: "/../admin" }, origin), null);
+  const drafted = {
+    ...emptyCampaignDocument(),
+    blocks: emptyCampaignDocument().blocks.map((block) =>
+      block.type === "button"
+        ? { ...block, destination: { kind: "url" as const, url: "https://WWW.FLASHSPORTS.SHOP/productos" } }
+        : block.type === "heading"
+          ? { ...block, text: '"><script>alert(1)</script>' }
+          : block.type === "image"
+            ? { ...block, image: { ...photo, alt: '"><script>' } }
+            : block,
+    ),
+  };
+  const html = renderCampaignPreview(drafted, origin, previewUnsubscribe);
+  assert.match(html, /href="https:\/\/www\.flashsports\.shop\/productos"/);
+  assert.equal(html.includes("WWW.FLASHSPORTS"), false);
+  assert.equal(html.includes("<script>"), false);
+  assert.match(html, /alt="&quot;&gt;&lt;script&gt;"/);
+});
+
+test("la vista previa no lleva token y el render usa el enlace de baja recibido", () => {
+  const draft = emptyCampaignDocument();
+  const preview = renderCampaignPreview(draft, origin, previewUnsubscribe);
+  assert.match(preview, /href="https:\/\/www\.flashsports\.shop\/newsletter\/baja"/);
+  assert.equal(preview.includes("token="), false);
+  const personal = renderCampaignPreview(draft, origin, "https://www.flashsports.shop/newsletter/baja?token=cuerpo.firma");
+  assert.match(personal, /href="https:\/\/www\.flashsports\.shop\/newsletter\/baja\?token=cuerpo\.firma"/);
+  const injected = renderCampaignPreview(draft, origin, "javascript:alert(1)");
+  assert.equal(injected.includes("javascript:"), false);
 });
 
 test("el editor nuevo no envía y el alta sigue sin correo de bienvenida", () => {
@@ -117,7 +184,14 @@ test("el editor nuevo no envía y el alta sigue sin correo de bienvenida", () =>
   assert.match(list, /\/admin\/newsletter\/campanas\/nueva/);
   assert.match(page, /loadCampaignCatalog/);
   assert.match(catalog, /getSessionUser/);
-  assert.doesNotMatch(editor, /sendNewsletterCampaign|RESEND_API_KEY|EMAIL_FROM/);
+  assert.doesNotMatch(editor, /sendNewsletterCampaign|RESEND_API_KEY|EMAIL_FROM|fetch\(/);
+  assert.match(editor, /beforeunload/);
+  assert.match(editor, /hasCampaignChanges/);
+  assert.match(editor, /disabled=\{atLimit\}/);
+  assert.match(editor, /aria-label=\{`Subir bloque de/);
+  assert.match(editor, /newsletter\/baja/);
+  assert.doesNotMatch(editor, /createUnsubscribeToken|token=/);
+  assert.match(editor, /eslint-disable-next-line @next\/next\/no-img-element/);
   assert.doesNotMatch(page, /sendNewsletterCampaign/);
   assert.match(subscribe, /newsletterSubscriber\.upsert/);
   assert.doesNotMatch(subscribe, /welcome|sendWelcomeEmail/);

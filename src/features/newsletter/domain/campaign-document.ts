@@ -3,6 +3,30 @@ export const CAMPAIGN_LOGO_PATH = "/flashsport-logo.png";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const STORE_HOSTS = new Set(["flashsports.shop", "www.flashsports.shop"]);
+const CONTROL_CHARS = /[\u0000-\u001F\u007F]/;
+const CATALOG_QUERY_KEYS = new Set([
+  "q",
+  "liga",
+  "equipo",
+  "temporada",
+  "version",
+  "talla",
+  "disponibilidad",
+  "modalidad",
+  "sort",
+  "page",
+]);
+const SENSITIVE_QUERY_KEYS = new Set([
+  "token",
+  "access_token",
+  "refresh_token",
+  "id_token",
+  "code",
+  "session",
+  "password",
+  "secret",
+]);
+const SORTS = new Set(["default", "price-asc", "price-desc", "name-asc", "name-desc", "newest"]);
 
 export type CampaignImage = {
   sourceId: string;
@@ -58,15 +82,61 @@ export function isAllowedInternalPath(path: string): boolean {
   return parts[0] === "productos" || parts[0] === "ligas" || parts[0] === "equipos";
 }
 
-export function isAllowedCampaignUrl(url: string): boolean {
+function hasUnsafeUrlCharacters(value: string): boolean {
+  return value !== value.trim() || /\s/.test(value) || CONTROL_CHARS.test(value);
+}
+
+function isCatalogQueryValue(key: string, value: string): boolean {
+  if (!value || CONTROL_CHARS.test(value) || /[<>"'`]/.test(value)) return false;
+  if (key === "q") return value.length <= 100;
+  if (key === "liga") return value.length <= 500;
+  if (key === "equipo" || key === "temporada" || key === "version") return value.length <= 60;
+  if (key === "talla") return value.length <= 10;
+  if (key === "disponibilidad") return value === "AVAILABLE" || value === "OUT_OF_STOCK";
+  if (key === "modalidad") return value === "INMEDIATA" || value === "BAJO_PEDIDO";
+  if (key === "sort") return SORTS.has(value);
+  if (key === "page") return /^[1-9]\d{0,3}$/.test(value) && Number(value) <= 1000;
+  return false;
+}
+
+/** Parámetros de /productos. El resto de destinos públicos no lleva query. */
+function isAllowedCampaignSearch(pathname: string, params: URLSearchParams): boolean {
+  const entries = [...params.entries()];
+  if (entries.some(([key]) => SENSITIVE_QUERY_KEYS.has(key.toLowerCase()))) return false;
+  if (entries.length === 0) return true;
+  if (pathname !== "/productos") return false;
+  const seen = new Set<string>();
+  for (const [key, value] of entries) {
+    if (seen.has(key) || !CATALOG_QUERY_KEYS.has(key) || !isCatalogQueryValue(key, value)) return false;
+    seen.add(key);
+  }
+  return true;
+}
+
+/**
+ * URL https de la tienda lista para un href. Devuelve la forma canónica del parser,
+ * no la cadena escrita por el administrador.
+ */
+export function canonicalCampaignUrl(url: string): string | null {
+  if (typeof url !== "string" || url.length === 0 || url.length > 2000 || hasUnsafeUrlCharacters(url)) return null;
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
-    return false;
+    return null;
   }
-  if (parsed.protocol !== "https:" || parsed.username || parsed.password) return false;
-  return STORE_HOSTS.has(parsed.hostname.toLowerCase());
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password) return null;
+  if (parsed.port !== "" && parsed.port !== "443") return null;
+  if (parsed.hash || !STORE_HOSTS.has(parsed.hostname.toLowerCase())) return null;
+  if (!isAllowedInternalPath(parsed.pathname)) return null;
+  if (!isAllowedCampaignSearch(parsed.pathname, parsed.searchParams)) return null;
+  const canonical = new URL(`https://${parsed.hostname.toLowerCase()}${parsed.pathname}`);
+  for (const [key, value] of parsed.searchParams) canonical.searchParams.append(key, value);
+  return canonical.href;
+}
+
+export function isAllowedCampaignUrl(url: string): boolean {
+  return canonicalCampaignUrl(url) !== null;
 }
 
 export function isPublicImageUrl(url: string): boolean {
@@ -91,7 +161,7 @@ export function campaignHref(destination: CampaignDestination, origin: string): 
     if (!isAllowedInternalPath(destination.path)) return null;
     return `${base.origin}${destination.path}`;
   }
-  return isAllowedCampaignUrl(destination.url) ? destination.url : null;
+  return canonicalCampaignUrl(destination.url);
 }
 
 export function setBlockImage(document: CampaignDocument, blockId: string, image: CampaignImage): CampaignDocument {
@@ -132,6 +202,10 @@ export function moveCampaignBlock(document: CampaignDocument, blockId: string, d
   const [block] = blocks.splice(index, 1);
   blocks.splice(next, 0, block);
   return { ...document, blocks };
+}
+
+export function hasCampaignChanges(current: CampaignDocument, initial: CampaignDocument): boolean {
+  return JSON.stringify(current) !== JSON.stringify(initial);
 }
 
 export function documentProblems(document: CampaignDocument, origin: string): string[] {
@@ -182,7 +256,30 @@ function paragraphHtml(value: string): string {
     .join("");
 }
 
-export function renderCampaignPreview(document: CampaignDocument, origin: string): string {
+function safeUnsubscribeHref(href: string, origin: string): string | null {
+  if (typeof href !== "string" || href.length === 0 || href.length > 2000 || hasUnsafeUrlCharacters(href)) return null;
+  let parsed: URL;
+  let base: URL;
+  try {
+    parsed = new URL(href);
+    base = new URL(origin);
+  } catch {
+    return null;
+  }
+  if (parsed.username || parsed.password || parsed.hash) return null;
+  if (parsed.port !== "" && parsed.port !== "443") return null;
+  if (parsed.pathname !== "/newsletter/baja") return null;
+  const sameDevHost = parsed.protocol === "http:" && base.protocol === "http:" && parsed.hostname === base.hostname;
+  const storeHost = parsed.protocol === "https:" && STORE_HOSTS.has(parsed.hostname.toLowerCase());
+  if (!sameDevHost && !storeHost) return null;
+  const keys = [...parsed.searchParams.keys()];
+  if (keys.some((key) => key.toLowerCase() !== "token")) return null;
+  const token = parsed.searchParams.get("token");
+  if (token !== null && !/^[A-Za-z0-9_-]{1,200}(?:\.[A-Za-z0-9_-]{1,200}){0,3}$/.test(token)) return null;
+  return parsed.href;
+}
+
+export function renderCampaignPreview(document: CampaignDocument, origin: string, unsubscribeHref: string): string {
   let base: URL;
   try {
     base = new URL(origin);
@@ -221,6 +318,10 @@ export function renderCampaignPreview(document: CampaignDocument, origin: string
   const hidden = preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml(preheader)}</div>`
     : "";
+  const unsubscribe = safeUnsubscribeHref(unsubscribeHref, site);
+  const unsubscribeControl = unsubscribe
+    ? `<a href="${escapeHtml(unsubscribe)}" style="color:#111111;">Dejar de recibir ofertas</a>`
+    : "Dejar de recibir ofertas";
 
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(document.subject.trim() || "Flashsport")}</title></head><body style="margin:0;padding:0;background:#f4f4f4;">${hidden}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;">${rows}<tr><td style="padding:24px;background:#ffffff;border-top:1px solid #e5e5e5;"><p style="margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#444444;">Flashsport · flashsport.col@gmail.com</p><p style="margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;"><a href="${escapeHtml(`${site}/privacidad`)}" style="color:#111111;">Privacidad</a></p><p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;"><a href="${escapeHtml(`${site}/newsletter/baja`)}" style="color:#111111;">Dejar de recibir ofertas</a></p></td></tr></table></td></tr></table></body></html>`;
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(document.subject.trim() || "Flashsport")}</title></head><body style="margin:0;padding:0;background:#f4f4f4;">${hidden}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;">${rows}<tr><td style="padding:24px;background:#ffffff;border-top:1px solid #e5e5e5;"><p style="margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#444444;">Flashsport · flashsport.col@gmail.com</p><p style="margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;"><a href="${escapeHtml(`${site}/privacidad`)}" style="color:#111111;">Privacidad</a></p><p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;">${unsubscribeControl}</p></td></tr></table></td></tr></table></body></html>`;
 }

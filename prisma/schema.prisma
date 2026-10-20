@@ -339,9 +339,11 @@ model User {
   email        String  @unique
   name         String?
   phone        String?
-  role         String  @default("CUSTOMER") // CUSTOMER | ADMIN | SUPER_ADMIN
+  role         String  @default("CUSTOMER") // CUSTOMER | ADMIN | SUPER_ADMIN | VENDOR
   isActive     Boolean @default(true)
   passwordHash String?
+  /// Identidad de Supabase Auth. Nulo hasta el primer ingreso del personal.
+  authUserId   String? @unique
 
   customer Customer?
 
@@ -392,7 +394,7 @@ model Order {
   trackingNumber  String?
   trackingCarrier String?
 
-  paymentMethod String    @default("CARD") // CARD | PSE | NEQUI | DAVIPLATA
+  paymentMethod String    @default("CARD") // CARD | PSE | NEQUI | DAVIPLATA | CASH
   paymentRef    String?
   paidAt        DateTime?
 
