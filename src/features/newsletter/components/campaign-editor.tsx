@@ -122,9 +122,14 @@ export function CampaignEditor({
     if (!window.confirm(`¿Enviar esta campaña a ${label}?`)) return;
     setSending(true);
     setSendResult(null);
-    const result = await sendDesignedNewsletterCampaign(document);
-    setSendResult(result);
-    setSending(false);
+    try {
+      const result = await sendDesignedNewsletterCampaign(document);
+      setSendResult(result);
+    } catch {
+      setSendResult({ ok: false, error: "No pudimos enviar la campaña. Intenta de nuevo." });
+    } finally {
+      setSending(false);
+    }
   }
 
   function add(type: CampaignBlock["type"]) {

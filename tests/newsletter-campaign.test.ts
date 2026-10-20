@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { campaignProblems, renderCampaignEmail, subscribedEmails } from "../src/features/newsletter/domain/campaign-message.ts";
+import { isCampaignRecipient, resendAcceptedIds, resendErrorText, resendSingleId } from "../src/features/newsletter/domain/resend-batch.ts";
 import { createUnsubscribeToken, readUnsubscribeToken } from "../src/features/newsletter/domain/unsubscribe-token.ts";
 
 test("la baja firmada recupera el mismo correo", () => {
@@ -36,6 +37,15 @@ test("cada correo de oferta incluye el enlace de baja y escapa HTML", () => {
   assert.match(rendered.text, /newsletter\/baja\?token=abc/);
   assert.match(rendered.html, /Dejar de recibir ofertas/);
   assert.equal(rendered.html.includes("<script>"), false);
+});
+
+test("un lote rechazado expone el mensaje y no cuenta correos sin id", () => {
+  assert.equal(isCampaignRecipient("ana@example.test"), true);
+  assert.equal(isCampaignRecipient("no-es-correo"), false);
+  assert.deepEqual(resendAcceptedIds({ data: [{ id: "a" }, {}] }), ["a", ""]);
+  assert.equal(resendAcceptedIds({ id: "solo" }), null);
+  assert.equal(resendSingleId({ id: "mail_1" }), "mail_1");
+  assert.equal(resendErrorText({ message: "The flashsports.shop domain is not verified." }), "The flashsports.shop domain is not verified.");
 });
 
 test("el admin lista suscriptores y el envío no vive en el cliente", () => {
