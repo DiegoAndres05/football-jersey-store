@@ -72,7 +72,6 @@ export function HomepageCarouselPicker({
     <details
       ref={detailsRef}
       className="group rounded-xl border border-border bg-card"
-      defaultOpen={selectedIds.length === 0}
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 [&::-webkit-details-marker]:hidden">
         <span className="min-w-0">
