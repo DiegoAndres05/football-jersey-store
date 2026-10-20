@@ -270,7 +270,13 @@ function renderHtml(order: PaidOrderEmailInput, address: string[], orderedOn: st
           <td class="pad force-light" bgcolor="${CARD}" style="padding:0 32px 32px;background-color:${CARD};color:${INK};">
             <p class="force-ink" style="margin:0 0 8px;font-family:${DISPLAY};font-size:12px;line-height:16px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${INK};">Seguimiento de tu compra</p>
             <p class="force-muted" style="margin:0;font-family:${FONT};font-size:14px;line-height:22px;color:${MUTED};">Por ahora el seguimiento se hace por WhatsApp. Escribe con el número de tu pedido <strong class="force-ink" style="color:${INK};">${code}</strong>.</p>
-            <p style="margin:12px 0 0;font-family:${FONT};font-size:14px;line-height:22px;"><a href="${escapeHtml(trackingUrl)}" style="color:${INK};text-decoration:underline;">Escribir por WhatsApp</a></p>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
+              <tr>
+                <td align="center" bgcolor="#25D366" style="background-color:#25D366;border-radius:8px;">
+                  <a href="${escapeHtml(trackingUrl)}" style="display:inline-block;padding:12px 20px;font-family:${FONT};font-size:15px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;">Escribir por WhatsApp</a>
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>
         <tr>

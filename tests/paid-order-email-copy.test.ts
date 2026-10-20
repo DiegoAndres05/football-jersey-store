@@ -35,5 +35,7 @@ test("el correo muestra fechas solo en bajo pedido y el seguimiento por WhatsApp
   assert.match(email.text, /Escribe con el número de tu pedido/);
   assert.match(email.text, /https:\/\/wa\.me\/573046149525\?text=/);
   assert.match(email.html, /wa\.me\/573046149525/);
-  assert.match(decodeURIComponent(email.text), /pedido FS-MAIL-1/);
+  assert.match(email.html, /background-color:#25D366/);
+  assert.match(email.html, /Escribir por WhatsApp/);
+  assert.match(email.html, /quiero%20el%20seguimiento%20de%20mi%20pedido%20FS-MAIL-1/);
 });
