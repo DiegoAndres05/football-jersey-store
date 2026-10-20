@@ -9,7 +9,9 @@ import {
   emptyCampaignDocument,
   hasCampaignChanges,
   isAllowedCampaignUrl,
+  parseCampaignDocument,
   renderCampaignPreview,
+  renderCampaignText,
   setBlockImage,
 } from "../src/features/newsletter/domain/campaign-document.ts";
 
@@ -175,16 +177,18 @@ test("la vista previa no lleva token y el render usa el enlace de baja recibido"
   assert.equal(injected.includes("javascript:"), false);
 });
 
-test("el editor nuevo no envía y el alta sigue sin correo de bienvenida", () => {
+test("el editor envía la campaña diseñada sin usar el remitente de compras", () => {
   const editor = readFileSync("src/features/newsletter/components/campaign-editor.tsx", "utf8");
   const page = readFileSync("src/app/admin/(dashboard)/newsletter/campanas/nueva/page.tsx", "utf8");
   const catalog = readFileSync("src/features/newsletter/server/campaign-catalog.ts", "utf8");
   const list = readFileSync("src/app/admin/(dashboard)/newsletter/page.tsx", "utf8");
   const subscribe = readFileSync("src/features/newsletter/server/newsletter-actions.ts", "utf8");
+  const sender = readFileSync("src/features/newsletter/server/campaign-actions.ts", "utf8");
   assert.match(list, /\/admin\/newsletter\/campanas\/nueva/);
   assert.match(page, /loadCampaignCatalog/);
   assert.match(catalog, /getSessionUser/);
-  assert.doesNotMatch(editor, /sendNewsletterCampaign|RESEND_API_KEY|EMAIL_FROM|fetch\(/);
+  assert.match(editor, /sendDesignedNewsletterCampaign/);
+  assert.doesNotMatch(editor, /RESEND_API_KEY|EMAIL_FROM|fetch\(/);
   assert.match(editor, /beforeunload/);
   assert.match(editor, /hasCampaignChanges/);
   assert.match(editor, /disabled=\{atLimit\}/);
@@ -193,6 +197,25 @@ test("el editor nuevo no envía y el alta sigue sin correo de bienvenida", () =>
   assert.doesNotMatch(editor, /createUnsubscribeToken|token=/);
   assert.match(editor, /eslint-disable-next-line @next\/next\/no-img-element/);
   assert.doesNotMatch(page, /sendNewsletterCampaign/);
+  assert.match(sender, /getNewsletterConfig/);
+  assert.doesNotMatch(sender, /EMAIL_FROM/);
   assert.match(subscribe, /newsletterSubscriber\.upsert/);
   assert.doesNotMatch(subscribe, /welcome|sendWelcomeEmail/);
+});
+
+test("el documento enviado conserva el enlace personal de baja y rechaza una imagen insegura", () => {
+  const draft = emptyCampaignDocument();
+  draft.name = "Lanzamiento";
+  draft.subject = "Nuevas camisetas";
+  const parsed = parseCampaignDocument(draft);
+  assert.ok(parsed);
+  const text = renderCampaignText(parsed, origin, "https://www.flashsports.shop/newsletter/baja?token=cuerpo.firma");
+  assert.match(text, /newsletter\/baja\?token=cuerpo\.firma/);
+  const unsafe = parseCampaignDocument({
+    ...draft,
+    blocks: draft.blocks.map((block) => block.type === "image"
+      ? { ...block, image: { sourceId: "x", name: "x", alt: "x", url: "javascript:alert(1)" } }
+      : block),
+  });
+  assert.equal(unsafe, null);
 });

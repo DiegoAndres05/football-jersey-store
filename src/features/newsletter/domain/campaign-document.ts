@@ -208,6 +208,75 @@ export function hasCampaignChanges(current: CampaignDocument, initial: CampaignD
   return JSON.stringify(current) !== JSON.stringify(initial);
 }
 
+function isBlockId(value: string): boolean {
+  return /^[a-z0-9-]{1,40}$/.test(value);
+}
+
+function parseDestination(value: unknown): CampaignDestination | null {
+  if (!value || typeof value !== "object") return null;
+  const destination = value as CampaignDestination;
+  if (destination.kind === "internal" && typeof destination.path === "string" && isAllowedInternalPath(destination.path)) {
+    return { kind: "internal", path: destination.path };
+  }
+  if (destination.kind === "url" && typeof destination.url === "string") {
+    const url = canonicalCampaignUrl(destination.url);
+    if (url) return { kind: "url", url };
+  }
+  return null;
+}
+
+function parseImage(value: unknown): CampaignImage | null {
+  if (!value || typeof value !== "object") return null;
+  const image = value as CampaignImage;
+  if (typeof image.sourceId !== "string" || image.sourceId.length < 1 || image.sourceId.length > 80) return null;
+  if (typeof image.name !== "string" || image.name.length > 160) return null;
+  if (typeof image.alt !== "string" || image.alt.length > 200) return null;
+  if (typeof image.url !== "string" || !isPublicImageUrl(image.url)) return null;
+  return { sourceId: image.sourceId, name: image.name, alt: image.alt, url: image.url };
+}
+
+/** Acepta solo el documento que el editor puede construir. Ignora campos extra. */
+export function parseCampaignDocument(value: unknown): CampaignDocument | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as { name?: unknown; subject?: unknown; preheader?: unknown; blocks?: unknown };
+  if (typeof raw.name !== "string" || typeof raw.subject !== "string" || typeof raw.preheader !== "string") return null;
+  if (!Array.isArray(raw.blocks) || raw.blocks.length > CAMPAIGN_BLOCK_LIMIT) return null;
+  const blocks: CampaignBlock[] = [];
+  const ids = new Set<string>();
+  for (const item of raw.blocks) {
+    if (!item || typeof item !== "object") return null;
+    const block = item as { id?: unknown; type?: unknown };
+    if (typeof block.id !== "string" || !isBlockId(block.id) || ids.has(block.id)) return null;
+    ids.add(block.id);
+    if (block.type === "logo") {
+      if (typeof (item as { visible?: unknown }).visible !== "boolean") return null;
+      if (blocks.some((current) => current.type === "logo")) return null;
+      blocks.push({ id: block.id, type: "logo", visible: (item as { visible: boolean }).visible });
+    } else if (block.type === "image") {
+      const image = (item as { image?: unknown }).image;
+      if (image == null) {
+        blocks.push({ id: block.id, type: "image", image: null });
+      } else {
+        const parsed = parseImage(image);
+        if (!parsed) return null;
+        blocks.push({ id: block.id, type: "image", image: parsed });
+      }
+    } else if (block.type === "heading" || block.type === "text") {
+      const text = (item as { text?: unknown }).text;
+      if (typeof text !== "string") return null;
+      blocks.push({ id: block.id, type: block.type, text });
+    } else if (block.type === "button") {
+      const label = (item as { label?: unknown }).label;
+      const destination = parseDestination((item as { destination?: unknown }).destination);
+      if (typeof label !== "string" || !destination) return null;
+      blocks.push({ id: block.id, type: "button", label, destination });
+    } else {
+      return null;
+    }
+  }
+  return { name: raw.name, subject: raw.subject, preheader: raw.preheader, blocks };
+}
+
 export function documentProblems(document: CampaignDocument, origin: string): string[] {
   const problems: string[] = [];
   const name = document.name.trim();
@@ -277,6 +346,20 @@ function safeUnsubscribeHref(href: string, origin: string): string | null {
   const token = parsed.searchParams.get("token");
   if (token !== null && !/^[A-Za-z0-9_-]{1,200}(?:\.[A-Za-z0-9_-]{1,200}){0,3}$/.test(token)) return null;
   return parsed.href;
+}
+
+export function renderCampaignText(document: CampaignDocument, origin: string, unsubscribeHref: string): string {
+  const lines: string[] = [];
+  if (document.preheader.trim()) lines.push(document.preheader.trim());
+  for (const block of document.blocks) {
+    if ((block.type === "heading" || block.type === "text") && block.text.trim()) lines.push(block.text.trim());
+    if (block.type === "button" && block.label.trim()) {
+      const href = campaignHref(block.destination, origin);
+      lines.push(href ? `${block.label.trim()}: ${href}` : block.label.trim());
+    }
+  }
+  lines.push("", "Si no quieres más correos de ofertas, entra aquí:", unsubscribeHref);
+  return lines.join("\n");
 }
 
 export function renderCampaignPreview(document: CampaignDocument, origin: string, unsubscribeHref: string): string {

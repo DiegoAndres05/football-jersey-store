@@ -22,7 +22,7 @@ export default async function AdminNewsletterPage() {
       <section className="rounded-xl border border-border bg-card p-5">
         <h3 className="font-semibold">Campañas</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Todavía no hay campañas guardadas. Puedes diseñar una y ver cómo quedará el correo.
+          Diseña una campaña visual y envíala desde el editor. El diseño no queda guardado.
         </p>
         <Link href="/admin/newsletter/campanas/nueva" className="mt-4 inline-flex rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
           Nueva campaña

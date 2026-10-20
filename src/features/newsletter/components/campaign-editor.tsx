@@ -20,6 +20,7 @@ import {
   type CampaignImage,
 } from "../domain/campaign-document";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { sendDesignedNewsletterCampaign, type CampaignSendResult } from "../server/campaign-actions";
 
 const fieldClass = "mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm";
 
@@ -35,10 +36,12 @@ export function CampaignEditor({
   origin,
   images,
   destinations,
+  activeCount,
 }: {
   origin: string;
   images: CampaignImage[];
   destinations: CampaignDestinationOption[];
+  activeCount: number;
 }) {
   const router = useRouter();
   const initialDocument = useRef(emptyCampaignDocument());
@@ -46,6 +49,8 @@ export function CampaignEditor({
   const [document, setDocument] = useState<CampaignDocument>(initialDocument.current);
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
   const [libraryFor, setLibraryFor] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<CampaignSendResult | null>(null);
   const sequence = useRef(1);
   const dirty = hasCampaignChanges(document, initialDocument.current);
   const problems = useMemo(() => documentProblems(document, origin), [document, origin]);
@@ -109,6 +114,17 @@ export function CampaignEditor({
       ...current,
       blocks: current.blocks.map((block) => (block.id === blockId ? patch(block) : block)),
     }));
+  }
+
+  async function sendCampaign() {
+    if (problems.length > 0 || activeCount === 0 || sending) return;
+    const label = activeCount === 1 ? "1 suscriptor activo" : `${activeCount} suscriptores activos`;
+    if (!window.confirm(`¿Enviar esta campaña a ${label}?`)) return;
+    setSending(true);
+    setSendResult(null);
+    const result = await sendDesignedNewsletterCampaign(document);
+    setSendResult(result);
+    setSending(false);
   }
 
   function add(type: CampaignBlock["type"]) {
@@ -256,14 +272,30 @@ export function CampaignEditor({
             ))}
           </ul>
         )}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+            disabled={sending || problems.length > 0 || activeCount === 0}
+            onClick={sendCampaign}
+          >
+            {sending ? "Enviando…" : "Enviar campaña"}
+          </button>
+          <p className="text-sm text-muted-foreground">
+            Se envía a {activeCount} {activeCount === 1 ? "suscriptor activo" : "suscriptores activos"}. El diseño no se guarda.
+          </p>
+        </div>
+        {sendResult?.ok && (
+          <p className="text-sm text-green-700" role="status">
+            Enviados: {sendResult.sent}. Fallidos: {sendResult.failed}. Omitidos por baja: {sendResult.skipped}.
+          </p>
+        )}
+        {sendResult && !sendResult.ok && <p className="text-sm text-destructive" role="status">{sendResult.error}</p>}
         {dirty && (
           <p className="text-sm text-amber-700" role="status">
             Hay cambios sin guardar. Si sales o recargas, se perderán.
           </p>
         )}
-        <p className="text-sm text-muted-foreground">
-          El guardado y el envío quedan para la fase siguiente. Esta pantalla no manda correos.
-        </p>
       </div>
 
       <aside className="space-y-3 xl:sticky xl:top-4 xl:self-start">
