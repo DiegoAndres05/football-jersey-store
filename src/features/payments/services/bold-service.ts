@@ -57,7 +57,7 @@ export async function prepareBoldTransaction(orderCode: string) {
   });
   if (!order) throw new Error("Pedido no encontrado.");
   const country = order.shippingCountry.trim().toUpperCase();
-  if (!canOpenBold({ provider: "bold-sandbox", ready: true, identityKey, secretKey }, {
+  if (!canOpenBold({ provider: "bold-sandbox", ready: true }, {
     country: country === "COLOMBIA" ? "CO" : country,
     currency: order.saleCurrency,
     total: order.total,

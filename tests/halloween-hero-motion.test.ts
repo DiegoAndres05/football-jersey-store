@@ -18,7 +18,8 @@ function sequence(values: number[]) {
 test("hay cuatro murciélagos, una araña y ningún fantasma", () => {
   assert.equal(HERO_DECORATIONS.filter((item) => item.kind === "bat").length, 4);
   assert.equal(HERO_DECORATIONS.filter((item) => item.kind === "spider").length, 1);
-  assert.equal(HERO_DECORATIONS.some((item) => item.id === "ghost"), false);
+  const retiredId: string = "ghost";
+  assert.equal(HERO_DECORATIONS.some((item) => item.id === retiredId), false);
   assert.equal(motion.opacity, 0.55);
   assert.equal(motion.spiderTravelPx, 6);
   assert.equal(motion.cardFloatPx, 4);
