@@ -55,6 +55,21 @@ test("webhook signature over the raw body or with another key is rejected", () =
   assert.equal(isValidBoldWebhookSignature(body, "not-hex", "secret"), false);
 });
 
+test("BOLD_ENV stays sandbox unless it is live or production", () => {
+  const base = { PAYMENT_PROVIDER: "bold", BOLD_IDENTITY_KEY: "id", BOLD_SECRET_KEY: "secret" };
+  assert.equal(getPaymentConfig(base as unknown as NodeJS.ProcessEnv).boldMode, "sandbox");
+  for (const value of ["live", "LIVE", " production "]) {
+    const config = getPaymentConfig({ ...base, BOLD_ENV: value } as unknown as NodeJS.ProcessEnv);
+    assert.equal(config.boldMode, "live");
+    assert.equal(config.provider, "bold-sandbox");
+  }
+  assert.equal(getPaymentConfig({ ...base, BOLD_ENV: "sandbox" } as unknown as NodeJS.ProcessEnv).boldMode, "sandbox");
+  const service = readFileSync("src/features/payments/services/bold-service.ts", "utf8");
+  assert.match(service, /boldWebhookSigningKey\(\{ mode: boldMode, secretKey \}\)/);
+  assert.match(service, /mode: boldMode/);
+  assert.doesNotMatch(service, /mode: "sandbox"/);
+});
+
 test("sandbox webhooks are signed with an empty key and live ones with the secret", () => {
   assert.equal(boldWebhookSigningKey({ mode: "sandbox", secretKey: "secret" }), "");
   assert.equal(boldWebhookSigningKey({ mode: "live", secretKey: "secret" }), "secret");

@@ -10,9 +10,9 @@ const BOLD_API_BASE = "https://payments.api.bold.co";
 function getBoldConfig() {
   const config = getPaymentConfig();
   if (config.provider !== "bold-sandbox" || !config.ready || !config.identityKey || !config.secretKey) {
-    throw new Error("Bold no está habilitado en modo sandbox.");
+    throw new Error("Bold no está habilitado.");
   }
-  return { identityKey: config.identityKey, secretKey: config.secretKey };
+  return { identityKey: config.identityKey, secretKey: config.secretKey, boldMode: config.boldMode };
 }
 
 /**
@@ -50,7 +50,7 @@ export function prepareBoldPayment(input: {
  * The upsert makes retries of hash preparation safe and reuses one reference.
  */
 export async function prepareBoldTransaction(orderCode: string) {
-  const { identityKey, secretKey } = getBoldConfig();
+  const { identityKey, secretKey, boldMode } = getBoldConfig();
   const order = await prisma.order.findUnique({
     where: { code: orderCode },
     include: { boldTransaction: true, shippingSnapshot: true },
@@ -88,11 +88,11 @@ export async function prepareBoldTransaction(orderCode: string) {
           amount: Number(sale.amount),
           currency: sale.currency,
           signatureHash: hash,
-          mode: "sandbox",
+          mode: boldMode,
           status: "PREPARED",
           idempotencyKey,
         },
-        update: { signatureHash: hash },
+        update: { signatureHash: hash, mode: boldMode },
       });
   return { orderId: sale.orderId, amount: sale.amount, currency: sale.currency, hash, apiKey: identityKey, idempotencyKey, transactionId: transaction.id };
 }
@@ -109,8 +109,8 @@ export function getBoldPublicKey(): string {
  * Verify a webhook signature from Bold (header `x-bold-signature`).
  */
 export function verifyBoldWebhookSignature(payload: string, signature: string): boolean {
-  const { secretKey } = getBoldConfig();
-  const key = boldWebhookSigningKey({ mode: "sandbox", secretKey });
+  const { secretKey, boldMode } = getBoldConfig();
+  const key = boldWebhookSigningKey({ mode: boldMode, secretKey });
   return isValidBoldWebhookSignature(payload, signature, key);
 }
 
