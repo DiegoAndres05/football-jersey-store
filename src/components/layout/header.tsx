@@ -90,7 +90,7 @@ export function Header({
               className="relative -ml-3 block translate-y-1 h-7 w-[8rem] shrink-0 min-[390px]:h-8 min-[390px]:w-[11.75rem] md:h-9 md:w-[13.5rem]"
             >
               <Image
-                src="/flashsport-logo.png"
+                src="/flashsport-logo-halloween.png"
                 alt={SITE.brand}
                 fill
                 priority

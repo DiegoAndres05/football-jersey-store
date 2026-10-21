@@ -36,6 +36,7 @@ import { ProductImage } from "@/shared/ui/product-image";
 import { Suspense } from "react";
 import { appendKeywords } from "@/features/seo/domain/keywords";
 import { HeroCopyAnimation } from "@/components/home/hero-copy-animation";
+import { HeroHalloween } from "@/components/home/hero-halloween";
 import { Marquee } from "@/components/ui/marquee";
 
 export const metadata: Metadata = {
@@ -95,8 +96,9 @@ export default async function HomePage() {
   return (
     <div>
       {/* ── HERO ───────────────────────────────────────────────────── */}
-      <section className="border-b border-border">
-        <div className="container-page grid items-center gap-6 pb-12 pt-6 sm:gap-10 sm:pb-16 sm:pt-10 md:pb-20 md:pt-14 lg:grid-cols-12 lg:gap-6">
+      <section className="relative overflow-x-clip border-b border-border">
+        <HeroHalloween />
+        <div className="container-page relative z-10 grid items-center gap-6 pb-12 pt-6 sm:gap-10 sm:pb-16 sm:pt-10 md:pb-20 md:pt-14 lg:grid-cols-12 lg:gap-6">
           {/* Texto */}
           <div className="lg:col-span-6 lg:pr-8">
             <HeroCopyAnimation>
