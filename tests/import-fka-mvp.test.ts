@@ -77,6 +77,17 @@ test("descarga pública: baja una imagen fuera de Football Kit Archive", async (
   }
 });
 
+test("descarga pública: acepta AVIF", async () => {
+  const restore = stubFetch(() => okResponse(Buffer.from([1, 2, 3]), "image/avif"));
+  try {
+    const result = await downloadPublicImage("https://www.footballkitarchive.com/cdn/a.avif");
+    assert.equal(result.contentType, "image/avif");
+    assert.equal(result.extension, "avif");
+  } finally {
+    restore();
+  }
+});
+
 test("descarga pública: no sigue una redirección a una dirección interna", async () => {
   const restore = stubFetch(() => redirectResponse("https://127.0.0.1/foto.jpg"));
   try {
@@ -93,6 +104,7 @@ test("fkaImageExtension: mapea MIME a extensión y rechaza otros", () => {
   assert.equal(fkaImageExtension("image/jpeg"), "jpg");
   assert.equal(fkaImageExtension("image/png"), "png");
   assert.equal(fkaImageExtension("image/webp"), "webp");
+  assert.equal(fkaImageExtension("image/avif"), "avif");
   assert.equal(fkaImageExtension("image/gif"), null);
   assert.equal(fkaImageExtension("text/html"), null);
 });

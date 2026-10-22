@@ -23,6 +23,7 @@ const EXT_BY_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
+  "image/avif": "avif",
 };
 
 export class FkaImageError extends Error {
@@ -211,7 +212,7 @@ async function downloadCheckedImage(
   const contentType = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
   const extension = fkaImageExtension(contentType);
   if (!extension) {
-    throw new FkaImageError("La imagen no es un formato válido (JPG, PNG o WebP).");
+    throw new FkaImageError("La imagen no es un formato válido (JPG, PNG, WebP o AVIF).");
   }
 
   const arrayBuffer = await res.arrayBuffer();

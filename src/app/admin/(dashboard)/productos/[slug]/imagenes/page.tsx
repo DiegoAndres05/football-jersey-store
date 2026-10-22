@@ -52,13 +52,13 @@ export default async function AdminProductImagesPage({
         className="rounded-xl border border-border bg-card p-5 space-y-3"
       >
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Subir imagen (JPG, PNG o WebP · máx 5 MB)
+          Subir imagen (JPG, PNG, WebP o AVIF · máx 5 MB)
         </p>
         <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="file"
             name="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,image/avif"
             required
             className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-secondary-hover"
           />
@@ -128,7 +128,7 @@ export default async function AdminProductImagesPage({
                       <input
                         type="file"
                         name="file"
-                        accept="image/jpeg,image/png,image/webp"
+                        accept="image/jpeg,image/png,image/webp,image/avif"
                         required
                         className="max-w-[9rem] text-xs file:rounded-md file:border file:border-border file:bg-secondary file:px-2 file:py-1 file:text-xs"
                       />

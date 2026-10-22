@@ -36,8 +36,8 @@ const productCardSelect = {
   },
   season: { select: { id: true, slug: true, name: true, isRetro: true } },
   images: {
-    where: { isPrimary: true },
     select: { id: true, url: true, altText: true },
+    orderBy: [{ isPrimary: "desc" }, { order: "asc" }],
     take: 1,
   },
 } satisfies Prisma.ProductSelect;

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/features/auth/server/session";
 import { extractFromUrl, type ExtractedProduct } from "../fka/url-extractor";
 import { downloadPublicImage } from "../fka/fka-image";
+import { asStoredImage } from "@/features/products/services/image-storage";
 import { supabaseServer, PRODUCT_IMAGES_BUCKET } from "@/lib/supabase/server";
 
 const extractSchema = z.object({
@@ -137,7 +138,8 @@ async function uploadImageFromUrl(
   productId?: string,
   sourceUrl?: string,
 ): Promise<string> {
-  const image = await downloadPublicImage(product.imageUrl, 15000, sourceUrl);
+  const downloaded = await downloadPublicImage(product.imageUrl, 15000, sourceUrl);
+  const image = await asStoredImage(downloaded.buffer, downloaded.contentType);
   const ext = image.extension;
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!base) throw new Error("Falta NEXT_PUBLIC_SUPABASE_URL.");
@@ -168,13 +170,14 @@ async function uploadImageFromUrl(
 
   if (type === "associated" && productId) {
     const publicUrl = `${base}/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/${storagePath}`;
+    const primaryCount = await prisma.productImage.count({ where: { productId, isPrimary: true } });
     await prisma.productImage.create({
       data: {
         productId,
         url: publicUrl,
         altText: product.title,
         order: 0,
-        isPrimary: false,
+        isPrimary: primaryCount === 0,
         storagePath,
       },
     });

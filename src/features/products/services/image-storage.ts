@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { supabaseServer, PRODUCT_IMAGES_BUCKET } from "@/lib/supabase/server";
 
@@ -9,11 +10,12 @@ import { supabaseServer, PRODUCT_IMAGES_BUCKET } from "@/lib/supabase/server";
  */
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 const EXT_BY_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
+  "image/avif": "avif",
 };
 
 export type ImageUploadInput = {
@@ -29,13 +31,28 @@ export class ImageStorageError extends Error {
   }
 }
 
+/** Supabase no acepta image/avif en el depósito. Se guarda como WebP. */
+export async function asStoredImage(
+  buffer: Buffer,
+  contentType: string,
+): Promise<{ buffer: Buffer; contentType: string; extension: string }> {
+  const normalized = contentType.split(";")[0].trim().toLowerCase();
+  if (normalized === "image/avif") {
+    const webp = await sharp(buffer).webp({ quality: 82 }).toBuffer();
+    return { buffer: webp, contentType: "image/webp", extension: "webp" };
+  }
+  const extension = EXT_BY_MIME[normalized];
+  if (!extension) throw new ImageStorageError("Formato no permitido. Usa JPG, PNG, WebP o AVIF.");
+  return { buffer, contentType: normalized, extension };
+}
+
 function validateImageFile(file: File): void {
   if (!file || file.size === 0) throw new ImageStorageError("El archivo está vacío.");
   if (file.size > MAX_IMAGE_BYTES) {
     throw new ImageStorageError("La imagen supera el tamaño máximo de 5 MB.");
   }
   if (!ALLOWED_MIME.has(file.type)) {
-    throw new ImageStorageError("Formato no permitido. Usa JPG, PNG o WebP.");
+    throw new ImageStorageError("Formato no permitido. Usa JPG, PNG, WebP o AVIF.");
   }
 }
 
@@ -69,13 +86,13 @@ export async function uploadProductImage(input: ImageUploadInput) {
   });
   if (!product) throw new ImageStorageError("El producto no existe.");
 
-  const ext = EXT_BY_MIME[input.file.type];
+  const stored = await asStoredImage(Buffer.from(await input.file.arrayBuffer()), input.file.type);
   const order = await prisma.productImage.count({ where: { productId: input.productId } });
-  const storagePath = `products/${input.productId}/${normalizeFileName(product.slug)}-${Date.now()}-${order}.${ext}`;
+  const storagePath = `products/${input.productId}/${normalizeFileName(product.slug)}-${Date.now()}-${order}.${stored.extension}`;
 
   const { error } = await supabaseServer.storage
     .from(PRODUCT_IMAGES_BUCKET)
-    .upload(storagePath, input.file, { contentType: input.file.type, upsert: false });
+    .upload(storagePath, stored.buffer, { contentType: stored.contentType, upsert: false });
   if (error) throw new ImageStorageError(`Error de Storage al subir: ${error.message}`);
 
   try {
@@ -181,9 +198,10 @@ export async function replaceProductImage(imageId: string, file: File, altText?:
     throw new ImageStorageError("No se puede reemplazar una imagen externa. Elimínala y sube una nueva.");
   }
 
+  const stored = await asStoredImage(Buffer.from(await file.arrayBuffer()), file.type);
   const { error } = await supabaseServer.storage
     .from(PRODUCT_IMAGES_BUCKET)
-    .update(image.storagePath, file, { contentType: file.type, upsert: true });
+    .update(image.storagePath, stored.buffer, { contentType: stored.contentType, upsert: true });
   if (error) throw new ImageStorageError(`Error de Storage al reemplazar: ${error.message}`);
 
   return prisma.productImage.update({

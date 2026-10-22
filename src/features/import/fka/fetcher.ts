@@ -133,7 +133,7 @@ export class FkaFetcher {
     const contentType = normalizeImageContentType(result.contentType);
     const extension = fkaImageExtension(contentType);
     if (!extension) {
-      throw new FkaImageError("La imagen no es un formato válido (JPG, PNG o WebP).");
+      throw new FkaImageError("La imagen no es un formato válido (JPG, PNG, WebP o AVIF).");
     }
     if (result.size === 0) {
       throw new FkaImageError("La imagen descargada está vacía.");

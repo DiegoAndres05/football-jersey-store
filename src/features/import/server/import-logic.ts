@@ -89,7 +89,10 @@ export function fkaImageStoragePath(productId: string, imageUrl: string, extensi
 }
 
 export function extensionToMime(extension: string): string {
-  return extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : "image/jpeg";
+  if (extension === "png") return "image/png";
+  if (extension === "webp") return "image/webp";
+  if (extension === "avif") return "image/avif";
+  return "image/jpeg";
 }
 
 export type SeasonCreateData = { slug: string; name: string; year: number | null };
