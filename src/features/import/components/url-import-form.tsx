@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, Loader2, Download, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { extractUrlAction, downloadUrlImagesAction, type ExtractUrlResponse } from "../server/url-import-actions";
+import {
+  extractUrlAction,
+  downloadUrlImagesAction,
+  searchImportProductsAction,
+  type ExtractUrlResponse,
+  type ImportProductOption,
+} from "../server/url-import-actions";
 
 type Product = {
   title: string;
@@ -20,9 +26,11 @@ export function UrlImportForm() {
   const [result, setResult] = useState<ExtractUrlResponse | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [imageType, setImageType] = useState<"independent" | "associated">("independent");
+  const [productQuery, setProductQuery] = useState("");
   const [productId, setProductId] = useState("");
-  const [teamId, setTeamId] = useState("");
-  const [seasonId, setSeasonId] = useState("");
+  const [productLabel, setProductLabel] = useState("");
+  const [productOptions, setProductOptions] = useState<ImportProductOption[]>([]);
+  const [searchingProducts, setSearchingProducts] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadResult, setDownloadResult] = useState<string[] | null>(null);
 
@@ -74,8 +82,7 @@ export function UrlImportForm() {
         products: selected,
         type: imageType,
         productId: imageType === "associated" ? productId || undefined : undefined,
-        teamId: imageType === "associated" ? teamId || undefined : undefined,
-        seasonId: imageType === "associated" ? seasonId || undefined : undefined,
+        sourceUrl: url.trim() || undefined,
       });
       if (res.ok) {
         setDownloadResult(res.urls);
@@ -88,6 +95,44 @@ export function UrlImportForm() {
     } finally {
       setDownloading(false);
     }
+  }
+
+  useEffect(() => {
+    if (imageType !== "associated" || productId || productQuery.trim().length < 2) {
+      setProductOptions([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setSearchingProducts(true);
+      void searchImportProductsAction(productQuery)
+        .then((options) => {
+          if (!cancelled) setProductOptions(options);
+        })
+        .catch(() => {
+          if (!cancelled) setProductOptions([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearchingProducts(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [imageType, productId, productQuery]);
+
+  function onProductQueryChange(value: string) {
+    setProductQuery(value);
+    setProductId("");
+    setProductLabel("");
+  }
+
+  function selectProduct(option: ImportProductOption) {
+    setProductId(option.id);
+    setProductLabel(`${option.name} · ${option.teamName} · ${option.seasonName}`);
+    setProductQuery(option.name);
+    setProductOptions([]);
   }
 
   const selectedCount = products.filter((p) => p.selected).length;
@@ -178,34 +223,41 @@ export function UrlImportForm() {
           </div>
 
           {imageType === "associated" && (
-            <div className="grid gap-4 lg:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="url-import-product">Producto (obligatorio)</Label>
-                <Input
-                  id="url-import-product"
-                  value={productId}
-                  onChange={(e) => setProductId(e.target.value)}
-                  placeholder="ID del producto"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="url-import-team">Equipo (opcional)</Label>
-                <Input
-                  id="url-import-team"
-                  value={teamId}
-                  onChange={(e) => setTeamId(e.target.value)}
-                  placeholder="ID del equipo"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="url-import-season">Temporada (opcional)</Label>
-                <Input
-                  id="url-import-season"
-                  value={seasonId}
-                  onChange={(e) => setSeasonId(e.target.value)}
-                  placeholder="ID de la temporada"
-                />
-              </div>
+            <div className="relative space-y-1.5">
+              <Label htmlFor="url-import-product">Camiseta</Label>
+              <Input
+                id="url-import-product"
+                value={productQuery}
+                onChange={(e) => onProductQueryChange(e.target.value)}
+                placeholder="Escribe el nombre, por ejemplo Brasil"
+                autoComplete="off"
+              />
+              {productOptions.length > 0 && (
+                <ul className="absolute z-10 top-16 max-h-60 w-full overflow-auto rounded-lg border border-border bg-card shadow-md">
+                  {productOptions.map((option) => (
+                    <li key={option.id}>
+                      <button
+                        type="button"
+                        onClick={() => selectProduct(option)}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-secondary"
+                      >
+                        {option.name}
+                        <span className="block text-xs text-muted-foreground">
+                          {option.teamName} · {option.seasonName}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {searchingProducts && (
+                <p className="text-xs text-muted-foreground">Buscando…</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {productLabel
+                  ? `Se guardará en ${productLabel}.`
+                  : "Elige una camiseta que ya exista en la tienda."}
+              </p>
             </div>
           )}
 
@@ -245,7 +297,7 @@ export function UrlImportForm() {
           <div className="flex items-center gap-3">
             <Button
               onClick={onDownload}
-              disabled={downloading || selectedCount === 0}
+              disabled={downloading || selectedCount === 0 || (imageType === "associated" && !productId)}
             >
               {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {downloading ? "Descargando…" : `Descargar seleccionadas (${selectedCount})`}

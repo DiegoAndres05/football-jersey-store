@@ -2,8 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   assertAllowedFkaImageUrl,
+  assertAllowedPublicImageUrl,
   fkaImageExtension,
   downloadFkaImage,
+  downloadPublicImage,
   FkaImageError,
 } from "../src/features/import/fka/fka-image.ts";
 import {
@@ -49,6 +51,42 @@ test("validación de URL FKA: rechaza dominios externos", () => {
   assert.throws(() => assertAllowedFkaImageUrl("https://169.254.169.254/latest"), FkaImageError);
   assert.throws(() => assertAllowedFkaImageUrl("https://192.168.1.10/cdn/a.jpg"), FkaImageError);
   assert.throws(() => assertAllowedFkaImageUrl("https://[::1]/cdn/a.jpg"), FkaImageError);
+});
+
+test("validación de URL pública: acepta cualquier HTTPS y rechaza destinos internos", () => {
+  assert.doesNotThrow(() =>
+    assertAllowedPublicImageUrl("https://www.camisetasfutbolybaloncesto.com/foto.jpg"),
+  );
+  assert.doesNotThrow(() => assertAllowedPublicImageUrl("https://images.unsplash.com/photo.jpg"));
+  assert.throws(() => assertAllowedPublicImageUrl("http://tienda.example/foto.jpg"), /HTTPS/);
+  assert.throws(() => assertAllowedPublicImageUrl("https://127.0.0.1/foto.jpg"), /destino/);
+  assert.throws(() => assertAllowedPublicImageUrl("https://169.254.169.254/latest"), /destino/);
+  assert.throws(() => assertAllowedPublicImageUrl("https://localhost/foto.jpg"), /destino/);
+  assert.throws(() => assertAllowedPublicImageUrl("https://user:pass@tienda.example/foto.jpg"), /destino/);
+  assert.throws(() => assertAllowedFkaImageUrl("https://www.camisetasfutbolybaloncesto.com/foto.jpg"), /origen/);
+});
+
+test("descarga pública: baja una imagen fuera de Football Kit Archive", async () => {
+  const restore = stubFetch(() => okResponse(Buffer.from([1, 2, 3]), "image/jpeg"));
+  try {
+    const result = await downloadPublicImage("https://www.camisetasfutbolybaloncesto.com/foto.jpg");
+    assert.equal(result.extension, "jpg");
+    assert.equal(result.buffer.length, 3);
+  } finally {
+    restore();
+  }
+});
+
+test("descarga pública: no sigue una redirección a una dirección interna", async () => {
+  const restore = stubFetch(() => redirectResponse("https://127.0.0.1/foto.jpg"));
+  try {
+    await assert.rejects(
+      downloadPublicImage("https://www.camisetasfutbolybaloncesto.com/foto.jpg"),
+      /destino/,
+    );
+  } finally {
+    restore();
+  }
 });
 
 test("fkaImageExtension: mapea MIME a extensión y rechaza otros", () => {

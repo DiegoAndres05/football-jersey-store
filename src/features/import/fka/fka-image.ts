@@ -33,6 +33,33 @@ export class FkaImageError extends Error {
 }
 
 export function assertAllowedFkaImageUrl(url: string): void {
+  const parsed = parseHttpsImageUrl(url);
+  if (!ALLOWED_HOSTS.has(parsed.hostname)) {
+    throw new FkaImageError("El origen de la imagen no está permitido.");
+  }
+  if (isPrivateOrReservedIp(parsed.hostname)) {
+    throw new FkaImageError("El destino de la imagen no está permitido.");
+  }
+}
+
+/** HTTPS público para el importador por URL. No exige el host de Football Kit Archive. */
+export function assertAllowedPublicImageUrl(url: string): void {
+  const parsed = parseHttpsImageUrl(url);
+  if (parsed.username || parsed.password) {
+    throw new FkaImageError("El destino de la imagen no está permitido.");
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    isPrivateOrReservedIp(host)
+  ) {
+    throw new FkaImageError("El destino de la imagen no está permitido.");
+  }
+}
+
+function parseHttpsImageUrl(url: string): URL {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -42,17 +69,20 @@ export function assertAllowedFkaImageUrl(url: string): void {
   if (parsed.protocol !== "https:") {
     throw new FkaImageError("La imagen debe servirse por HTTPS.");
   }
-  if (!ALLOWED_HOSTS.has(parsed.hostname)) {
-    throw new FkaImageError("El origen de la imagen no está permitido.");
-  }
-  if (isPrivateOrReservedIp(parsed.hostname)) {
-    throw new FkaImageError("El destino de la imagen no está permitido.");
-  }
+  return parsed;
 }
 
 async function assertSafeFkaImageUrl(url: string): Promise<void> {
   assertAllowedFkaImageUrl(url);
+  await assertPublicDns(url);
+}
 
+async function assertSafePublicImageUrl(url: string): Promise<void> {
+  assertAllowedPublicImageUrl(url);
+  await assertPublicDns(url);
+}
+
+async function assertPublicDns(url: string): Promise<void> {
   const hostname = new URL(url).hostname;
   if (isIP(hostname)) return;
 
@@ -107,24 +137,54 @@ export async function downloadFkaImage(url: string, timeoutMs = 15000): Promise<
   contentType: string;
   extension: string;
 }> {
+  return downloadCheckedImage(url, assertSafeFkaImageUrl, `${FKA_ORIGIN}/`, timeoutMs);
+}
+
+export async function downloadPublicImage(url: string, timeoutMs = 15000, pageUrl?: string): Promise<{
+  buffer: Buffer;
+  contentType: string;
+  extension: string;
+}> {
+  assertAllowedPublicImageUrl(url);
+  return downloadCheckedImage(url, assertSafePublicImageUrl, publicImageReferer(url, pageUrl), timeoutMs);
+}
+
+function publicImageReferer(imageUrl: string, pageUrl?: string): string {
+  if (pageUrl) {
+    try {
+      const page = new URL(pageUrl);
+      if (page.protocol === "https:" || page.protocol === "http:") return `${page.origin}/`;
+    } catch {
+      /* La página de origen no es una URL usable; se usa el origen de la imagen. */
+    }
+  }
+  return `${new URL(imageUrl).origin}/`;
+}
+
+async function downloadCheckedImage(
+  url: string,
+  assertSafeUrl: (url: string) => Promise<void>,
+  referer: string,
+  timeoutMs: number,
+): Promise<{ buffer: Buffer; contentType: string; extension: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let currentUrl = url;
   let res: Response;
   try {
     for (let redirectCount = 0; ; redirectCount++) {
-      await assertSafeFkaImageUrl(currentUrl);
+      await assertSafeUrl(currentUrl);
       res = await fetch(currentUrl, {
         signal: controller.signal,
         redirect: "manual",
         headers: {
           Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-          Referer: `${FKA_ORIGIN}/`,
+          Referer: referer,
           "User-Agent": FKA_USER_AGENT,
         },
       });
 
-      if (res.url) await assertSafeFkaImageUrl(res.url);
+      if (res.url) await assertSafeUrl(res.url);
       if (res.status < 300 || res.status >= 400) break;
 
       if (redirectCount >= MAX_REDIRECTS) {
