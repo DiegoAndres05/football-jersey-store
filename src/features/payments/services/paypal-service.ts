@@ -60,7 +60,15 @@ async function paypalFetch(path: string, init: RequestInit = {}): Promise<unknow
   });
   const text = await response.text();
   if (!response.ok) {
-    console.error("[PayPal] API failed:", response.status, path);
+    let issue = "";
+    try {
+      const parsed = JSON.parse(text) as { name?: string; details?: Array<{ issue?: string; field?: string }> };
+      const detail = parsed.details?.[0];
+      issue = [parsed.name, detail?.issue, detail?.field].filter(Boolean).join(" ");
+    } catch {
+      issue = "";
+    }
+    console.error("[PayPal] API failed:", response.status, path, issue);
     throw new Error("No pudimos completar el pago con PayPal.");
   }
   return text ? JSON.parse(text) as unknown : null;
@@ -110,12 +118,16 @@ export async function createPayPalCheckout(orderCode: string): Promise<{ approve
         custom_id: order.code,
         amount: { currency_code: "USD", value },
       }],
-      application_context: {
-        brand_name: "Flashsport",
-        user_action: "PAY_NOW",
-        shipping_preference: "NO_SHIPPING",
-        return_url: `${origin}/api/paypal/return`,
-        cancel_url: `${origin}/checkout?paypal=cancelled`,
+      payment_source: {
+        paypal: {
+          experience_context: {
+            brand_name: "Flashsport",
+            user_action: "PAY_NOW",
+            shipping_preference: "NO_SHIPPING",
+            return_url: `${origin}/api/paypal/return`,
+            cancel_url: `${origin}/checkout?paypal=cancelled`,
+          },
+        },
       },
     }),
   }));

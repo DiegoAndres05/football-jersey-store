@@ -93,3 +93,10 @@ test("checkout shows one Bold button in Colombia and one PayPal button elsewhere
   assert.doesNotMatch(source, /Tarjeta débito o crédito/);
   assert.doesNotMatch(source, /cotización pendiente/);
 });
+
+test("PayPal checkout uses the current experience context", () => {
+  const source = readFileSync("src/features/payments/services/paypal-service.ts", "utf8");
+  assert.match(source, /payment_source/);
+  assert.match(source, /experience_context/);
+  assert.doesNotMatch(source, /application_context/);
+});
