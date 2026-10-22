@@ -30,7 +30,7 @@ import {
 } from "@/features/products/types/delivery-mode";
 import { validatePersonalization } from "@/features/products/personalization";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
-import { deriveProductDisplayPrice } from "../domain/product-price-display";
+import { deriveProductDisplayPrice, displayedCompareAtPrice } from "../domain/product-price-display";
 import { resolveSelectedSize } from "../domain/size-selection";
 
 type CustomType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
@@ -92,6 +92,13 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
     availability: product.availability,
     currentPrice: currentVariant?.salePrice,
     lastValidProductPrice: product.lastValidProductPrice,
+  });
+  const compareAtPrice = displayedCompareAtPrice({
+    sizeSelected: Boolean(selectedSize),
+    selectedCompareAtPrice: currentVariant?.compareAtPrice,
+    versionCompareAtPrices: product.variants
+      .filter((variant) => variant.version.slug === selectedVersion)
+      .map((variant) => variant.compareAtPrice),
   });
 
   const getVariantAvailability = useCallback(
@@ -246,7 +253,11 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
           </div>
 
           {priceDisplay.showPrice && priceDisplay.displayPrice !== null && (
-            <ProductPrice salePrice={priceDisplay.displayPrice + surcharge} compareAtPrice={currentVariant?.compareAtPrice ? currentVariant.compareAtPrice + surcharge : null} currencyContext={currencyContext} />
+            <ProductPrice
+              salePrice={priceDisplay.displayPrice + surcharge}
+              compareAtPrice={compareAtPrice === null ? null : compareAtPrice + surcharge}
+              currencyContext={currencyContext}
+            />
           )}
 
           {product.availability === "OUT_OF_STOCK" && <ProductAvailability availability="OUT_OF_STOCK" stock={0} />}

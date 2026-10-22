@@ -28,3 +28,16 @@ export function deriveProductDisplayPrice(input: {
   }
   return { availability, displayPrice: current ?? fallback, showPrice: (current ?? fallback) !== null, statusLabel: "En stock" };
 }
+
+export function displayedCompareAtPrice(input: {
+  sizeSelected: boolean;
+  selectedCompareAtPrice?: number | null;
+  versionCompareAtPrices: Array<number | null>;
+}): number | null {
+  if (input.sizeSelected) return positivePrice(input.selectedCompareAtPrice);
+  return input.versionCompareAtPrices.map(positivePrice).find((price) => price !== null) ?? null;
+}
+
+function positivePrice(price: number | null | undefined): number | null {
+  return typeof price === "number" && price > 0 ? Math.trunc(price) : null;
+}
