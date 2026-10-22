@@ -9,7 +9,7 @@ import { appendKeywords } from "@/features/seo/domain/keywords";
 export const metadata: Metadata = {
   title: "Sobre nosotros",
   description:
-    "Conoce a Flashsport: camisetas de fútbol de calidad, réplicas de tus equipos favoritos con atención personalizada.",
+    "Conoce a Flashsport: camisetas de fútbol de calidad, Calidad en tus equipos favoritos con atención personalizada.",
   keywords: appendKeywords(
     "Flashsport camisetas de fútbol",
     "tienda de camisetas de fútbol en Colombia",
@@ -23,17 +23,17 @@ const VALUES = [
   {
     title: "Calidad",
     description:
-      "Camisetas confeccionadas con materiales suaves y duraderos, revisadas una a una antes de enviarse.",
+      "Camisetas confeccionadas con materiales suaves y duraderos, revisadas una a una antes de enviarse. Totalmente importadas de Europa.",
   },
   {
     title: "Disponibilidad",
     description:
-      "Si no la tienes en el catálogo, la conseguimos: manejamos muchos más equipos, temporadas y ediciones retro.",
+      "Si no la encuentras en el catálogo, la conseguimos: manejamos muchos equipos, temporadas y ediciones retro. (Si tienes un equipo que no está en el catálogo, contáctanos y te ayudamos a conseguirlo.)",
   },
   {
     title: "Atención",
     description:
-      "Te acompañamos desde la elección de la talla hasta que la camiseta llega a tu puerta.",
+      "Te acompañamos desde la elección de la talla hasta que la camiseta llega a tu puerta. Tenemos un equipo de atención al cliente que te ayudará a resolver cualquier duda o problema que tengas.",
   },
 ] as const;
 
@@ -54,11 +54,11 @@ export default function SobreNosotrosPage() {
       </h1>
       <p className="mt-6 text-lg text-muted-foreground max-w-2xl leading-relaxed">
         Flashsport nació con una idea simple: que cualquier hincha pueda vestir la
-        camiseta de su equipo, de la temporada que quiera — actual o retro — sin
+        camiseta de su equipo, de la temporada que quiera (actual o retro) sin
         complicaciones y con atención de verdad.
       </p>
       <p className="mt-4 text-muted-foreground max-w-2xl leading-relaxed">
-        Ofrecemos réplicas de calidad de camisetas de clubes y selecciones de todo el
+        Ofrecemos calidad de camisetas de clubes y selecciones de todo el
         mundo, con personalización de nombre y número. Si no encontramos tu camiseta
         en el catálogo, la conseguimos bajo pedido.
       </p>
