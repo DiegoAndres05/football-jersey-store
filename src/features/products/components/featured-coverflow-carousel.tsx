@@ -95,7 +95,7 @@ function SlideFace({
         src={item.url}
         alt={item.altText ?? item.name}
         fill
-        sizes="(max-width: 1024px) 90vw, 28rem"
+        sizes="(max-width: 640px) 16rem, (max-width: 1024px) 18rem, 22rem"
         className="object-cover"
         loading="lazy"
       />
@@ -232,22 +232,8 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
       </div>
 
       <div className="relative">
-        {/* Mobile: one full card, no coverflow */}
         <div
-          className="px-4 lg:hidden"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <article className="relative mx-auto aspect-[3/4] w-full max-w-sm">
-            <SlideFace item={current} tiltEnabled={false} showCta />
-          </article>
-          <SlideCaption item={current} />
-        </div>
-
-        {/* Desktop: calmer coverflow with readable peeks */}
-        <div
-          className="relative mx-auto hidden h-[440px] max-w-5xl px-16 lg:block"
+          className="relative mx-auto h-[20rem] max-w-5xl [--cover-shift:92%] px-2 sm:h-[24rem] sm:[--cover-shift:78%] lg:h-[440px] lg:px-16 lg:[--cover-shift:58%]"
           style={{ perspective: "1200px" }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -264,7 +250,6 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
                     : offset;
 
               const isActive = wrappedOffset === 0;
-              const translateX = wrappedOffset * 58;
               const rotateY = isActive ? 0 : wrappedOffset * -8;
               const scale = isActive ? 1 : 0.88;
               const zIndex = isActive ? 10 : 5 - Math.abs(wrappedOffset);
@@ -273,9 +258,9 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
               return (
                 <div
                   key={item.imageId}
-                  className="absolute top-0 bottom-0 left-1/2 w-[min(22rem,58%)] -ml-[min(11rem,29%)] transition-transform duration-500 ease-in-out"
+                  className="absolute top-0 bottom-0 left-1/2 w-[15.5rem] -ml-[7.75rem] transition-transform duration-500 ease-in-out sm:w-[18rem] sm:-ml-[9rem] lg:w-[min(22rem,58%)] lg:-ml-[min(11rem,29%)]"
                   style={{
-                    transform: `translateX(${translateX}%) rotateY(${rotateY}deg) scale(${scale})`,
+                    transform: `translateX(calc(var(--cover-shift) * ${wrappedOffset})) rotateY(${rotateY}deg) scale(${scale})`,
                     zIndex: zIndex < 0 ? 0 : zIndex,
                     opacity,
                     pointerEvents: Math.abs(wrappedOffset) <= 1 ? "auto" : "none",
@@ -293,37 +278,37 @@ export function FeaturedCoverflowCarousel({ items }: FeaturedCoverflowCarouselPr
               );
             })}
           </div>
+
+          {showControls && (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute left-1 top-1/2 z-20 h-11 w-11 -translate-y-1/2 bg-background/90 hover:bg-background lg:left-4"
+                onClick={goPrev}
+                aria-label="Anterior"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 z-20 h-11 w-11 -translate-y-1/2 bg-background/90 hover:bg-background lg:right-4"
+                onClick={goNext}
+                aria-label="Siguiente"
+              >
+                <ChevronRight className="h-6 w-6" />
+              </Button>
+            </>
+          )}
         </div>
 
-        {/* Desktop caption under active card only */}
-        <div className="mx-auto mt-4 hidden max-w-sm px-4 lg:block">
+        <div className="mx-auto mt-4 max-w-sm px-4">
           <SlideCaption item={current} />
         </div>
 
-        {showControls && (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute left-2 top-1/2 z-20 h-11 w-11 -translate-y-1/2 bg-background/90 hover:bg-background lg:left-4"
-              onClick={goPrev}
-              aria-label="Anterior"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute right-2 top-1/2 z-20 h-11 w-11 -translate-y-1/2 bg-background/90 hover:bg-background lg:right-4"
-              onClick={goNext}
-              aria-label="Siguiente"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </Button>
-          </>
-        )}
       </div>
 
       {showControls && (

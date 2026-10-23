@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { buildProductWhere } from "./product-where";
 import { productMatchesCatalogFilters } from "../domain/catalog-filter-match";
+import { isSoldOutListing, sortPurchasableFirst } from "../domain/catalog-listing-order";
 import type {
   ProductCardData,
   ProductListResult,
@@ -50,78 +51,66 @@ export async function getProducts(filters: ProductFilters): Promise<ProductListR
 
   const where = buildProductWhere(filters);
   const orderBy = buildProductOrderBy(filters.sort);
-
   const isPriceSort = filters.sort === "price-asc" || filters.sort === "price-desc";
   const hasAvailabilityFilter =
     filters.availability === "AVAILABLE" || filters.availability === "OUT_OF_STOCK";
   const hasDeliveryModeFilter =
     filters.deliveryMode === "INMEDIATA" || filters.deliveryMode === "BAJO_PEDIDO";
   const hasPurchasableSizeFilter = Boolean(filters.size);
-  const needsVariantInfos =
-    hasAvailabilityFilter || hasDeliveryModeFilter || hasPurchasableSizeFilter;
 
-  // Precio, disponibilidad (comprable), modalidad y talla comprable usan
-  // agregados de ledger / variant infos; la paginación va sobre ids filtrados.
-  if (isPriceSort || needsVariantInfos) {
-    const candidateIds = (
-      await prisma.product.findMany({ where, select: { id: true }, orderBy })
-    ).map((p) => p.id);
+  const candidateIds = (
+    await prisma.product.findMany({ where, select: { id: true }, orderBy })
+  ).map((product) => product.id);
 
-    const rangesByProductId = await getPriceRangesByProductIds(candidateIds);
-    const variantInfosByProductId = needsVariantInfos
-      ? await getVariantInfosByProductIds(candidateIds)
-      : undefined;
-
-    let allowedIds = candidateIds;
-
-    if (needsVariantInfos && variantInfosByProductId) {
-      allowedIds = candidateIds.filter((id) =>
-        productMatchesCatalogFilters(variantInfosByProductId.get(id) ?? [], {
-          availability:
-            filters.availability === "AVAILABLE" || filters.availability === "OUT_OF_STOCK"
-              ? filters.availability
-              : undefined,
-          deliveryMode: filters.deliveryMode,
-          sizeCode: filters.size,
-        }),
-      );
-    }
-
-    if (isPriceSort) {
-      const dir = filters.sort === "price-asc" ? 1 : -1;
-      allowedIds = [...allowedIds].sort((a, b) => {
-        const priceA = rangesByProductId.get(a)?.min ?? 0;
-        const priceB = rangesByProductId.get(b)?.min ?? 0;
-        return (priceA - priceB) * dir;
-      });
-    }
-
-    const total = allowedIds.length;
-    const pageIds = allowedIds.slice(skip, skip + PAGE_SIZE);
-    const products =
-      pageIds.length > 0
-        ? await prisma.product.findMany({
-            where: { id: { in: pageIds } },
-            select: productCardSelect,
-          })
-        : [];
-    const productsById = new Map(products.map((p) => [p.id, p]));
-    const ordered = pageIds
-      .map((id) => productsById.get(id))
-      .filter((p): p is NonNullable<typeof p> => p !== undefined);
-    const mapped = await mapProductCards(ordered, {
-      rangesByProductId,
-      variantInfosByProductId,
-    });
-    return { products: mapped, total, page, totalPages: Math.ceil(total / PAGE_SIZE) };
-  }
-
-  const [products, total] = await Promise.all([
-    prisma.product.findMany({ where, select: productCardSelect, skip, take: PAGE_SIZE, orderBy }),
-    prisma.product.count({ where }),
+  const [rangesByProductId, variantInfosByProductId] = await Promise.all([
+    isPriceSort ? getPriceRangesByProductIds(candidateIds) : Promise.resolve(undefined),
+    getVariantInfosByProductIds(candidateIds),
   ]);
 
-  const mapped = await mapProductCards(products);
+  let allowedIds = candidateIds;
+  if (hasAvailabilityFilter || hasDeliveryModeFilter || hasPurchasableSizeFilter) {
+    allowedIds = candidateIds.filter((id) =>
+      productMatchesCatalogFilters(variantInfosByProductId.get(id) ?? [], {
+        availability:
+          filters.availability === "AVAILABLE" || filters.availability === "OUT_OF_STOCK"
+            ? filters.availability
+            : undefined,
+        deliveryMode: filters.deliveryMode,
+        sizeCode: filters.size,
+      }),
+    );
+  }
+
+  if (isPriceSort && rangesByProductId) {
+    const dir = filters.sort === "price-asc" ? 1 : -1;
+    allowedIds = [...allowedIds].sort((a, b) => {
+      const priceA = rangesByProductId.get(a)?.min ?? 0;
+      const priceB = rangesByProductId.get(b)?.min ?? 0;
+      return (priceA - priceB) * dir;
+    });
+  }
+
+  allowedIds = sortPurchasableFirst(allowedIds, (id) =>
+    isSoldOutListing(variantInfosByProductId.get(id) ?? []),
+  );
+
+  const total = allowedIds.length;
+  const pageIds = allowedIds.slice(skip, skip + PAGE_SIZE);
+  const products =
+    pageIds.length > 0
+      ? await prisma.product.findMany({
+          where: { id: { in: pageIds } },
+          select: productCardSelect,
+        })
+      : [];
+  const productsById = new Map(products.map((product) => [product.id, product]));
+  const ordered = pageIds
+    .map((id) => productsById.get(id))
+    .filter((product): product is NonNullable<typeof product> => product !== undefined);
+  const mapped = await mapProductCards(ordered, {
+    rangesByProductId,
+    variantInfosByProductId,
+  });
   return { products: mapped, total, page, totalPages: Math.ceil(total / PAGE_SIZE) };
 }
 
@@ -196,28 +185,32 @@ export async function getRelatedProducts(
   const candidates = await prisma.product.findMany({
     where: { isActive: true, productKind: { not: "MYSTERY_BOX" }, id: { not: product.id }, OR: or },
     select: productCardSelect,
-    take: limit * 3,
     orderBy: { createdAt: "desc" },
   });
 
-  const ordered = candidates.sort((a, b) => {
-    const aSameTeam = a.team.id === product.team.id ? 0 : 1;
-    const bSameTeam = b.team.id === product.team.id ? 0 : 1;
-    return aSameTeam - bSameTeam;
-  });
-  const mapped = await mapProductCards(ordered.slice(0, limit));
-  return mapped;
+  const mapped = await mapProductCards(candidates);
+  return mapped
+    .map((card, index) => ({ card, index }))
+    .sort((a, b) => {
+      const soldOutA = a.card.availability === "OUT_OF_STOCK" ? 1 : 0;
+      const soldOutB = b.card.availability === "OUT_OF_STOCK" ? 1 : 0;
+      const otherTeamA = a.card.team.id === product.team.id ? 0 : 1;
+      const otherTeamB = b.card.team.id === product.team.id ? 0 : 1;
+      return soldOutA - soldOutB || otherTeamA - otherTeamB || a.index - b.index;
+    })
+    .slice(0, limit)
+    .map(({ card }) => card);
 }
 
 export async function getFeaturedProducts(limit = 8): Promise<ProductCardData[]> {
   const products = await prisma.product.findMany({
     where: { isFeatured: true, isActive: true },
     select: productCardSelect,
-    take: limit,
     orderBy: { createdAt: "desc" },
   });
 
-  return mapProductCards(products);
+  const mapped = await mapProductCards(products);
+  return sortPurchasableFirst(mapped, (card) => card.availability === "OUT_OF_STOCK").slice(0, limit);
 }
 
 export async function computeStock(variantId: string): Promise<number> {

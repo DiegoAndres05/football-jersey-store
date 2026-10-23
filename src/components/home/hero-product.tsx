@@ -20,7 +20,7 @@ export function HeroProduct({ product }: { product: ProductCardData | null }) {
           alt=""
           fill
           priority
-          sizes="(max-width: 1024px) 90vw, 45vw"
+          sizes="(max-width: 639px) 22rem, (max-width: 1024px) 28rem, 45vw"
           className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
         />
       ) : image ? (
@@ -29,7 +29,7 @@ export function HeroProduct({ product }: { product: ProductCardData | null }) {
           alt={image.altText ?? "Camisetas Flashsport"}
           fill
           priority
-          sizes="(max-width: 1024px) 90vw, 45vw"
+          sizes="(max-width: 639px) 22rem, (max-width: 1024px) 28rem, 45vw"
           className="object-cover"
         />
       ) : (

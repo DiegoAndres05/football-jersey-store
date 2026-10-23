@@ -414,10 +414,20 @@ async function writeStockTargets(
   if (data.length > 0) await prisma.inventoryMovement.createMany({ data });
 }
 
-async function applyInitialStock(productId: string, versionId: string, sizeId: string, target: number | null) {
+async function applyInitialStock(
+  productId: string,
+  versionId: string,
+  sizeId: string | string[],
+  target: number | null,
+) {
   if (target === null || target === 0) return;
+  const sizeFilter = sizeId === "__ALL__"
+    ? {}
+    : Array.isArray(sizeId)
+      ? { sizeId: { in: sizeId } }
+      : { sizeId };
   const variants = await prisma.productVariant.findMany({
-    where: { productId, versionId, ...(sizeId === "__ALL__" ? {} : { sizeId }) },
+    where: { productId, versionId, ...sizeFilter },
     select: { id: true },
   });
   if (variants.length === 0) return;
@@ -523,6 +533,75 @@ export async function createVariantAction(productId: string, formData: FormData)
   });
   await applyInitialStock(product.id, version.id, parsed.data.sizeId, initialStock);
   redirect(`/admin/productos/${product.slug}/variantes`);
+}
+
+export async function assignSizesToAllProductsAction(formData: FormData) {
+  await requireAdmin();
+  const versionId = formData.get("versionId");
+  const sizeIds = [...new Set(
+    formData.getAll("sizeId").filter((value): value is string => typeof value === "string" && value.length > 0),
+  )];
+  if (typeof versionId !== "string" || versionId.length === 0) throw new Error("Selecciona la versión.");
+  if (sizeIds.length === 0) throw new Error("Elige al menos una talla.");
+
+  const parsed = variantSchema.omit({ versionId: true, sizeId: true }).safeParse({
+    costPrice: formData.get("costPrice") ?? "0",
+    salePrice: formData.get("salePrice"),
+    compareAtPrice: cleanNullable(formData.get("compareAtPrice")),
+    lowStockAt: cleanNullable(formData.get("lowStockAt")),
+    weight: formData.get("weight") ?? "400",
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+  const initialStock = readTargetStock(formData.get("initialStock"), false);
+
+  const version = await prisma.version.findUnique({ where: { id: versionId }, select: { id: true, slug: true } });
+  if (!version) throw new Error("La versión seleccionada no existe.");
+  const sizes = await prisma.size.findMany({
+    where: { id: { in: sizeIds } },
+    orderBy: { position: "asc" },
+    select: { id: true, code: true },
+  });
+  if (sizes.length === 0) throw new Error("Las tallas seleccionadas no existen.");
+
+  const products = await prisma.product.findMany({
+    where: { productKind: { not: "MYSTERY_BOX" } },
+    select: { id: true, slug: true },
+  });
+  if (products.length === 0) throw new Error("No hay camisetas para asignar tallas.");
+
+  const existing = await prisma.productVariant.findMany({
+    where: { versionId: version.id, sizeId: { in: sizes.map((size) => size.id) } },
+    select: { productId: true, sizeId: true },
+  });
+  const existingKeys = new Set(existing.map((variant) => `${variant.productId}:${variant.sizeId}`));
+
+  for (const product of products) {
+    await createVariantsForAllSizes(product, version, sizes, {
+      costPrice: parsed.data.costPrice,
+      salePrice: parsed.data.salePrice,
+      compareAtPrice: parsed.data.compareAtPrice ?? null,
+      lowStockAt: parsed.data.lowStockAt ?? null,
+      weight: parsed.data.weight,
+    });
+  }
+
+  const created = await prisma.productVariant.findMany({
+    where: { versionId: version.id, sizeId: { in: sizes.map((size) => size.id) } },
+    select: { id: true, productId: true, sizeId: true },
+  });
+  const fresh = created.filter((variant) => !existingKeys.has(`${variant.productId}:${variant.sizeId}`));
+  if (initialStock !== null && initialStock > 0 && fresh.length > 0) {
+    await writeStockTargets(
+      fresh.map((variant) => ({ id: variant.id, stock: 0 })),
+      initialStock,
+      "Cantidad inicial al asignar tallas a todas las camisetas",
+    );
+  }
+
+  revalidatePath("/admin/productos");
+  revalidatePath("/productos");
+  revalidatePath("/");
+  redirect(`/admin/productos?tallas=${fresh.length}`);
 }
 
 export async function setProductStockAction(productId: string, formData: FormData) {

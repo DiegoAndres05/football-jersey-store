@@ -141,7 +141,7 @@ export default async function HomePage() {
           </div>
 
           {/* Fotografía de producto */}
-          <div className="lg:col-span-6">
+          <div className="mx-auto w-[92%] max-w-[22rem] sm:w-full sm:max-w-[28rem] lg:col-span-6 lg:mx-0 lg:max-w-none">
             <HeroProduct product={heroProduct} />
           </div>
         </div>

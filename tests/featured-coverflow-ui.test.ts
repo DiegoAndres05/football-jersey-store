@@ -144,10 +144,12 @@ test("coverflow renders a single slide instead of returning null", () => {
   assert.doesNotMatch(source, /primaryImage/);
 });
 
-test("mobile shows a single full card without coverflow", () => {
+test("coverflow is the layout on mobile and desktop", () => {
   const source = readComponent();
-  assert.match(source, /lg:hidden/);
-  assert.match(source, /hidden lg:block|lg:block/);
+  assert.match(source, /--cover-shift/);
+  assert.match(source, /translateX\(calc\(var\(--cover-shift\)/);
+  assert.match(source, /rotateY/);
+  assert.doesNotMatch(source, /lg:hidden/);
   assert.match(source, /line-clamp-2/);
 });
 
@@ -200,7 +202,7 @@ test("tilt is gated to active desktop slide without scale3d", () => {
 test("010 controls and 009 slide source remain intact", () => {
   const source = readComponent();
   const page = readPage();
-  assert.match(source, /lg:hidden/);
+  assert.match(source, /--cover-shift/);
   assert.match(source, /h-11 w-11/);
   assert.match(source, /aria-current/);
   assert.match(source, /Pausar/);
@@ -219,9 +221,4 @@ test("010 controls and 009 slide source remain intact", () => {
 test("active slide gets CTA; peeks pass showCta false or isActive gate", () => {
   const source = readComponent();
   assert.match(source, /showCta=\{isActive\}/);
-  assert.match(source, /showCta(?:\s*\/>|\s+)/);
-  assert.ok(
-    /showCta\s*\/>/.test(source) || /showCta=\{true\}/.test(source),
-    "Mobile active card should enable showCta",
-  );
 });

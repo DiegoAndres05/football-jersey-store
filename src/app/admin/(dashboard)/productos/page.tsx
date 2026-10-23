@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { ImageIcon, ArrowRight } from "lucide-react";
 import {
+  assignSizesToAllProductsAction,
   createProductAction,
   updateAllProductsAction,
 } from "@/features/catalog/server/catalog-actions";
@@ -11,7 +12,7 @@ import { ProductVisibilityButton } from "@/features/catalog/components/product-v
 import { ActivateAllProductsButton } from "@/features/catalog/components/activate-all-products-button";
 import { AdminPendingNotice, AdminSubmitButton } from "@/features/catalog/components/admin-form-status";
 import { KIT_TYPES } from "@/features/catalog/types/kit-types";
-import { getTeams, getSeasons } from "@/features/catalog/server/reference-cache";
+import { getTeams, getSeasons, getVersions, getSizes } from "@/features/catalog/server/reference-cache";
 import { HomepageCarouselPicker } from "@/features/products/components/homepage-carousel-picker";
 import {
   getHomepageCarouselImageIds,
@@ -23,8 +24,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function AdminProductsPage() {
-  const [products, teams, seasons, carouselPhotos, selectedCarouselIds] = await Promise.all([
+export default async function AdminProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tallas?: string }>;
+}) {
+  const assignedSizes = Number((await searchParams).tallas);
+  const [products, teams, seasons, versions, sizes, carouselPhotos, selectedCarouselIds] = await Promise.all([
     prisma.product.findMany({
       orderBy: { name: "asc" },
       include: {
@@ -34,6 +40,8 @@ export default async function AdminProductsPage() {
     }),
     getTeams(),
     getSeasons(),
+    getVersions(),
+    getSizes(),
     listEligibleCarouselPhotos(),
     getHomepageCarouselImageIds(),
   ]);
@@ -176,6 +184,72 @@ export default async function AdminProductsPage() {
           />
           <AdminSubmitButton label="Crear" pendingLabel="Creando…" className="rounded-xl bg-primary px-4 h-10 text-sm font-medium text-primary-foreground hover:bg-[hsl(var(--primary-hover))] disabled:opacity-60" />
         </div>
+      </form>
+
+      <form action={assignSizesToAllProductsAction} className="space-y-4 rounded-xl border border-border bg-card p-5">
+        <AdminPendingNotice label="Asignando las tallas" />
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Tallas para todas las camisetas
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Asigna las mismas tallas a todo el catálogo, sin abrir cada camiseta. Si una camiseta ya tiene esa talla en la versión elegida, se deja como está.
+          </p>
+        </div>
+        {Number.isInteger(assignedSizes) && assignedSizes >= 0 && (
+          <p className="rounded-lg bg-secondary px-3 py-2 text-sm" role="status">
+            {assignedSizes === 0
+              ? "Todas las camisetas ya tenían esas tallas."
+              : `Se agregaron ${assignedSizes} tallas. Las que ya existían no se modificaron.`}
+          </p>
+        )}
+        {sizes.length === 0 || versions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Primero crea versiones y tallas en el menú del panel.
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="text-xs text-muted-foreground">
+                Versión
+                <select name="versionId" required defaultValue="" className={fieldClass}>
+                  <option value="" disabled>Versión…</option>
+                  {versions.map((version) => (
+                    <option key={version.id} value={version.id}>{version.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Precio de venta
+                <input name="salePrice" type="number" min={1} required placeholder="COP" className={fieldClass} />
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Precio tachado
+                <input name="compareAtPrice" type="number" min={0} placeholder="Opcional" className={fieldClass} />
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Cantidad inicial
+                <input name="initialStock" type="number" min={0} placeholder="Opcional" className={fieldClass} />
+              </label>
+            </div>
+            <fieldset>
+              <legend className="text-xs text-muted-foreground">Tallas</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {sizes.map((size) => (
+                  <label key={size.id} className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-border px-3 text-sm">
+                    <input name="sizeId" type="checkbox" value={size.id} defaultChecked className="h-4 w-4 accent-primary" />
+                    {size.name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <AdminSubmitButton
+              label="Asignar a todas"
+              pendingLabel="Asignando…"
+              className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-[hsl(var(--primary-hover))] disabled:opacity-60"
+            />
+          </>
+        )}
       </form>
 
       <form action={updateAllProductsAction} className="space-y-4">
