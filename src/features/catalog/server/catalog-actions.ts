@@ -14,7 +14,8 @@ import {
 import { deleteProductIfAllowed } from "@/features/catalog/server/product-delete";
 import { deleteVariantIfAllowed } from "@/features/catalog/server/variant-delete";
 import { setProductActiveIfExists } from "@/features/catalog/server/product-visibility";
-import { saveError, type AdminSaveResult } from "@/shared/admin/admin-save-result";
+import { stockAdjustment } from "@/features/catalog/domain/stock-target";
+import { saveError, saveSuccess, type AdminSaveResult } from "@/shared/admin/admin-save-result";
 
 /**
  * CRUD de catálogo (FASE 4). Solo admin (cookie firmada).
@@ -368,6 +369,73 @@ export async function setProductActiveAction(
   return result;
 }
 
+export async function activateAllProductsAction(): Promise<AdminSaveResult> {
+  const admin = await getSessionUser();
+  if (!admin) return saveError("No autorizado.");
+  try {
+    await prisma.product.updateMany({ where: { isActive: false }, data: { isActive: true } });
+    revalidatePath("/admin/productos");
+    revalidatePath("/productos");
+    revalidatePath("/");
+    return saveSuccess();
+  } catch {
+    return saveError("No se pudieron mostrar los productos. Intenta de nuevo.");
+  }
+}
+
+function readTargetStock(value: FormDataEntryValue | null, required: boolean): number | null {
+  if (typeof value !== "string" || value.trim() === "") {
+    if (required) throw new Error("Escribe la cantidad.");
+    return null;
+  }
+  const parsed = z.coerce.number().int().min(0).max(100000).safeParse(value);
+  if (!parsed.success) throw new Error("La cantidad debe ser un entero entre 0 y 100.000.");
+  return parsed.data;
+}
+
+async function writeStockTargets(
+  variants: { id: string; stock: number }[],
+  target: number,
+  reason: string,
+) {
+  const admin = (await prisma.user.findFirst({ where: { role: "ADMIN" }, select: { email: true } }))?.email ?? null;
+  const data = variants.flatMap((variant) => {
+    const quantity = stockAdjustment(variant.stock, target);
+    if (quantity === null) return [];
+    return [{
+      variantId: variant.id,
+      type: "ADJUSTMENT",
+      quantity,
+      adjustmentDirection: quantity > 0 ? "INCREMENT" : "DECREMENT",
+      reason,
+      userReference: admin,
+    }];
+  });
+  if (data.length > 0) await prisma.inventoryMovement.createMany({ data });
+}
+
+async function applyInitialStock(productId: string, versionId: string, sizeId: string, target: number | null) {
+  if (target === null || target === 0) return;
+  const variants = await prisma.productVariant.findMany({
+    where: { productId, versionId, ...(sizeId === "__ALL__" ? {} : { sizeId }) },
+    select: { id: true },
+  });
+  if (variants.length === 0) return;
+  const sums = await prisma.inventoryMovement.groupBy({
+    by: ["variantId"],
+    where: { variantId: { in: variants.map((variant) => variant.id) } },
+    _sum: { quantity: true },
+  });
+  const stock = new Map(sums.map((row) => [row.variantId, row._sum.quantity ?? 0]));
+  await writeStockTargets(
+    variants
+      .filter((variant) => (stock.get(variant.id) ?? 0) === 0)
+      .map((variant) => ({ id: variant.id, stock: 0 })),
+    target,
+    "Cantidad inicial al crear las tallas",
+  );
+}
+
 // ---------------- VARIANTES ----------------
 
 const variantSchema = z.object({
@@ -395,6 +463,7 @@ export async function createVariantAction(productId: string, formData: FormData)
     weight: formData.get("weight") ?? "400",
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+  const initialStock = readTargetStock(formData.get("initialStock"), false);
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
@@ -427,6 +496,7 @@ export async function createVariantAction(productId: string, formData: FormData)
       },
     );
 
+    await applyInitialStock(product.id, version.id, "__ALL__", initialStock);
     redirect(`/admin/productos/${product.slug}/variantes`);
   }
 
@@ -451,6 +521,42 @@ export async function createVariantAction(productId: string, formData: FormData)
       weight: parsed.data.weight,
     },
   });
+  await applyInitialStock(product.id, version.id, parsed.data.sizeId, initialStock);
+  redirect(`/admin/productos/${product.slug}/variantes`);
+}
+
+export async function setProductStockAction(productId: string, formData: FormData) {
+  await requireAdmin();
+  const target = readTargetStock(formData.get("quantity"), true);
+  if (target === null) throw new Error("Escribe la cantidad.");
+  const versionValue = formData.get("versionId");
+  const versionId = typeof versionValue === "string" && versionValue.length > 0 ? versionValue : null;
+
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { slug: true },
+  });
+  if (!product) throw new Error("El producto no existe.");
+
+  const variants = await prisma.productVariant.findMany({
+    where: { productId, ...(versionId ? { versionId } : {}) },
+    select: { id: true },
+  });
+  if (variants.length === 0) throw new Error("No hay tallas para aplicar esa cantidad.");
+
+  const sums = await prisma.inventoryMovement.groupBy({
+    by: ["variantId"],
+    where: { variantId: { in: variants.map((variant) => variant.id) } },
+    _sum: { quantity: true },
+  });
+  const stock = new Map(sums.map((row) => [row.variantId, row._sum.quantity ?? 0]));
+  await writeStockTargets(
+    variants.map((variant) => ({ id: variant.id, stock: stock.get(variant.id) ?? 0 })),
+    target,
+    "Cantidad aplicada a todas las tallas",
+  );
+  revalidatePath(`/admin/productos/${product.slug}/variantes`);
+  revalidatePath("/productos");
   redirect(`/admin/productos/${product.slug}/variantes`);
 }
 

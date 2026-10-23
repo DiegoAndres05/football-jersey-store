@@ -41,3 +41,19 @@ export function displayedCompareAtPrice(input: {
 function positivePrice(price: number | null | undefined): number | null {
   return typeof price === "number" && price > 0 ? Math.trunc(price) : null;
 }
+
+/** Oferta de la tarjeta: el tachado de la variante cuyo precio de venta es el «Desde». */
+export function listingCompareAtPrice(input: {
+  salePrice: number;
+  compareAtPrices: Array<number | null | undefined>;
+}): { compareAtPrice: number; discountPercent: number } | null {
+  const compareAt = input.compareAtPrices
+    .map(positivePrice)
+    .filter((price): price is number => price !== null && price > input.salePrice)
+    .sort((a, b) => b - a)[0];
+  if (!compareAt) return null;
+  return {
+    compareAtPrice: compareAt,
+    discountPercent: Math.round((1 - input.salePrice / compareAt) * 100),
+  };
+}

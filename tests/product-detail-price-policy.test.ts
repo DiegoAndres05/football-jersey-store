@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deriveProductDisplayPrice, displayedCompareAtPrice } from "../src/features/products/domain/product-price-display";
+import { deriveProductDisplayPrice, displayedCompareAtPrice, listingCompareAtPrice } from "../src/features/products/domain/product-price-display";
 
 test("detail sold-out state is non-zero or hidden", () => {
   for (const lastValidProductPrice of [250000, null, 0, -1]) {
@@ -53,4 +53,17 @@ test("con talla elegida solo cuenta el tachado de esa variante", () => {
     }),
     310000,
   );
+});
+
+test("la tarjeta muestra el tachado de la variante que se vende como desde", () => {
+  const offer = listingCompareAtPrice({
+    salePrice: 95000,
+    compareAtPrices: [149999, null, 90000],
+  });
+  assert.equal(offer?.compareAtPrice, 149999);
+  assert.equal(offer?.discountPercent, 37);
+});
+
+test("la tarjeta no muestra tachado si no hay oferta", () => {
+  assert.equal(listingCompareAtPrice({ salePrice: 95000, compareAtPrices: [95000, null] }), null);
 });

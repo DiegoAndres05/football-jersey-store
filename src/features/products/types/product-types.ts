@@ -27,6 +27,8 @@ export type ProductCardData = {
   displayPrice: number | null;
   showPrice: boolean;
   statusLabel: "En stock" | "Bajo pedido" | "Agotado";
+  /** Precio tachado de la variante que se muestra como «Desde», si es mayor. */
+  compareAtPrice: number | null;
 };
 
 export type Availability = "AVAILABLE" | "ON_DEMAND" | "OUT_OF_STOCK";

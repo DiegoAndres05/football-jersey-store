@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import type { ProductCardData } from "@/features/products/types/product-types";
 
 /**
@@ -11,13 +12,21 @@ export function HeroProduct({ product }: { product: ProductCardData | null }) {
   const image = product?.primaryImage;
   const seasonYear = product?.season.name.replace(/^temporada\s*/i, "");
 
-  return (
-    <div className="hero-jersey-float">
+  const card = (
       <div className="hero-jersey-card relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-border bg-secondary shadow-[0_20px_50px_-24px_rgba(0,0,0,0.18)]">
-      {image ? (
+      {image && product ? (
         <Image
           src={image.url}
-          alt={image.altText ?? `${product?.name ?? "Camisetas"} de ${product?.team.name ?? "Flashsport"}`}
+          alt=""
+          fill
+          priority
+          sizes="(max-width: 1024px) 90vw, 45vw"
+          className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+        />
+      ) : image ? (
+        <Image
+          src={image.url}
+          alt={image.altText ?? "Camisetas Flashsport"}
           fill
           priority
           sizes="(max-width: 1024px) 90vw, 45vw"
@@ -37,6 +46,21 @@ export function HeroProduct({ product }: { product: ProductCardData | null }) {
         Temporada {seasonYear ?? "25/26"}
       </span>
       </div>
+  );
+
+  return (
+    <div className="hero-jersey-float">
+      {product ? (
+        <Link
+          href={`/productos/${product.slug}`}
+          aria-label={`Ver ${product.name}`}
+          className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {card}
+        </Link>
+      ) : (
+        card
+      )}
     </div>
   );
 }

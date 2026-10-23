@@ -13,7 +13,7 @@ import type {
   Availability,
   SortOption,
 } from "../types/product-types";
-import { deriveProductDisplayPrice } from "../domain/product-price-display";
+import { deriveProductDisplayPrice, listingCompareAtPrice } from "../domain/product-price-display";
 import { MYSTERY_BOX_SLUG, mysteryBoxTier } from "../domain/mystery-box";
 
 const productCardSelect = {
@@ -175,6 +175,8 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailData 
     sizePosition: v.size.position,
     versionName: v.version.name,
     versionAdjustment: v.version.priceAdjustment,
+    salePrice: v.salePrice,
+    compareAtPrice: v.compareAtPrice,
   })));
   const lastValidProductPrice = Math.max(0, ...product.variants.map((v) => v.salePrice).filter((p) => p > 0));
   const priceDisplay = deriveProductDisplayPrice({ availability, currentPrice: lastValidProductPrice, lastValidProductPrice });
@@ -405,6 +407,14 @@ async function mapProductCards(
       currentPrice: range.min > 0 ? range.min : null,
       lastValidProductPrice,
     });
+    const offer = priceDisplay.displayPrice
+      ? listingCompareAtPrice({
+          salePrice: priceDisplay.displayPrice,
+          compareAtPrices: infos
+            .filter((info) => info.salePrice === priceDisplay.displayPrice)
+            .map((info) => info.compareAtPrice),
+        })
+      : null;
     return {
       id: p.id,
       slug: p.slug,
@@ -424,6 +434,7 @@ async function mapProductCards(
       canBackorder: infos.some((info) => info.allowsBackorder),
       lastValidProductPrice,
       ...priceDisplay,
+      compareAtPrice: offer?.compareAtPrice ?? null,
     } satisfies ProductCardData;
   });
 }
@@ -478,6 +489,8 @@ type VariantInfo = {
   versionName: string;
   versionAdjustment: number;
   allowsBackorder: boolean;
+  salePrice: number;
+  compareAtPrice: number | null;
 };
 
 async function getVariantInfosByProductIds(productIds: string[]): Promise<Map<string, VariantInfo[]>> {
@@ -489,6 +502,8 @@ async function getVariantInfosByProductIds(productIds: string[]): Promise<Map<st
       productId: true,
       allowsBackorder: true,
       size: { select: { code: true, position: true } },
+      salePrice: true,
+      compareAtPrice: true,
       version: { select: { name: true, priceAdjustment: true } },
     },
   });
@@ -502,6 +517,8 @@ async function getVariantInfosByProductIds(productIds: string[]): Promise<Map<st
       versionName: v.version.name,
       versionAdjustment: v.version.priceAdjustment,
       allowsBackorder: v.allowsBackorder,
+      salePrice: v.salePrice,
+      compareAtPrice: v.compareAtPrice,
     };
     const list = byProduct.get(v.productId) ?? [];
     list.push(info);

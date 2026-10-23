@@ -23,6 +23,13 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
   });
   const isSoldOut = listing === "SOLD_OUT";
   const isBackorderOnly = listing === "BACKORDER_ONLY";
+  const discountPercent =
+    product.showPrice &&
+    product.displayPrice !== null &&
+    product.compareAtPrice !== null &&
+    product.compareAtPrice > product.displayPrice
+      ? Math.round((1 - product.displayPrice / product.compareAtPrice) * 100)
+      : null;
 
   const formatPrice = (amountCop: number) =>
     formatMoney({
@@ -58,6 +65,9 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           {isOutlet && (
             <Badge tone="warning" size="sm">Retro</Badge>
+          )}
+          {discountPercent !== null && discountPercent > 0 && (
+            <Badge tone="primary" size="sm">−{discountPercent}%</Badge>
           )}
         </div>
         <button type="button" aria-label={favorite ? `Quitar ${product.name} de favoritos` : `Guardar ${product.name} en favoritos`} aria-pressed={favorite} onClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleFavorite({ productId: product.id, slug: product.slug }); }} className="absolute right-1 top-1 inline-flex h-11 w-11 items-center justify-center rounded-full bg-background/90 shadow-sm hover:bg-background"><Heart className={`h-4 w-4 ${favorite ? "fill-current text-red-600" : ""}`} /></button>
@@ -106,7 +116,14 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
           {product.showPrice && product.displayPrice !== null && (
           <div className="mt-2 flex w-full min-w-0 flex-col items-start gap-0.5 overflow-hidden">
             {!isSoldOut && <span className="text-sm text-muted-foreground">Desde</span>}
-            <span className="max-w-full break-words text-base font-bold">{formatPrice(product.displayPrice)}</span>
+            <span className="flex max-w-full flex-wrap items-baseline gap-x-2">
+              <span className="break-words text-base font-bold">{formatPrice(product.displayPrice)}</span>
+              {discountPercent !== null && product.compareAtPrice !== null && (
+                <span className="break-words text-xs text-muted-foreground line-through">
+                  {formatPrice(product.compareAtPrice)}
+                </span>
+              )}
+            </span>
             {!isSoldOut && product.maxPrice > product.minPrice && (
               <span className="max-w-full break-words text-xs leading-relaxed text-muted-foreground">
                 Hasta {formatPrice(product.maxPrice)}

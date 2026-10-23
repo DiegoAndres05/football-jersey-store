@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProductDetailLoading() {
   return (
-    <div className="container-page py-8">
+    <div className="container-page py-8" role="status" aria-label="Cargando la camiseta">
       <Skeleton variant="text" className="h-4 w-48 mb-6" />
 
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
