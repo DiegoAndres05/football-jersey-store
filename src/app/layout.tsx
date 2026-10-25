@@ -5,7 +5,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { SITE } from "@/shared/config/site";
 import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
 import { SITE_KEYWORDS } from "@/features/seo/domain/keywords";
-import { resolvePublicOrigin } from "@/shared/config/public-origin";
+import { publicHomeUrl, resolvePublicOrigin } from "@/shared/config/public-origin";
 import "./globals.css";
 
 const inter = localFont({
@@ -89,7 +89,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         "@type": "WebSite",
         "@id": `${siteUrl}/#website`,
         name: SITE.name,
-        url: siteUrl,
+        url: publicHomeUrl(),
         publisher: { "@id": `${siteUrl}/#organization` },
         potentialAction: {
           "@type": "SearchAction",

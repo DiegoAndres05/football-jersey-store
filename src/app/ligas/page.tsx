@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, ArrowRight } from "lucide-react";
 import { getLeagues, getTeamsByLeague } from "@/features/products/repositories/product-repository";
+import { formatCatalogStockLabel } from "@/features/products/domain/catalog-stock-label";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE } from "@/features/seo/domain/robots-policy";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
@@ -74,9 +75,11 @@ export default async function LigasPage() {
                 </div>
 
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {league.productCount > 0
-                    ? `${league.productCount} producto${league.productCount !== 1 ? "s" : ""} disponible${league.productCount !== 1 ? "s" : ""}`
-                    : "Próximamente"}
+                  {formatCatalogStockLabel({
+                    total: league.productCount,
+                    purchasable: league.purchasableCount,
+                    soldOut: league.soldOutCount,
+                  })}
                 </p>
 
                 {league.productCount === 0 ? (

@@ -52,3 +52,8 @@ export function resolvePublicOrigin(): string {
   // Normalize: strip trailing slash
   return url.origin;
 }
+
+/** Home canónica. La raíz del sitio siempre se sirve con barra final. */
+export function publicHomeUrl(): string {
+  return `${resolvePublicOrigin()}/`;
+}

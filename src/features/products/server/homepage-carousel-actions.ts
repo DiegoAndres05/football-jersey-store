@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicCatalog } from "@/shared/cache/invalidate-public-store";
 import { z } from "zod";
 import { getSessionUser } from "@/features/auth/server/session";
 import { HOMEPAGE_CAROUSEL_MAX } from "@/features/products/domain/homepage-carousel-slides";
@@ -40,6 +41,7 @@ export async function saveHomepageCarouselAction(
     await saveHomepageCarouselImageIds(unique);
     revalidatePath("/");
     revalidatePath("/admin/productos");
+    invalidatePublicCatalog();
     return saveSuccess();
   } catch {
     return saveError("No se pudo guardar el carrusel. Intenta de nuevo.");

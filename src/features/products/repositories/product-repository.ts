@@ -1,5 +1,7 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { PUBLIC_CATALOG_TAG, PUBLIC_READ_REVALIDATE_SECONDS } from "@/shared/cache/public-store";
 import { buildProductWhere } from "./product-where";
 import { productMatchesCatalogFilters } from "../domain/catalog-filter-match";
 import { isSoldOutListing, sortPurchasableFirst } from "../domain/catalog-listing-order";
@@ -45,7 +47,17 @@ const productCardSelect = {
 
 const PAGE_SIZE = 24;
 
-export async function getProducts(filters: ProductFilters): Promise<ProductListResult> {
+function cacheCatalog<Args extends unknown[], Result>(
+  fn: (...args: Args) => Promise<Result>,
+  key: string,
+) {
+  return unstable_cache(fn, [key], {
+    revalidate: PUBLIC_READ_REVALIDATE_SECONDS,
+    tags: [PUBLIC_CATALOG_TAG],
+  });
+}
+
+async function loadProducts(filters: ProductFilters): Promise<ProductListResult> {
   const page = Math.max(1, filters.page ?? 1);
   const skip = (page - 1) * PAGE_SIZE;
 
@@ -114,7 +126,9 @@ export async function getProducts(filters: ProductFilters): Promise<ProductListR
   return { products: mapped, total, page, totalPages: Math.ceil(total / PAGE_SIZE) };
 }
 
-export async function getProductBySlug(slug: string): Promise<ProductDetailData | null> {
+export const getProducts = cacheCatalog(loadProducts, "public-products-v1");
+
+async function loadProductBySlug(slug: string): Promise<ProductDetailData | null> {
   const product = await prisma.product.findUnique({
     where: { slug, isActive: true },
     include: {
@@ -173,6 +187,8 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailData 
   return { ...product, players, variants: variantsWithStock, lastValidProductPrice, ...priceDisplay };
 }
 
+export const getProductBySlug = cacheCatalog(loadProductBySlug, "public-product-by-slug-v1");
+
 export async function getRelatedProducts(
   product: Pick<ProductDetailData, "id" | "team">,
   limit = 4,
@@ -202,7 +218,7 @@ export async function getRelatedProducts(
     .map(({ card }) => card);
 }
 
-export async function getFeaturedProducts(limit = 8): Promise<ProductCardData[]> {
+async function loadFeaturedProducts(limit = 8): Promise<ProductCardData[]> {
   const products = await prisma.product.findMany({
     where: { isFeatured: true, isActive: true },
     select: productCardSelect,
@@ -212,6 +228,8 @@ export async function getFeaturedProducts(limit = 8): Promise<ProductCardData[]>
   const mapped = await mapProductCards(products);
   return sortPurchasableFirst(mapped, (card) => card.availability === "OUT_OF_STOCK").slice(0, limit);
 }
+
+export const getFeaturedProducts = cacheCatalog(loadFeaturedProducts, "public-featured-products-v1");
 
 export async function computeStock(variantId: string): Promise<number> {
   const result = await prisma.inventoryMovement.aggregate({
@@ -231,34 +249,49 @@ export function computeAvailability(
   return "OUT_OF_STOCK";
 }
 
-export async function getLeagues(): Promise<LeagueData[]> {
+async function loadLeagues(): Promise<LeagueData[]> {
   const leagues = await prisma.league.findMany({
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      country: true,
-      teams: {
-        select: {
-          products: { where: { isActive: true }, select: { id: true } },
-        },
-      },
-    },
+    where: { slug: { not: "interno" } },
+    select: { id: true, slug: true, name: true, country: true },
     orderBy: { name: "asc" },
   });
+  const products = await prisma.product.findMany({
+    where: {
+      isActive: true,
+      productKind: { not: "MYSTERY_BOX" },
+      team: { league: { slug: { not: "interno" } } },
+    },
+    select: { id: true, team: { select: { leagueId: true } } },
+  });
+  const infos = await getVariantInfosByProductIds(products.map((product) => product.id));
+  const byLeague = new Map<string, { total: number; soldOut: number }>();
+  for (const product of products) {
+    const leagueId = product.team.leagueId;
+    const bucket = byLeague.get(leagueId) ?? { total: 0, soldOut: 0 };
+    bucket.total += 1;
+    if (availabilityFromVariantInfos(infos.get(product.id) ?? []) === "OUT_OF_STOCK") {
+      bucket.soldOut += 1;
+    }
+    byLeague.set(leagueId, bucket);
+  }
 
-  return leagues
-    .filter((l) => l.slug !== "interno")
-    .map((l) => ({
-      id: l.id,
-      slug: l.slug,
-      name: l.name,
-      country: l.country,
-      productCount: l.teams.reduce((acc, t) => acc + t.products.length, 0),
-    }));
+  return leagues.map((league) => {
+    const bucket = byLeague.get(league.id) ?? { total: 0, soldOut: 0 };
+    return {
+      id: league.id,
+      slug: league.slug,
+      name: league.name,
+      country: league.country,
+      productCount: bucket.total,
+      purchasableCount: bucket.total - bucket.soldOut,
+      soldOutCount: bucket.soldOut,
+    };
+  });
 }
 
-export async function getTeamsByLeague(leagueSlug?: string): Promise<TeamData[]> {
+export const getLeagues = cacheCatalog(loadLeagues, "public-leagues-v2");
+
+async function loadTeamsByLeague(leagueSlug?: string): Promise<TeamData[]> {
   const where: Prisma.TeamWhereInput = {};
   if (leagueSlug) {
     const leagueSlugs = leagueSlug.split(",").filter(Boolean);
@@ -278,7 +311,9 @@ export async function getTeamsByLeague(leagueSlug?: string): Promise<TeamData[]>
   return teams;
 }
 
-export async function getLeagueBySlug(slug: string) {
+export const getTeamsByLeague = cacheCatalog(loadTeamsByLeague, "public-teams-by-league-v1");
+
+async function loadLeagueBySlug(slug: string) {
   const league = await prisma.league.findUnique({
     where: { slug },
     include: {
@@ -291,25 +326,35 @@ export async function getLeagueBySlug(slug: string) {
     },
   });
   if (!league) return null;
-  const activeProducts = await prisma.product.count({
-    where: { isActive: true, productKind: { not: "MYSTERY_BOX" }, team: { leagueId: league.id } },
-  });
-  if (activeProducts === 0) return null;
-  return { ...league, activeProducts };
+  const counts = await countCatalogProducts({ team: { leagueId: league.id } });
+  if (counts.total === 0) return null;
+  return {
+    ...league,
+    activeProducts: counts.total,
+    purchasableCount: counts.purchasable,
+    soldOutCount: counts.soldOut,
+  };
 }
 
-export async function getTeamBySlug(slug: string) {
+export const getLeagueBySlug = cacheCatalog(loadLeagueBySlug, "public-league-by-slug-v2");
+
+async function loadTeamBySlug(slug: string) {
   const team = await prisma.team.findUnique({
     where: { slug },
     include: { league: true },
   });
   if (!team) return null;
-  const activeProducts = await prisma.product.count({
-    where: { isActive: true, productKind: { not: "MYSTERY_BOX" }, teamId: team.id },
-  });
-  if (activeProducts === 0) return null;
-  return { ...team, activeProducts };
+  const counts = await countCatalogProducts({ teamId: team.id });
+  if (counts.total === 0) return null;
+  return {
+    ...team,
+    activeProducts: counts.total,
+    purchasableCount: counts.purchasable,
+    soldOutCount: counts.soldOut,
+  };
 }
+
+export const getTeamBySlug = cacheCatalog(loadTeamBySlug, "public-team-by-slug-v2");
 
 export async function getProductsByLeague(leagueId: string, limit = 50) {
   return prisma.product.findMany({
@@ -329,19 +374,64 @@ export async function getProductsByTeam(teamId: string, limit = 50) {
   });
 }
 
-export async function getSeasons() {
+async function loadSeasons() {
   return prisma.season.findMany({
     where: { slug: { not: "interno-caja-misteriosa" } },
     orderBy: { year: "desc" },
   });
 }
 
-export async function getVersions() {
+async function loadVersions() {
   return prisma.version.findMany({ orderBy: { priceAdjustment: "asc" } });
 }
 
-export async function getSizes() {
+async function loadSizes() {
   return prisma.size.findMany({ orderBy: { position: "asc" } });
+}
+
+export const getSeasons = cacheCatalog(loadSeasons, "public-seasons-v1");
+export const getVersions = cacheCatalog(loadVersions, "public-versions-v1");
+export const getSizes = cacheCatalog(loadSizes, "public-sizes-v1");
+
+/** Misma regla que las fichas: hay stock en alguna talla, o alguna admite bajo pedido. */
+async function countCatalogProducts(where: Prisma.ProductWhereInput) {
+  const products = await prisma.product.findMany({
+    where: { isActive: true, productKind: { not: "MYSTERY_BOX" }, ...where },
+    select: { id: true },
+  });
+  const infos = await getVariantInfosByProductIds(products.map((product) => product.id));
+  let soldOut = 0;
+  for (const product of products) {
+    if (availabilityFromVariantInfos(infos.get(product.id) ?? []) === "OUT_OF_STOCK") soldOut += 1;
+  }
+  return { total: products.length, purchasable: products.length - soldOut, soldOut };
+}
+
+export async function getActiveProductCardsByIds(ids: string[]): Promise<ProductCardData[]> {
+  const unique = [...new Set(ids.filter((id) => id.length > 0 && id.length <= 80))].slice(0, 12);
+  if (unique.length === 0) return [];
+  const products = await prisma.product.findMany({
+    where: { id: { in: unique }, isActive: true },
+    select: productCardSelect,
+  });
+  return mapProductCards(products);
+}
+
+export async function getPrimaryImageUrlBySlug(slug: string): Promise<string | null> {
+  const clean = slug.trim();
+  if (!clean || clean.length > 200) return null;
+  const product = await prisma.product.findFirst({
+    where: { slug: clean, isActive: true },
+    select: {
+      images: {
+        where: { url: { not: "" } },
+        orderBy: [{ isPrimary: "desc" }, { order: "asc" }],
+        take: 1,
+        select: { url: true },
+      },
+    },
+  });
+  return product?.images[0]?.url ?? null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -552,7 +642,7 @@ export async function isMysteryBoxInNav(): Promise<boolean> {
   );
 }
 
-export async function getMysteryBoxPage(): Promise<MysteryBoxPageData | null> {
+async function loadMysteryBoxPage(): Promise<MysteryBoxPageData | null> {
   const product = await prisma.product.findFirst({
     where: { slug: MYSTERY_BOX_SLUG, isActive: true, productKind: "MYSTERY_BOX" },
     include: {
@@ -594,3 +684,5 @@ export async function getMysteryBoxPage(): Promise<MysteryBoxPageData | null> {
     variants,
   };
 }
+
+export const getMysteryBoxPage = cacheCatalog(loadMysteryBoxPage, "public-mystery-box-v1");

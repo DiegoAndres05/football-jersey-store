@@ -14,9 +14,9 @@ function SpiderSilhouette() {
 
 export function HeroHalloween() {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden" style={{ opacity: HERO_HALLOWEEN_MOTION.opacity }}>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 overflow-hidden" style={{ opacity: HERO_HALLOWEEN_MOTION.opacity }}>
       <HeroBats />
-      <span data-hero-decoration="spider" className="hero-spider text-foreground">
+      <span data-hero-decoration="spider" className="hero-spider pointer-events-none text-foreground">
         <SpiderSilhouette />
       </span>
     </div>

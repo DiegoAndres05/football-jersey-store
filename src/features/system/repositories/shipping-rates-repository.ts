@@ -1,4 +1,6 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { PUBLIC_READ_REVALIDATE_SECONDS, PUBLIC_SETTINGS_TAG } from "@/shared/cache/public-store";
 import {
   DEFAULT_SHIPPING_RATES,
   parseShippingFee,
@@ -8,7 +10,7 @@ import {
 const NATIONAL_KEY = "shipping_national_fee_cop";
 const INTERNATIONAL_KEY = "shipping_international_fee_cop";
 
-export async function getShippingRates(): Promise<ShippingRates> {
+async function loadShippingRates(): Promise<ShippingRates> {
   try {
     const [national, international] = await Promise.all([
       prisma.setting.findUnique({ where: { key: NATIONAL_KEY } }),
@@ -23,6 +25,11 @@ export async function getShippingRates(): Promise<ShippingRates> {
     return DEFAULT_SHIPPING_RATES;
   }
 }
+
+export const getShippingRates = unstable_cache(loadShippingRates, ["public-shipping-rates-v1"], {
+  revalidate: PUBLIC_READ_REVALIDATE_SECONDS,
+  tags: [PUBLIC_SETTINGS_TAG],
+});
 
 export async function persistShippingRates(rates: ShippingRates): Promise<ShippingRates> {
   await prisma.$transaction([
