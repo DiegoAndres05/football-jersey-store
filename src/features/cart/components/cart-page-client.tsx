@@ -79,6 +79,8 @@ export function CartPageClient({ currencyContext, shippingRates }: { currencyCon
       if (adjustments.length > 0) {
         toast({ title: formatReconcileMessage(adjustments), variant: "warning" });
       }
+    }).catch(() => {
+      if (!cancelled) setStockByVariant(new Map());
     });
     return () => {
       cancelled = true;

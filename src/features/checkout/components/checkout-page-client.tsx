@@ -29,13 +29,21 @@ import {
   type CheckoutFormValues,
 } from "@/features/checkout/schemas/checkout-schema";
 import { buildBoldCheckoutPayload } from "@/features/payments/domain/bold-checkout-attrs";
+import {
+  BOLD_MODAL_OPEN_TIMEOUT_MS,
+  isBoldCheckoutCloseEvent,
+  nextBoldModalPhase,
+  type CheckoutPaymentPhase,
+} from "@/features/payments/domain/bold-modal-session";
 import { CheckoutConsents } from "@/app/checkout/consents";
 import type { LegalConfig } from "@/shared/config/legal";
 import { validateConsents } from "@/features/checkout/validation";
 import { createPaymentIdempotencyKey, readRecoveredCartItems, rememberPaymentRecovery } from "@/features/payments/recovery";
 import { cartUnitCount, cartUnitLabel } from "@/features/cart/domain/cart-units";
+import type { CartItem } from "@/shared/stores/cart-store";
 
 const BOLD_SCRIPT_SRC = "https://checkout.bold.co/library/boldPaymentButton.js";
+const BOLD_CHECKOUT_EVENT = "BOLD_CHECKOUT_EVENT";
 const DESTINATION_COUNTRIES = [
   "Colombia",
   "Estados Unidos",
@@ -64,6 +72,23 @@ function checkoutCurrencyForCountry(
   }
   return { currency: "COP", copPerUsd: currencyContext?.copPerUsd ?? null };
 }
+
+function cartLinesKey(lines: readonly Pick<CartItem, "variantId" | "quantity" | "customizationType" | "customizationName" | "customizationNumber" | "deliveryMode">[]): string {
+  return lines
+    .map((line) => [line.variantId, line.quantity, line.customizationType, line.customizationName, line.customizationNumber, line.deliveryMode].join(":"))
+    .join("|");
+}
+
+type ReservedOrder = {
+  code: string;
+  total: number;
+  paymentAmount: number;
+  saleCurrency: string;
+  bold: { orderId: string; amount: string; currency: string; hash: string; apiKey: string } | null;
+  linesKey: string;
+  items: CartItem[];
+  contact: CheckoutFormValues;
+};
 
 function hasBoldCheckout(): boolean {
   return Boolean((window as Window & { BoldCheckout?: unknown }).BoldCheckout);
@@ -109,7 +134,18 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
   const appliedCouponDiscount = useCartStore((s) => s.couponDiscount);
   const clearCoupon = useCartStore((s) => s.clearCoupon);
   const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
-  const clearCart = useCartStore((s) => s.clear);
+  const boldWatchRef = useRef<number | null>(null);
+  const boldConfigRef = useRef<ReturnType<typeof buildBoldCheckoutPayload> | null>(null);
+  const preparedRef = useRef<ReservedOrder | null>(null);
+  const clearBoldWatchRef = useRef<() => void>(() => {});
+  const [mounted, setMounted] = useState(false);
+  const [step, setStep] = useState<"form" | "payment">("form");
+  const [paymentStatus, setPaymentStatus] = useState<CheckoutPaymentPhase>("idle");
+  const [prepared, setPrepared] = useState<ReservedOrder | null>(null);
+  const [payError, setPayError] = useState("");
+  const formRef = useRef<CheckoutFormValues | null>(null);
+  const paymentKeyRef = useRef<string>("");
+  if (!paymentKeyRef.current) paymentKeyRef.current = createPaymentIdempotencyKey();
 
   useEffect(() => {
     const restore = () => {
@@ -124,28 +160,19 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
       : persist?.onFinishHydration(restore);
     if (!persist || persist.hasHydrated()) restore();
     const onMessage = (event: MessageEvent) => {
-      const allowed = event.origin === "https://checkout.bold.co"
-        || event.origin === "https://stg.checkout.bold.co"
-        || event.origin === "https://qa.checkout.bold.co"
-        || event.origin === window.location.origin;
       const data = event.data as { type?: string } | null;
-      if (!allowed || data?.type !== "BOLD_CHECKOUT_EVENT") return;
+      if (!isBoldCheckoutCloseEvent(event.origin, data, window.location.origin) || data?.type !== BOLD_CHECKOUT_EVENT) return;
       restore();
+      clearBoldWatchRef.current();
+      setPaymentStatus((phase) => phase === "processing" || phase === "preparing" ? nextBoldModalPhase(phase, "closed") : phase);
     };
     window.addEventListener("message", onMessage);
     return () => {
       unsubscribe?.();
       window.removeEventListener("message", onMessage);
+      if (boldWatchRef.current != null) window.clearInterval(boldWatchRef.current);
     };
   }, []);
-
-  const [mounted, setMounted] = useState(false);
-  const [step, setStep] = useState<"form" | "payment">("form");
-  const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
-  const [payError, setPayError] = useState("");
-  const formRef = useRef<CheckoutFormValues | null>(null);
-  const paymentKeyRef = useRef<string>("");
-  if (!paymentKeyRef.current) paymentKeyRef.current = createPaymentIdempotencyKey();
 
   useEffect(() => setMounted(true), []);
   useLayoutEffect(() => {
@@ -170,7 +197,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
       if (adjustments.length > 0) {
         toast({ title: formatReconcileMessage(adjustments), variant: "warning" });
       }
-    });
+    }).catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -244,7 +271,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
   const shippingCountryField = register("shippingCountry");
   const unitLabel = cartUnitLabel(cartUnitCount(items));
 
-  if (mounted && items.length === 0) {
+  if (mounted && items.length === 0 && !prepared) {
     return (
       <div className="container-page py-16">
         <div className="flex flex-col items-center justify-center py-20 text-center rounded-xl border border-dashed border-border bg-card">
@@ -264,6 +291,116 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
     );
   }
 
+  const clearBoldWatch = () => {
+    if (boldWatchRef.current != null) {
+      window.clearInterval(boldWatchRef.current);
+      boldWatchRef.current = null;
+    }
+  };
+  clearBoldWatchRef.current = clearBoldWatch;
+
+  const armBoldWatch = () => {
+    clearBoldWatch();
+    const started = Date.now();
+    let sawFrame = false;
+    boldWatchRef.current = window.setInterval(() => {
+      const frame = document.querySelector("#boldEmbeddedCheckout, bold-embedded-checkout");
+      if (frame) {
+        sawFrame = true;
+        return;
+      }
+      if (sawFrame || Date.now() - started >= BOLD_MODAL_OPEN_TIMEOUT_MS) {
+        clearBoldWatch();
+        setPaymentStatus((phase) => nextBoldModalPhase(phase, sawFrame ? "closed" : "timeout"));
+      }
+    }, 250);
+  };
+
+  const rememberPrepared = (order: ReservedOrder | null) => {
+    preparedRef.current = order;
+    setPrepared(order);
+  };
+
+  const requestBoldHash = async (result: { code: string; paymentAmount: number; saleCurrency: string }) => {
+    const hashRes = await fetch("/api/bold/hash", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId: result.code,
+        amount: result.paymentAmount,
+        currency: result.saleCurrency,
+      }),
+    });
+    const body = await hashRes.json();
+    if (!hashRes.ok) {
+      throw new Error(typeof body.error === "string" ? body.error : "Error al preparar el pago.");
+    }
+    return body as NonNullable<ReservedOrder["bold"]>;
+  };
+
+  const reserveBoldOrder = async (values: CheckoutFormValues): Promise<ReservedOrder | null> => {
+    const boldScript = loadBoldCheckoutScript();
+    boldScript.catch(() => undefined);
+    const current = useCartStore.getState();
+    const ids = [...new Set(current.items.map((item) => item.variantId))];
+    const rows = await getImmediateStockByVariantIds(ids);
+    const stockMap = new Map(rows.map((row) => [row.variantId, row.stock]));
+    const adjustments = current.reconcileWithStock(stockMap);
+    if (adjustments.length > 0) {
+      toast({ title: formatReconcileMessage(adjustments), variant: "warning" });
+      setPaymentStatus("idle");
+      return null;
+    }
+    const lines = useCartStore.getState().items;
+    if (lines.length === 0) {
+      setPaymentStatus("idle");
+      return null;
+    }
+    const result = await submitOrder({
+      form: values,
+      lines: lines.map((i) => ({
+        variantId: i.variantId,
+        quantity: i.quantity,
+        customizationType: i.customizationType,
+        customizationName: i.customizationName,
+        customizationNumber: i.customizationNumber,
+        deliveryMode: i.deliveryMode,
+      })),
+      paymentMethod: "CARD",
+      paymentReference: paymentKeyRef.current,
+      saleCurrency: "COP",
+      couponCode: appliedCouponCode,
+    });
+    if (!result.ok) {
+      setPayError(result.error);
+      if (appliedCouponCode) clearCoupon();
+      setPaymentStatus(preparedRef.current ? "retry" : "failed");
+      return null;
+    }
+    let bold = result.bold ?? null;
+    if (!bold) {
+      try {
+        bold = result.bold ?? (await requestBoldHash(result));
+      } catch (error) {
+        setPayError(error instanceof Error ? error.message : "No pudimos preparar el pago.");
+      }
+    }
+    boldConfigRef.current = null;
+    const reserved: ReservedOrder = {
+      code: result.code,
+      total: result.total,
+      paymentAmount: result.paymentAmount,
+      saleCurrency: result.saleCurrency,
+      bold,
+      linesKey: cartLinesKey(lines),
+      items: lines,
+      contact: values,
+    };
+    rememberPrepared(reserved);
+    rememberPaymentRecovery(result.code, lines);
+    return reserved;
+  };
+
   const onValid = (values: CheckoutFormValues) => {
     const missing = validateConsents({ TERMS: values.consentTerms, PRIVACY: values.consentPrivacy, DATA_PROCESSING: values.consentDataProcessing });
     if (missing.length > 0) {
@@ -274,63 +411,84 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
       return;
     }
     formRef.current = values;
+    setPayError("");
     setStep("payment");
+    const payingWithPayPal = normalizeCountry(values.shippingCountry) !== normalizeCountry(SITE.country);
+    if (payingWithPayPal) {
+      if (!canPayInternational) {
+        setPayError("No pudimos calcular el pago en dólares. Intenta de nuevo.");
+        setPaymentStatus("failed");
+        return;
+      }
+      setPaymentStatus("idle");
+      return;
+    }
+    setPaymentStatus("preparing");
+    void reserveBoldOrder(values).then((order) => {
+      if (order) setPaymentStatus("idle");
+    });
+  };
+
+  const openBoldCheckout = (config: ReturnType<typeof buildBoldCheckoutPayload>) => {
+    const BoldCheckout = (window as Window & { BoldCheckout?: new (config: object) => { open: () => void } }).BoldCheckout;
+    if (!BoldCheckout) {
+      setPayError("El sistema de pago no está listo. Recarga la página e intenta de nuevo.");
+      setPaymentStatus("retry");
+      return;
+    }
+    boldConfigRef.current = config;
+    const checkout = new BoldCheckout(config);
+    checkout.open();
+    armBoldWatch();
   };
 
   const payNow = async () => {
-    if (paymentStatus !== "idle" || !formRef.current) return;
+    if (!formRef.current) return;
+    if (paymentStatus === "processing" || paymentStatus === "preparing") return;
     const payingWithPayPal = normalizeCountry(formRef.current.shippingCountry) !== normalizeCountry(SITE.country);
     if (payingWithPayPal && !canPayInternational) {
       setPayError("No pudimos calcular el pago en dólares. Intenta de nuevo.");
       return;
     }
-    setPaymentStatus("processing");
-    setPayError("");
-    const boldScript = payingWithPayPal ? null : loadBoldCheckoutScript();
-    boldScript?.catch(() => undefined);
-
-    const current = useCartStore.getState();
-    const ids = [...new Set(current.items.map((item) => item.variantId))];
-    const rows = await getImmediateStockByVariantIds(ids);
-    const stockMap = new Map(rows.map((row) => [row.variantId, row.stock]));
-    const adjustments = current.reconcileWithStock(stockMap);
-    if (adjustments.length > 0) {
-      toast({ title: formatReconcileMessage(adjustments), variant: "warning" });
-      setPaymentStatus("idle");
-      return;
-    }
-
-    const lines = useCartStore.getState().items;
-    if (lines.length === 0) {
-      setPaymentStatus("idle");
-      return;
-    }
-    const result = await submitOrder({
-      form: formRef.current,
-      lines: lines.map((i) => ({
-        variantId: i.variantId,
-        quantity: i.quantity,
-        customizationType: i.customizationType,
-        customizationName: i.customizationName,
-        customizationNumber: i.customizationNumber,
-        deliveryMode: i.deliveryMode,
-      })),
-      paymentMethod: payingWithPayPal ? "PAYPAL" : "CARD",
-      paymentReference: paymentKeyRef.current,
-      saleCurrency: checkoutCurrencyForCountry(formRef.current.shippingCountry, currencyContext).currency,
-      couponCode: appliedCouponCode,
-    });
-
-    if (!result.ok) {
-      setPayError(result.error);
-      if (appliedCouponCode) {
-        clearCoupon();
-      }
-      setPaymentStatus("failed");
-      return;
-    }
-
     if (payingWithPayPal) {
+      setPaymentStatus("processing");
+      setPayError("");
+      const current = useCartStore.getState();
+      const ids = [...new Set(current.items.map((item) => item.variantId))];
+      const rows = await getImmediateStockByVariantIds(ids);
+      const stockMap = new Map(rows.map((row) => [row.variantId, row.stock]));
+      const adjustments = current.reconcileWithStock(stockMap);
+      if (adjustments.length > 0) {
+        toast({ title: formatReconcileMessage(adjustments), variant: "warning" });
+        setPaymentStatus("idle");
+        return;
+      }
+      const lines = useCartStore.getState().items;
+      if (lines.length === 0) {
+        setPaymentStatus("idle");
+        return;
+      }
+      const result = await submitOrder({
+        form: formRef.current,
+        lines: lines.map((i) => ({
+          variantId: i.variantId,
+          quantity: i.quantity,
+          customizationType: i.customizationType,
+          customizationName: i.customizationName,
+          customizationNumber: i.customizationNumber,
+          deliveryMode: i.deliveryMode,
+        })),
+        paymentMethod: "PAYPAL",
+        paymentReference: paymentKeyRef.current,
+        saleCurrency: checkoutCurrencyForCountry(formRef.current.shippingCountry, currencyContext).currency,
+        couponCode: appliedCouponCode,
+      });
+      if (!result.ok) {
+        setPayError(result.error);
+        if (appliedCouponCode) clearCoupon();
+        setPaymentStatus("failed");
+        return;
+      }
       if (!result.paypal?.approveUrl) {
         setPayError(result.paypalError ?? "No pudimos abrir PayPal. Intenta de nuevo.");
         setPaymentStatus("failed");
@@ -340,64 +498,54 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
       return;
     }
 
+    if (boldConfigRef.current && hasBoldCheckout()) {
+      setPaymentStatus("processing");
+      setPayError("");
+      try {
+        openBoldCheckout(boldConfigRef.current);
+      } catch (err) {
+        console.error("Bold checkout error:", err);
+        setPayError(err instanceof Error ? err.message : "Error al conectar con el sistema de pago.");
+        setPaymentStatus("retry");
+      }
+      return;
+    }
+
+    setPaymentStatus("processing");
+    setPayError("");
     try {
-      const requestBoldHash = async () => {
-        const hashRes = await fetch("/api/bold/hash", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            orderId: result.code,
-            amount: result.paymentAmount,
-            currency: result.saleCurrency,
-          }),
-        });
-        const body = await hashRes.json();
-        if (!hashRes.ok) {
-          throw new Error(typeof body.error === "string" ? body.error : "Error al preparar el pago.");
-        }
-        return body;
-      };
-      const payload = result.bold ?? (await requestBoldHash());
-      if (!boldScript) {
-        setPayError("El sistema de pago no está listo. Recarga la página e intenta de nuevo.");
-        setPaymentStatus("idle");
+      const order = preparedRef.current?.bold ? preparedRef.current : await reserveBoldOrder(formRef.current);
+      if (!order) return;
+      if (!order.bold) {
+        setPayError((current) => current || "No pudimos abrir Bold. Intenta de nuevo.");
+        setPaymentStatus("retry");
         return;
       }
-      await boldScript;
-
-      const BoldCheckout = (window as Window & { BoldCheckout?: new (config: object) => { open: () => void } }).BoldCheckout;
-
-      if (!BoldCheckout) {
-        setPayError("El sistema de pago no está listo. Recarga la página e intenta de nuevo.");
-        setPaymentStatus("idle");
-        return;
-      }
-
+      await loadBoldCheckoutScript();
       const checkoutConfig = buildBoldCheckoutPayload({
-        orderId: payload.orderId,
-        amount: payload.amount,
-        currency: payload.currency,
-        apiKey: payload.apiKey,
-        integritySignature: payload.hash,
-        description: `Pedido ${payload.orderId}`,
-        redirectionUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/pedido/confirmado/${payload.orderId}`,
+        orderId: order.bold.orderId,
+        amount: order.bold.amount,
+        currency: order.bold.currency,
+        apiKey: order.bold.apiKey,
+        integritySignature: order.bold.hash,
+        description: `Pedido ${order.bold.orderId}`,
+        redirectionUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/pedido/confirmado/${order.bold.orderId}`,
         customer: {
-          email: formRef.current?.email,
-          fullName: formRef.current?.fullName,
-          phone: formRef.current?.phone,
+          email: order.contact.email,
+          fullName: order.contact.fullName,
+          phone: order.contact.phone,
         },
       });
-
-      const checkout = new BoldCheckout(checkoutConfig);
-      checkout.open();
-      rememberPaymentRecovery(result.code, useCartStore.getState().items);
-      clearCart();
+      rememberPaymentRecovery(order.code, order.items);
+      openBoldCheckout(checkoutConfig);
     } catch (err) {
       console.error("Bold checkout error:", err);
       setPayError(err instanceof Error ? err.message : "Error al conectar con el sistema de pago.");
-      setPaymentStatus("failed");
+      setPaymentStatus("retry");
     }
   };
+
+
 
   const summaryItems = (
     <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
@@ -470,6 +618,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
       <ArrowRight className="h-4 w-4 shrink-0" />
     </span>
   );
+  const reviewContact = prepared?.contact ?? formRef.current;
 
   return (
     <div className="container-page py-6 sm:py-8">
@@ -595,6 +744,68 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
             </form>
           ) : (
             <div className="space-y-6">
+              <section className="space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="font-display text-lg font-bold uppercase tracking-tight">Tu pedido</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {prepared
+                        ? `Número ${prepared.code}`
+                        : paymentStatus === "preparing"
+                          ? "Reservando tu pedido…"
+                          : "Aún no hay un número de pedido."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="text-sm underline disabled:opacity-50"
+                    disabled={paymentStatus === "processing" || paymentStatus === "preparing"}
+                    onClick={() => {
+                      setStep("form");
+                      setPaymentStatus("idle");
+                    }}
+                  >
+                    Editar datos
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {(prepared?.items ?? items).map((item) => (
+                    <div key={item.lineId} className="text-sm">
+                      <p className="font-medium">{item.productName} · x{item.quantity}</p>
+                      <p className="text-xs text-muted-foreground">{formatPurchaseLineDetail(item)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {DELIVERY_MODE_INFO[item.deliveryMode].label} · {DELIVERY_MODE_INFO[item.deliveryMode].eta}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                {reviewContact && (
+                  <div className="text-sm text-muted-foreground">
+                    <p>{reviewContact.fullName} · {reviewContact.email} · {reviewContact.phone}</p>
+                    <p>
+                      {[reviewContact.shippingLine1, reviewContact.shippingLine2, reviewContact.shippingCity, reviewContact.shippingState, reviewContact.shippingCountry]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </p>
+                  </div>
+                )}
+                <p className="text-lg font-bold tabular-nums">
+                  Total {formatMoney({ amountCop: prepared?.total ?? total, ...moneyContext })}
+                </p>
+                {prepared && prepared.linesKey !== cartLinesKey(items) && (
+                  <p className="text-xs text-muted-foreground">
+                    El carrito cambió después de reservar este pedido. Reintentar pago abre otra vez el pedido {prepared.code}.
+                  </p>
+                )}
+              </section>
+
+              {paymentStatus === "preparing" && (
+                <div className="rounded-xl border border-border bg-card p-6 text-center sm:p-8">
+                  <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+                  <p className="mt-4 text-sm font-medium">Reservando tu pedido…</p>
+                </div>
+              )}
+
               {paymentStatus === "processing" && (
                 <div className="rounded-xl border border-border bg-card p-6 text-center sm:p-8">
                   <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
@@ -619,17 +830,27 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
                 </div>
               )}
 
-              {paymentStatus === "failed" && (
-                <div className="rounded-xl border border-border bg-card p-5 text-center sm:p-6">
-                  <p className="text-sm font-medium text-destructive">{payError || "No se pudo procesar el pago."}</p>
-                  <Button className="mt-4" onClick={() => setPaymentStatus("idle")}>
-                    Reintentar
-                  </Button>
+              {(paymentStatus === "retry" || paymentStatus === "failed") && (
+                <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+                  <p className="text-sm font-medium">
+                    {payError || (paymentStatus === "failed"
+                      ? "No se pudo procesar el pago."
+                      : "Cerraste la ventana de pago. Tu pedido sigue pendiente.")}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Button type="button" onClick={payNow}>
+                      Reintentar pago
+                    </Button>
+                    <Button type="button" variant="outline" asChild>
+                      <Link href="/carrito">Volver al carrito</Link>
+                    </Button>
+                  </div>
                 </div>
               )}
 
               {paymentStatus === "idle" && (
                 <Button
+                  type="button"
                   onClick={payNow}
                   disabled={!isColombiaDestination && !canPayInternational}
                   className="w-full !flex-nowrap !whitespace-nowrap sm:w-auto"

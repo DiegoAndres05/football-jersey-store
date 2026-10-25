@@ -14,5 +14,10 @@ export async function getImmediateStockByVariantIds(
 ): Promise<{ variantId: string; stock: number }[]> {
   const parsed = variantIdsSchema.safeParse(variantIds);
   if (!parsed.success) return [];
-  return loadImmediateStock(parsed.data);
+  try {
+    return await loadImmediateStock(parsed.data);
+  } catch (error) {
+    console.error("getImmediateStockByVariantIds failed:", error);
+    return [];
+  }
 }

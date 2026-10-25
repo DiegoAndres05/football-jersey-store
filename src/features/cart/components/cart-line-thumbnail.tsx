@@ -17,7 +17,7 @@ export function CartLineThumbnail({
   imageUrl: string;
   alt: string;
 }) {
-  const stored = imageUrl.trim();
+  const stored = typeof imageUrl === "string" ? imageUrl.trim() : "";
   const [override, setOverride] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const src = override ?? stored;
@@ -29,6 +29,8 @@ export function CartLineThumbnail({
       if (cancel) return;
       if (url) setOverride(url);
       else setFailed(true);
+    }).catch(() => {
+      if (!cancel) setFailed(true);
     });
     return () => {
       cancel = true;
@@ -60,7 +62,7 @@ export function CartLineThumbnail({
         getCartLineImage(slug).then((url) => {
           if (url && url !== src) setOverride(url);
           else setFailed(true);
-        });
+        }).catch(() => setFailed(true));
       }}
     />
   );

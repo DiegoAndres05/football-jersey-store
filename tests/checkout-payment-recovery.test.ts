@@ -32,6 +32,16 @@ test("closing Bold restores the cart and the form validates while typing", () =>
   assert.match(checkout, /readRecoveredCartItems\(\)/);
   assert.match(checkout, /replaceItems\(recovered\)/);
   assert.match(checkout, /mode: "onChange"/);
+  assert.match(checkout, /Reintentar pago/);
+  assert.match(checkout, /Volver al carrito/);
+  assert.match(checkout, /Editar datos/);
+  assert.doesNotMatch(checkout, /clearCart\(/);
+  assert.doesNotMatch(checkout, /bold-tx-status/);
+  assert.doesNotMatch(checkout, /setPaymentStatus\("success"\)/);
+  const payNow = checkout.slice(checkout.indexOf("const payNow"));
+  const shortcut = payNow.indexOf("boldConfigRef.current && hasBoldCheckout()");
+  const reserveAgain = payNow.indexOf("await reserveBoldOrder");
+  assert.ok(shortcut > 0 && shortcut < reserveAgain, "reintentar reabre Bold antes de crear otro pedido");
 });
 
 test("confirmation shows the shipping fee and returns the cart unless the order is paid", () => {

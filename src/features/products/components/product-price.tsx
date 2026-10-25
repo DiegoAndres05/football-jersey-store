@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/shared/money/format";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
+import { discountPercent as sharedDiscountPercent } from "@/features/products/domain/product-price-display";
 
 export function ProductPrice({
   salePrice,
@@ -14,9 +15,7 @@ export function ProductPrice({
   currencyContext?: CurrencyContext;
 }) {
   const hasDiscount = compareAtPrice && compareAtPrice > salePrice;
-  const discountPercent = hasDiscount
-    ? Math.round((1 - salePrice / compareAtPrice) * 100)
-    : null;
+  const discountPercent = sharedDiscountPercent(salePrice, compareAtPrice);
 
   const format = (amountCop: number) =>
     formatMoney({

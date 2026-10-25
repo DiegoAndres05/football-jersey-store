@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { getProductBySlug, getRelatedProducts } from "@/features/products/repositories/product-repository";
+import { getShippingRates } from "@/features/system/repositories/shipping-rates-repository";
 import { ProductDetailClient } from "@/features/products/components/product-detail-client";
 import { ProductGrid } from "@/features/products/components/product-grid";
 import { getCurrencyContext } from "@/shared/money/server-helpers";
@@ -67,9 +68,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const [product, currencyCtx] = await Promise.all([
+  const [product, currencyCtx, shippingRates] = await Promise.all([
     getProductBySlug(slug),
     getCurrencyContext(),
+    getShippingRates(),
   ]);
 
   if (!product) {
@@ -122,7 +124,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
-      <ProductDetailClient product={product} currencyContext={currencyCtx} />
+      <ProductDetailClient product={product} currencyContext={currencyCtx} shippingRates={shippingRates} />
 
       {related.length > 0 && (
         <section className="container-page py-10 border-t border-border">

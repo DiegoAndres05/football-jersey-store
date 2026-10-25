@@ -285,16 +285,16 @@ function CartBadge() {
   const count = useCartStore((s) => s.items.reduce((acc, i) => acc + i.quantity, 0));
 
   return (
-    <Link href="/carrito" className="relative">
-      <Button variant="ghost" size="icon" aria-label="Carrito" className="h-11 w-11">
+    <Button variant="ghost" size="icon" aria-label="Carrito" className="relative h-11 w-11" asChild>
+      <Link href="/carrito">
         <CartIcon className="h-5 w-5" />
         {count > 0 && (
           <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
             {count > 99 ? "99+" : count}
           </span>
         )}
-      </Button>
-    </Link>
+      </Link>
+    </Button>
   );
 }
 
