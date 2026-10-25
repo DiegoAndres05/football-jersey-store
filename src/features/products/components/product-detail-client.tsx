@@ -20,6 +20,7 @@ import type { ProductDetailData, VariantWithStock } from "@/features/products/ty
 import { SizeGuideDialog } from "./size-guide-dialog";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
 import { useRecentlyViewedStore } from "@/shared/stores/recently-viewed-store";
+import { productEyebrowParts } from "@/features/products/domain/product-public-copy";
 import { useCartStore } from "@/shared/stores/cart-store";
 import { remainingImmediate } from "@/features/cart/domain/immediate-quantity";
 import { toast } from "@/components/ui/toast";
@@ -234,17 +235,17 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
         <div className="space-y-6 min-w-0">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <span>{product.team.name}</span>
-              <span>·</span>
-              <span>{product.brand}</span>
-              {product.team.league && (
-                <>
-                  <span>·</span>
-                  <span>{product.team.league.name}</span>
-                </>
-              )}
-              <span>·</span>
-              <span>{product.season.name}</span>
+              {productEyebrowParts({
+                teamName: product.team.name,
+                brand: product.brand,
+                leagueName: product.team.league?.name,
+                seasonName: product.season.name,
+              }).map((part, index) => (
+                <span key={`${index}-${part}`} className="inline-flex items-center gap-2">
+                  {index > 0 && <span aria-hidden="true">·</span>}
+                  {part}
+                </span>
+              ))}
             </div>
             <h1 className="text-2xl font-bold md:text-3xl">{product.name}</h1>
             <button type="button" aria-label={favorite ? "Quitar de favoritos" : "Guardar en favoritos"} aria-pressed={favorite} onClick={() => { toggleFavorite({ productId: product.id, slug: product.slug }); toast({ title: favorite ? "Quitado de favoritos" : "Guardado en favoritos", variant: "success" }); }} className="mt-3 inline-flex items-center gap-2 text-sm underline underline-offset-4"><Heart className={`h-4 w-4 ${favorite ? "fill-current text-red-600" : ""}`} /> {favorite ? "Guardado en favoritos" : "Guardar en favoritos"}</button>

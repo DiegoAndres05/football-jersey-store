@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
+import { CartLineThumbnail } from "@/features/cart/components/cart-line-thumbnail";
 import { Minus, Plus, Trash2, ArrowRight } from "lucide-react";
 import { CartIcon } from "@/components/ui/cart-icon";
 import { Button } from "@/components/ui/button";
@@ -152,21 +152,7 @@ export function CartPageClient({ currencyContext, shippingRates }: { currencyCon
               className="flex gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 motion-reduce:transition-none"
             >
               <Link href={item.lineKind === "MYSTERY_BOX" ? "/caja-misteriosa" : `/productos/${item.productSlug}`} className="shrink-0">
-                {item.imageUrl ? (
-                  <div className="relative h-24 w-20 rounded-lg overflow-hidden bg-secondary">
-                    <Image
-                      src={item.imageUrl}
-                      alt={item.productName}
-                      fill
-                      sizes="80px"
-                      className="object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="h-24 w-20 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground text-xs">
-                    Sin imagen
-                  </div>
-                )}
+                <CartLineThumbnail slug={item.productSlug} imageUrl={item.imageUrl} alt={item.productName} />
               </Link>
 
               <div className="flex flex-1 flex-col gap-1 min-w-0">

@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { invalidatePublicCatalog } from "@/shared/cache/invalidate-public-store";
 import { prisma } from "@/lib/prisma";
 import { supabaseServer, PRODUCT_IMAGES_BUCKET } from "@/lib/supabase/server";
 import { getSessionUser } from "@/features/auth/server/session";
@@ -341,6 +342,7 @@ export async function deleteProductAction(productId: string): Promise<AdminSaveR
     if (result.ok) {
       revalidatePath("/admin/productos");
       revalidatePath("/productos");
+      invalidatePublicCatalog();
     }
     return result;
   } catch {
@@ -364,6 +366,7 @@ export async function setProductActiveAction(
   if (result.ok) {
     revalidatePath("/admin/productos");
     revalidatePath("/productos");
+    invalidatePublicCatalog();
     revalidatePath("/");
   }
   return result;
@@ -376,6 +379,7 @@ export async function activateAllProductsAction(): Promise<AdminSaveResult> {
     await prisma.product.updateMany({ where: { isActive: false }, data: { isActive: true } });
     revalidatePath("/admin/productos");
     revalidatePath("/productos");
+    invalidatePublicCatalog();
     revalidatePath("/");
     return saveSuccess();
   } catch {
@@ -600,6 +604,7 @@ export async function assignSizesToAllProductsAction(formData: FormData) {
 
   revalidatePath("/admin/productos");
   revalidatePath("/productos");
+  invalidatePublicCatalog();
   revalidatePath("/");
   redirect(`/admin/productos?tallas=${fresh.length}`);
 }
@@ -636,6 +641,7 @@ export async function setProductStockAction(productId: string, formData: FormDat
   );
   revalidatePath(`/admin/productos/${product.slug}/variantes`);
   revalidatePath("/productos");
+  invalidatePublicCatalog();
   redirect(`/admin/productos/${product.slug}/variantes`);
 }
 
@@ -658,6 +664,8 @@ export async function updateVariantAction(variantId: string, formData: FormData)
   if (!variant) throw new Error("La variante no existe.");
 
   await prisma.productVariant.update({ where: { id: variantId }, data: parsed.data });
+  invalidatePublicCatalog();
+  revalidatePath("/productos");
   redirect(`/admin/productos/${variant.product.slug}/variantes`);
 }
 
@@ -693,6 +701,8 @@ export async function updateAllVariantsAction(productId: string, formData: FormD
   );
   const product = await prisma.product.findUnique({ where: { id: productId }, select: { slug: true } });
   if (!product) throw new Error("El producto no existe.");
+  invalidatePublicCatalog();
+  revalidatePath("/productos");
   redirect(`/admin/productos/${product.slug}/variantes`);
 }
 
@@ -755,6 +765,9 @@ export async function adjustStockAction(variantId: string, formData: FormData) {
       userReference: admin,
     },
   });
+  invalidatePublicCatalog();
+  revalidatePath("/productos");
+  revalidatePath("/");
   redirect(`/admin/productos/${variant.product.slug}/variantes`);
 }
 

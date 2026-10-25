@@ -8,6 +8,7 @@ import { getProducts } from "@/features/products/repositories/product-repository
 import { appendKeywords } from "@/features/seo/domain/keywords";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
 import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
+import { formatCatalogStockLabel } from "@/features/products/domain/catalog-stock-label";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -92,7 +93,11 @@ export default async function TeamDetailPage({ params }: PageProps) {
           {team.name}
         </h1>
         <p className="mt-2 text-muted-foreground">
-          {team.activeProducts} producto{team.activeProducts !== 1 ? "s" : ""} disponible{team.activeProducts !== 1 ? "s" : ""}
+          {formatCatalogStockLabel({
+            total: team.activeProducts,
+            purchasable: team.purchasableCount,
+            soldOut: team.soldOutCount,
+          })}
         </p>
 
         <div className="mt-8">

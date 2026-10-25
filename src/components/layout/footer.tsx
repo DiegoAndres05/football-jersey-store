@@ -2,25 +2,11 @@ import Link from "next/link";
 import { Mail } from "lucide-react";
 import { SITE, whatsappLink } from "@/shared/config/site";
 import { LegalLinks } from "@/shared/ui/legal-links";
+import { getLeagues } from "@/features/products/repositories/product-repository";
 
-const FOOTER_LINKS = [
-  {
-    title: "Tienda",
-    links: [
-      { href: "/productos", label: "Catálogo" },
-      { href: "/ligas", label: "Ligas" },
-      { href: "/ligas/la-liga", label: "La Liga" },
-      { href: "/ligas/premier-league", label: "Premier League" },
-      { href: "/ligas/ligue-1", label: "Ligue 1" },
-    ],
-  },
-  {
-    title: "Flashsport",
-    links: [
-      { href: "/sobre-nosotros", label: "Sobre nosotros" },
-      { href: "/cuenta", label: "Mi cuenta" },
-    ],
-  },
+const FLASHSORT_LINKS = [
+  { href: "/sobre-nosotros", label: "Sobre nosotros" },
+  { href: "/cuenta", label: "Mi cuenta" },
 ] as const;
 
 const SOCIAL_LINKS = [
@@ -55,7 +41,23 @@ function SocialIcon({ name }: { name: (typeof SOCIAL_LINKS)[number]["label"] }) 
   );
 }
 
-export function Footer() {
+export async function Footer() {
+  let shopLinks = [
+    { href: "/productos", label: "Catálogo" },
+    { href: "/ligas", label: "Ligas" },
+  ];
+  try {
+    const leagues = await getLeagues();
+    shopLinks = [
+      ...shopLinks,
+      ...leagues
+        .filter((league) => league.productCount > 0)
+        .map((league) => ({ href: `/ligas/${league.slug}`, label: league.name })),
+    ];
+  } catch (error) {
+    console.error("[footer] no se pudieron leer las ligas:", error);
+  }
+
   return (
     <footer className="border-t border-border bg-card mt-16">
       <div className="container-page pt-12 pb-28 lg:pb-12">
@@ -65,7 +67,7 @@ export function Footer() {
               {SITE.brand}
             </Link>
             <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground">
-              Camisetas de fútbol... ¡Bienvenidos al mundo del fútbol!
+              Camisetas de fútbol. Bienvenidos al mundo del fútbol.
             </p>
             <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-sm">
               {SITE.tagline} Camisetas de calidad con envío a toda Colombia y
@@ -99,25 +101,41 @@ export function Footer() {
             </p>
           </div>
 
-          {FOOTER_LINKS.map((group) => (
-            <div key={group.title}>
-              <h4 className="text-xs font-semibold uppercase tracking-[0.14em] mb-4">
-                {group.title}
-              </h4>
-              <ul className="space-y-2.5">
-                {group.links.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4 transition-colors"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-[0.14em] mb-4">
+              Tienda
+            </h4>
+            <ul className="space-y-2.5">
+              {shopLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4 transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-[0.14em] mb-4">
+              Flashsport
+            </h4>
+            <ul className="space-y-2.5">
+              {FLASHSORT_LINKS.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4 transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
 
           <div>
             <h4 className="mb-4 text-xs font-semibold uppercase tracking-[0.14em]">
@@ -147,7 +165,9 @@ export function Footer() {
             &copy; {new Date().getFullYear()} {SITE.brand}. Todos los derechos reservados.
           </p>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <span>Envíos a todo el país</span>
+            <Link href="/envios" className="hover:text-foreground hover:underline underline-offset-4">
+              Envíos a todo el país
+            </Link>
             <span aria-hidden>·</span>
             <span>Pagos seguros</span>
             <span aria-hidden>·</span>

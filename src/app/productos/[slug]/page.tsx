@@ -11,6 +11,7 @@ import { buildProductJsonLd } from "@/features/seo/domain/product-json-ld";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
 import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
 import { appendKeywords } from "@/features/seo/domain/keywords";
+import { kitTypeLabel, productFallbackDescription } from "@/features/products/domain/product-public-copy";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -25,9 +26,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!product) return { title: "Producto no encontrado" };
   if (product.productKind === "MYSTERY_BOX") redirect("/caja-misteriosa");
 
-  const description =
-    product.description ??
-    `Camiseta de fútbol de ${product.team.name}, temporada ${product.season.name}. Tipo: ${product.kitType}.${product.team.league ? ` Liga: ${product.team.league.name}.` : ""}`;
+  const description = productFallbackDescription({
+    description: product.description,
+    teamName: product.team.name,
+    seasonName: product.season.name,
+    kitType: product.kitType,
+    leagueName: product.team.league?.name,
+  });
   const primaryImage = product.images.find((img) => img.isPrimary) ?? product.images[0];
   const imageUrl = primaryImage?.url;
   const productUrl = `${siteUrl}/productos/${product.slug}`;
@@ -39,7 +44,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       `camiseta ${product.team.name}`,
       `camiseta de ${product.team.name}`,
       product.season.name,
-      product.kitType,
+      kitTypeLabel(product.kitType),
     ),
     alternates: { canonical: productUrl },
     openGraph: {
@@ -76,9 +81,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   const primaryImage = product.images.find((img) => img.isPrimary) ?? product.images[0];
   const imageUrl = primaryImage?.url;
-  const productDescription =
-    product.description ??
-    `Camiseta de fútbol de ${product.team.name}, temporada ${product.season.name}. Tipo: ${product.kitType}.${product.team.league ? ` Liga: ${product.team.league.name}.` : ""}`;
+  const productDescription = productFallbackDescription({
+    description: product.description,
+    teamName: product.team.name,
+    seasonName: product.season.name,
+    kitType: product.kitType,
+    leagueName: product.team.league?.name,
+  });
 
   const jsonLd = buildProductJsonLd({
     slug: product.slug,

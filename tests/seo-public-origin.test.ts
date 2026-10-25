@@ -64,6 +64,13 @@ describe("resolvePublicOrigin", () => {
       const { resolvePublicOrigin } = require("@/shared/config/public-origin");
       assert.equal(resolvePublicOrigin(), "https://shop.example.com");
     });
+
+    it("home canonical keeps the trailing slash", () => {
+      process.env.NEXT_PUBLIC_SITE_URL = "https://www.flashsports.shop";
+      const { publicHomeUrl, resolvePublicOrigin } = require("@/shared/config/public-origin");
+      assert.equal(resolvePublicOrigin(), "https://www.flashsports.shop");
+      assert.equal(publicHomeUrl(), "https://www.flashsports.shop/");
+    });
   });
 
   describe("development (NODE_ENV=development)", () => {
