@@ -105,6 +105,7 @@ export function AddToCartButton({
 
   return (
     <Button
+      type="button"
       size="xl"
       className={cn("w-full whitespace-nowrap", className)}
       disabled={disabled && !sizeRequired}

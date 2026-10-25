@@ -16,7 +16,7 @@ import type {
   Availability,
   SortOption,
 } from "../types/product-types";
-import { deriveProductDisplayPrice, listingCompareAtPrice } from "../domain/product-price-display";
+import { deriveProductDisplayPrice, listingOfferFromVariants } from "../domain/product-price-display";
 import { MYSTERY_BOX_SLUG, mysteryBoxTier } from "../domain/mystery-box";
 
 const productCardSelect = {
@@ -418,6 +418,7 @@ export async function getActiveProductCardsByIds(ids: string[]): Promise<Product
 }
 
 export async function getPrimaryImageUrlBySlug(slug: string): Promise<string | null> {
+  if (typeof slug !== "string") return null;
   const clean = slug.trim();
   if (!clean || clean.length > 200) return null;
   const product = await prisma.product.findFirst({
@@ -491,11 +492,9 @@ async function mapProductCards(
       lastValidProductPrice,
     });
     const offer = priceDisplay.displayPrice
-      ? listingCompareAtPrice({
+      ? listingOfferFromVariants({
           salePrice: priceDisplay.displayPrice,
-          compareAtPrices: infos
-            .filter((info) => info.salePrice === priceDisplay.displayPrice)
-            .map((info) => info.compareAtPrice),
+          variants: infos,
         })
       : null;
     return {

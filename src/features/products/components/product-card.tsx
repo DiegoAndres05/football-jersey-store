@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/shared/money/format";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
 import { listingAvailabilityFromCardFlags } from "@/features/products/domain/listing-availability";
+import { discountPercent } from "@/features/products/domain/product-price-display";
 import { cn } from "@/lib/utils";
 import { ProductImage } from "@/shared/ui/product-image";
 
@@ -23,13 +24,9 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
   });
   const isSoldOut = listing === "SOLD_OUT";
   const isBackorderOnly = listing === "BACKORDER_ONLY";
-  const discountPercent =
-    product.showPrice &&
-    product.displayPrice !== null &&
-    product.compareAtPrice !== null &&
-    product.compareAtPrice > product.displayPrice
-      ? Math.round((1 - product.displayPrice / product.compareAtPrice) * 100)
-      : null;
+  const offerPercent = product.showPrice
+    ? discountPercent(product.displayPrice, product.compareAtPrice)
+    : null;
 
   const formatPrice = (amountCop: number) =>
     formatMoney({
@@ -66,8 +63,8 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
           {isOutlet && (
             <Badge tone="warning" size="sm">Retro</Badge>
           )}
-          {discountPercent !== null && discountPercent > 0 && (
-            <Badge tone="primary" size="sm">−{discountPercent}%</Badge>
+          {offerPercent !== null && offerPercent > 0 && (
+            <Badge tone="primary" size="sm">−{offerPercent}%</Badge>
           )}
         </div>
         <button type="button" aria-label={favorite ? `Quitar ${product.name} de favoritos` : `Guardar ${product.name} en favoritos`} aria-pressed={favorite} onClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleFavorite({ productId: product.id, slug: product.slug }); }} className="absolute right-1 top-1 inline-flex h-11 w-11 items-center justify-center rounded-full bg-background/90 shadow-sm hover:bg-background"><Heart className={`h-4 w-4 ${favorite ? "fill-current text-red-600" : ""}`} /></button>
@@ -118,7 +115,7 @@ export function ProductCard({ product, priority, currencyContext, contextQuery }
             {!isSoldOut && <span className="text-sm text-muted-foreground">Desde</span>}
             <span className="flex max-w-full flex-wrap items-baseline gap-x-2">
               <span className="break-words text-base font-bold">{formatPrice(product.displayPrice)}</span>
-              {discountPercent !== null && product.compareAtPrice !== null && (
+              {offerPercent !== null && product.compareAtPrice !== null && (
                 <span className="break-words text-xs text-muted-foreground line-through">
                   {formatPrice(product.compareAtPrice)}
                 </span>

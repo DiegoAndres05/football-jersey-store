@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect, type ComponentProps } from "react";
 import Link from "next/link";
-import { ChevronRight, Heart, Truck, ShieldCheck, ArrowRight } from "lucide-react";
+import { ChevronRight, Heart, Truck, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -31,8 +31,10 @@ import {
 } from "@/features/products/types/delivery-mode";
 import { validatePersonalization } from "@/features/products/personalization";
 import type { CurrencyContext } from "@/shared/money/server-helpers";
-import { deriveProductDisplayPrice, displayedCompareAtPrice } from "../domain/product-price-display";
+import { deriveProductDisplayPrice, displayedCompareAtPrice, anchorVersionKey } from "../domain/product-price-display";
+import { publicShippingCopy } from "../domain/shipping-promise";
 import { resolveSelectedSize } from "../domain/size-selection";
+import type { ShippingRates } from "@/features/checkout/shipping";
 
 type CustomType = "NONE" | "CUSTOM" | "OFFICIAL_PLAYER";
 
@@ -44,8 +46,14 @@ function WhatsappIcon() {
   );
 }
 
-export function ProductDetailClient({ product, currencyContext }: { product: ProductDetailData; currencyContext?: CurrencyContext }) {
-  const [selectedVersion, setSelectedVersion] = useState(product.variants[0]?.version.slug ?? "");
+export function ProductDetailClient({ product, currencyContext, shippingRates }: { product: ProductDetailData; currencyContext?: CurrencyContext; shippingRates?: ShippingRates }) {
+  const [selectedVersion, setSelectedVersion] = useState(
+    () => anchorVersionKey(product.variants.map((variant) => ({
+      salePrice: variant.salePrice,
+      versionAdjustment: variant.version.priceAdjustment,
+      versionKey: variant.version.slug,
+    }))) ?? product.variants[0]?.version.slug ?? "",
+  );
   const [selectedSize, setSelectedSize] = useState("");
   const [customType, setCustomType] = useState<CustomType>("NONE");
   const [customName, setCustomName] = useState("");
@@ -94,11 +102,15 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
     currentPrice: currentVariant?.salePrice,
     lastValidProductPrice: product.lastValidProductPrice,
   });
+  const versionSale = product.variants.find((variant) => variant.version.slug === selectedVersion)?.salePrice ?? null;
   const compareAtPrice = displayedCompareAtPrice({
     sizeSelected: Boolean(selectedSize),
     selectedCompareAtPrice: currentVariant?.compareAtPrice,
+    salePrice: currentVariant?.salePrice ?? versionSale,
     versionCompareAtPrices: product.variants
       .filter((variant) => variant.version.slug === selectedVersion)
+      .slice()
+      .sort((a, b) => a.size.position - b.size.position)
       .map((variant) => variant.compareAtPrice),
   });
 
@@ -144,6 +156,20 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
     customType === "CUSTOM" ? customNumber : customType === "OFFICIAL_PLAYER" ? selectedPlayer?.number ?? "" : "";
 
   const availableModes = currentVariant ? getAvailableDeliveryModes(currentVariant.stock, currentVariant.allowsBackorder) : [];
+  const catalogModes = useMemo(() => {
+    const modes = new Set<DeliveryMode>();
+    for (const variant of product.variants) {
+      for (const mode of getAvailableDeliveryModes(variant.stock, variant.allowsBackorder)) modes.add(mode);
+    }
+    if (modes.size === 0 && product.availability === "ON_DEMAND") modes.add("BAJO_PEDIDO");
+    if (modes.size === 0 && product.availability === "AVAILABLE") modes.add("INMEDIATA");
+    return [...modes];
+  }, [product.availability, product.variants]);
+  const shippingCopy = publicShippingCopy({
+    mode: currentVariant ? deliveryMode : null,
+    availableModes: currentVariant ? availableModes : catalogModes,
+    nationalFeeCop: shippingRates?.nationalFeeCop ?? SHIPPING.flatFee,
+  });
   const personalizationValidation = validatePersonalization(
     { type: customType, name: customName, number: customNumber, playerId: customPlayerId },
     { enabled: product.customizationsEnabled, officialPlayer: selectedPlayer ?? undefined },
@@ -357,18 +383,16 @@ export function ProductDetailClient({ product, currencyContext }: { product: Pro
 
           {product.description && <p className="text-sm leading-relaxed text-muted-foreground">{product.description}</p>}
 
-          <div className="grid grid-cols-3 gap-3 pt-2">
-            {[
-              { icon: Truck, label: "Envío gratis", sub: `desde ${SHIPPING.freeThreshold.toLocaleString("es-CO")}` },
-              { icon: ShieldCheck, label: "Pago seguro", sub: "En línea" },
-              { icon: ArrowRight, label: "1–2 días", sub: "de despacho" },
-            ].map(({ icon: Icon, label, sub }) => (
-              <div key={label} className="rounded-xl border border-border bg-card p-3 text-center">
-                <Icon className="mx-auto h-5 w-5 text-primary" />
-                <p className="mt-2 text-xs font-medium">{label}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>
-              </div>
-            ))}
+          <div data-testid="shipping-promise" className="rounded-xl border border-border bg-card p-3 text-sm leading-relaxed">
+            <p className="flex items-start gap-2 font-medium">
+              <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span>{shippingCopy.time}</span>
+            </p>
+            <p className="mt-1 pl-6 text-muted-foreground">{shippingCopy.fee}</p>
+          </div>
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-3 text-sm">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            <span className="font-medium">Pago seguro en línea</span>
           </div>
         </div>
       </div>

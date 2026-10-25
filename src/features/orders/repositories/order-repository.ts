@@ -18,6 +18,7 @@ import { getLegalConfig } from "@/shared/config/legal";
 import { quoteShipping } from "@/features/checkout/shipping";
 import { normalizeCountry, validateConsents } from "@/features/checkout/validation";
 import { resolveCheckoutPayment } from "@/features/payments/domain/checkout-payment-route";
+import { samePendingOrder } from "@/features/orders/domain/pending-order-reuse";
 
 export type OrderLineInput = {
   variantId: string;
@@ -181,6 +182,71 @@ export async function createOrder(input: CreateOrderInput): Promise<
       });
       const stockById = new Map(stockRows.map((r) => [r.variantId, r._sum.quantity ?? 0]));
 
+      const pending = await tx.order.findFirst({
+        where: { paymentRef: input.paymentReference, status: "PENDING_PAYMENT" },
+        include: { items: true },
+      });
+      if (pending) {
+        const reusable = samePendingOrder({
+          existingLines: pending.items.map((item) => ({
+            variantId: item.variantId ?? "",
+            quantity: item.quantity,
+            customizationType: item.customizationType,
+            customizationName: item.customizationName,
+            customizationNumber: item.customizationNumber,
+            deliveryMode: item.deliveryMode,
+          })),
+          nextLines: input.lines,
+          existingMoney: {
+            subtotal: pending.subtotal,
+            shippingFee: pending.shippingFee,
+            discountAmount: pending.discountAmount,
+            total: pending.total,
+            saleCurrency: pending.saleCurrency,
+          },
+          nextMoney: { subtotal, shippingFee: fee, discountAmount, total, saleCurrency },
+        });
+        if (!reusable) throw new Error(`ORDER_LOCKED:${pending.code}`);
+
+        const sameEmailCustomer = await tx.customer.findFirst({ where: { email: f.email } });
+        const customer = sameEmailCustomer
+          ? await tx.customer.update({
+              where: { id: sameEmailCustomer.id },
+              data: { name: f.fullName, phone: f.phone },
+            })
+          : await tx.customer.create({
+              data: { email: f.email, name: f.fullName, phone: f.phone },
+            });
+        const updated = await tx.order.update({
+          where: { id: pending.id },
+          data: {
+            customerId: customer.id,
+            customerName: f.fullName,
+            customerEmail: f.email,
+            customerPhone: f.phone,
+            shippingFullName: f.shippingFullName,
+            shippingPhone: f.shippingPhone,
+            shippingLine1: f.shippingLine1,
+            shippingLine2: f.shippingLine2 || null,
+            shippingCity: f.shippingCity,
+            shippingState: f.shippingState,
+            shippingCountry: f.shippingCountry,
+            shippingZipCode: f.shippingZipCode || null,
+            notes: f.notes || null,
+          },
+        });
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: pending.id,
+            fromStatus: "PENDING_PAYMENT",
+            toStatus: "PENDING_PAYMENT",
+            note: "Datos de contacto actualizados antes del pago.",
+            createdBy: input.paymentReference,
+          },
+        });
+        return updated;
+      }
+
       const plan = planInventoryMovements(input.lines, stockById);
       if (!plan.ok) throw new Error(`NO_STOCK:${plan.error}`);
 
@@ -306,12 +372,15 @@ export async function createOrder(input: CreateOrderInput): Promise<
     return { ok: true, code: order.code, total: order.total, paymentAmount, saleCurrency };
   } catch (err) {
     const noStock = err instanceof Error && err.message.startsWith("NO_STOCK:");
+    const locked = err instanceof Error && err.message.startsWith("ORDER_LOCKED:");
     const couponUnavailable = err instanceof Error && err.message === "COUPON_UNAVAILABLE";
-    if (!noStock) console.error("createOrder failed:", err);
+    if (!noStock && !locked) console.error("createOrder failed:", err);
     return {
       ok: false,
       error: couponUnavailable
         ? "El cupón ya no está disponible; puedes continuar sin cupón."
+        : locked && err instanceof Error
+        ? `Ya reservamos el pedido ${err.message.slice("ORDER_LOCKED:".length)}. Si cambiaste el carrito, ese pedido sigue pendiente y no creamos otro.`
         : noStock && err instanceof Error
         ? err.message.slice("NO_STOCK:".length)
         : "No pudimos crear tu pedido. Intenta de nuevo.",
