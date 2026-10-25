@@ -73,9 +73,12 @@ test("removeItem is wired to the trash icon, not to minus", () => {
 
 // ── Spanish copy & images ────────────────────────────────────────────────────
 
-test("cart page renders next/image for product images", () => {
-  assert.match(CART_SOURCE, /next\/image/);
-  assert.match(CART_SOURCE, /<Image/);
+test("cart page renders a fixed-size thumbnail for product images", () => {
+  assert.match(CART_SOURCE, /CartLineThumbnail/);
+  const thumbnail = readFileSync("src/features/cart/components/cart-line-thumbnail.tsx", "utf8");
+  assert.match(thumbnail, /width=\{80\}/);
+  assert.match(thumbnail, /height=\{96\}/);
+  assert.match(thumbnail, /getCartLineImage/);
 });
 
 test("cart page shows Spanish text for articles count", () => {

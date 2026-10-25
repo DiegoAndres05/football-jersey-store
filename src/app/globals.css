@@ -289,6 +289,7 @@
 .hero-spider {
   position: absolute;
   color: hsl(var(--foreground));
+  pointer-events: none;
 }
 
 .hero-bat {
@@ -364,8 +365,8 @@
     visibility: visible;
   }
 
-  .hero-bat-bat-a { top: 10%; left: 34%; transform: scale(0.7); }
-  .hero-bat-bat-c { top: 58%; left: 4%; transform: scale(0.55); }
+  .hero-bat-bat-a { top: 8%; right: 8%; left: auto; transform: scale(0.55); }
+  .hero-bat-bat-c { top: auto; bottom: 10%; right: 16%; left: auto; transform: scale(0.5); }
 
   .hero-jersey-card:hover {
     transform: none;

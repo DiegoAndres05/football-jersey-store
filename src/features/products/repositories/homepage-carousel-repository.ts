@@ -1,4 +1,6 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { PUBLIC_CATALOG_TAG, PUBLIC_READ_REVALIDATE_SECONDS } from "@/shared/cache/public-store";
 import {
   slidesForHomepageCarousel,
   type CarouselPhotoRecord,
@@ -82,7 +84,7 @@ export async function findEligibleCarouselImageIds(ids: string[]): Promise<Set<s
   return new Set(images.map((image) => image.id));
 }
 
-export async function getHomepageCarouselSlides(): Promise<HomepageCarouselSlide[]> {
+async function loadHomepageCarouselSlides(): Promise<HomepageCarouselSlide[]> {
   const orderedIds = await getHomepageCarouselImageIds();
   if (orderedIds.length === 0) return [];
 
@@ -123,3 +125,9 @@ export async function getHomepageCarouselSlides(): Promise<HomepageCarouselSlide
 
   return slidesForHomepageCarousel(orderedIds, photosById);
 }
+
+export const getHomepageCarouselSlides = unstable_cache(
+  loadHomepageCarouselSlides,
+  ["public-homepage-carousel-v1"],
+  { revalidate: PUBLIC_READ_REVALIDATE_SECONDS, tags: [PUBLIC_CATALOG_TAG] },
+);

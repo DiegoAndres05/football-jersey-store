@@ -5,6 +5,7 @@ import { useCallback, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search, X } from "lucide-react";
+import { seasonFilterLabel } from "@/features/products/domain/season-label";
 
 type League = { slug: string; name: string; country: string | null };
 type Team = { slug: string; name: string };
@@ -279,7 +280,7 @@ export function ProductFilters({
           <option value="">Todas las temporadas</option>
           {seasons.map((s) => (
             <option key={s.slug} value={s.slug}>
-              {s.isRetro ? `Retro ${s.name.replace("Retro ", "")}` : s.name}
+              {seasonFilterLabel(s)}
             </option>
           ))}
         </select>

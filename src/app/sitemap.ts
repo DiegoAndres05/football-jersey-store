@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
-import { resolvePublicOrigin } from "@/shared/config/public-origin";
+import { publicHomeUrl, resolvePublicOrigin } from "@/shared/config/public-origin";
 
 const BASE_URL = resolvePublicOrigin();
 
@@ -23,11 +23,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]);
 
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: `${BASE_URL}/`, priority: 1 },
+    { url: publicHomeUrl(), priority: 1 },
     { url: `${BASE_URL}/productos`, priority: 0.9 },
     { url: `${BASE_URL}/ligas`, priority: 0.7 },
     { url: `${BASE_URL}/sobre-nosotros`, priority: 0.5 },
     { url: `${BASE_URL}/contacto`, priority: 0.5 },
+    { url: `${BASE_URL}/envios`, priority: 0.4 },
   ];
 
   return [

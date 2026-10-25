@@ -1,4 +1,6 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { PUBLIC_READ_REVALIDATE_SECONDS, PUBLIC_SETTINGS_TAG } from "@/shared/cache/public-store";
 
 export async function getUsdRateSettings(): Promise<{
   copPerUsd: number;
@@ -24,7 +26,7 @@ export async function getUsdRateSettings(): Promise<{
  * Lectura pública de la tasa USD vigente.
  * Se usa en Server Components y en el selector de moneda.
  */
-export async function getPublicUsdRate(): Promise<
+async function loadPublicUsdRate(): Promise<
   { available: false } | { available: true; copPerUsd: number; updatedAt: string }
 > {
   const { copPerUsd, enabled, updatedAt } = await getUsdRateSettings();
@@ -39,6 +41,11 @@ export async function getPublicUsdRate(): Promise<
     updatedAt: updatedAt ?? new Date().toISOString(),
   };
 }
+
+export const getPublicUsdRate = unstable_cache(loadPublicUsdRate, ["public-usd-rate-v1"], {
+  revalidate: PUBLIC_READ_REVALIDATE_SECONDS,
+  tags: [PUBLIC_SETTINGS_TAG],
+});
 
 /**
  * Persiste la tasa USD (solo admin).

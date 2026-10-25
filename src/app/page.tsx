@@ -30,7 +30,7 @@ import {
   FeaturedHomepageSectionFallback,
 } from "@/components/home/featured-homepage-section";
 import { getMysteryBoxPage } from "@/features/products/repositories/product-repository";
-import { resolvePublicOrigin } from "@/shared/config/public-origin";
+import { publicHomeUrl } from "@/shared/config/public-origin";
 import { INDEXABLE } from "@/features/seo/domain/robots-policy";
 import { ProductImage } from "@/shared/ui/product-image";
 import { Suspense } from "react";
@@ -49,12 +49,12 @@ export const metadata: Metadata = {
     "camisetas de fútbol por tallas",
   ),
   robots: INDEXABLE,
-  alternates: { canonical: resolvePublicOrigin() },
+  alternates: { canonical: publicHomeUrl() },
   openGraph: {
     title: "Camisetas de Fútbol en Colombia | Envíos Flashsport",
     description:
       "Camisetas de fútbol de las principales ligas y equipos del mundo. Elige tu temporada, talla y versión, con envíos a toda Colombia.",
-    url: resolvePublicOrigin(),
+    url: publicHomeUrl(),
     siteName: "Flashsport",
     type: "website",
     locale: "es_CO",
@@ -97,10 +97,9 @@ export default async function HomePage() {
     <div>
       {/* ── HERO ───────────────────────────────────────────────────── */}
       <section className="relative overflow-x-clip border-b border-border">
-        <HeroHalloween />
         <div className="container-page relative z-10 grid items-center gap-6 pb-12 pt-6 sm:gap-10 sm:pb-16 sm:pt-10 md:pb-20 md:pt-14 lg:grid-cols-12 lg:gap-6">
           {/* Texto */}
-          <div className="lg:col-span-6 lg:pr-8">
+          <div className="relative z-20 lg:col-span-6 lg:pr-8">
             <HeroCopyAnimation>
               <p
                 data-hero-eyebrow
@@ -141,8 +140,9 @@ export default async function HomePage() {
           </div>
 
           {/* Fotografía de producto */}
-          <div className="mx-auto w-[92%] max-w-[22rem] sm:w-full sm:max-w-[28rem] lg:col-span-6 lg:mx-0 lg:max-w-none">
+          <div className="relative mx-auto w-[92%] max-w-[22rem] sm:w-full sm:max-w-[28rem] lg:col-span-6 lg:mx-0 lg:max-w-none">
             <HeroProduct product={heroProduct} />
+            <HeroHalloween />
           </div>
         </div>
       </section>

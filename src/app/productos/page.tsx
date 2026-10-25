@@ -278,7 +278,7 @@ export default async function ProductosPage({ searchParams }: PageProps) {
               )}
             </nav>
           )}
-          <div id="vistos-recientemente"><RecentlyViewed products={result.products} /></div>
+          <div id="vistos-recientemente"><RecentlyViewed /></div>
         </div>
       </div>
     </div>

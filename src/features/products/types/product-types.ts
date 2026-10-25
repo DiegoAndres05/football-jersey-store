@@ -105,7 +105,11 @@ export type VariantWithStock = VariantWithRelations & {
 };
 
 export type LeagueData = Pick<League, "id" | "slug" | "name" | "country"> & {
+  /** Productos activos, incluidos los agotados. */
   productCount: number;
+  /** Se pueden comprar: stock en alguna talla o bajo pedido. */
+  purchasableCount: number;
+  soldOutCount: number;
 };
 
 export type TeamData = Pick<Team, "id" | "slug" | "name" | "shortName"> & {

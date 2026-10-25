@@ -59,7 +59,7 @@ export function HeroBats() {
             refs.current[index] = node;
           }}
           data-hero-decoration={bat.id}
-          className={`hero-bat hero-bat-${bat.id}`}
+          className={`hero-bat hero-bat-${bat.id} pointer-events-none`}
         >
           <img
             src={batSilhouette.src}

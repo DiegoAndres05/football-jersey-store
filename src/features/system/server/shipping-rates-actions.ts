@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicSettings } from "@/shared/cache/invalidate-public-store";
 import { getSessionUser } from "@/features/auth/server/session";
 import { persistShippingRates } from "@/features/system/repositories/shipping-rates-repository";
 import { validateShippingRates } from "@/features/system/schemas/shipping-rates-schema";
@@ -23,6 +24,7 @@ export async function updateShippingRatesAction(
     revalidatePath("/admin/ajustes");
     revalidatePath("/carrito");
     revalidatePath("/checkout");
+    invalidatePublicSettings();
     return { ok: true };
   } catch (error) {
     console.error("[shipping] no se pudieron guardar las tarifas:", error);

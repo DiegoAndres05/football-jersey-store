@@ -9,6 +9,7 @@ import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld"
 import { serializeJsonLd } from "@/features/seo/domain/serialize-json-ld";
 import { appendKeywords } from "@/features/seo/domain/keywords";
 import { leagueLogoSrc } from "@/features/products/domain/league-logos";
+import { formatCatalogStockLabel } from "@/features/products/domain/catalog-stock-label";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -87,7 +88,11 @@ export default async function LeagueDetailPage({ params }: PageProps) {
           {league.name}
         </h1>
         <p className="mt-2 text-muted-foreground">
-          {league.activeProducts} producto{league.activeProducts !== 1 ? "s" : ""} disponible{league.activeProducts !== 1 ? "s" : ""}
+          {formatCatalogStockLabel({
+            total: league.activeProducts,
+            purchasable: league.purchasableCount,
+            soldOut: league.soldOutCount,
+          })}
         </p>
 
         <div className="mt-8">

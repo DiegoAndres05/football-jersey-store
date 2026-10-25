@@ -33,6 +33,7 @@ import { CheckoutConsents } from "@/app/checkout/consents";
 import type { LegalConfig } from "@/shared/config/legal";
 import { validateConsents } from "@/features/checkout/validation";
 import { createPaymentIdempotencyKey, readRecoveredCartItems, rememberPaymentRecovery } from "@/features/payments/recovery";
+import { cartUnitCount, cartUnitLabel } from "@/features/cart/domain/cart-units";
 
 const BOLD_SCRIPT_SRC = "https://checkout.bold.co/library/boldPaymentButton.js";
 const DESTINATION_COUNTRIES = [
@@ -237,10 +238,9 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
   }, [mounted, step, isColombiaDestination]);
 
   const shippingCountryField = register("shippingCountry");
+  const unitLabel = cartUnitLabel(cartUnitCount(items));
 
-  if (!mounted) return null;
-
-  if (items.length === 0) {
+  if (mounted && items.length === 0) {
     return (
       <div className="container-page py-16">
         <div className="flex flex-col items-center justify-center py-20 text-center rounded-xl border border-dashed border-border bg-card">
@@ -481,7 +481,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
           <p className="mt-3 text-sm text-destructive">No pudimos confirmar el pago con PayPal. Si se debitó, espera unos minutos o escríbenos.</p>
         )}
         <p className="text-sm text-muted-foreground mt-1">
-          Paso {step === "form" ? "1 de 2" : "2 de 2"} · {items.length} {items.length === 1 ? "artículo" : "artículos"}
+          Paso {step === "form" ? "1 de 2" : "2 de 2"} · {mounted ? unitLabel : "Cargando tu carrito…"}
         </p>
       </div>
 
@@ -647,7 +647,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
         <aside className="contents lg:sticky lg:top-24 lg:block lg:rounded-xl lg:border lg:border-border lg:bg-card lg:p-5">
           <div className={`order-2 min-w-0 rounded-xl border border-border bg-card p-4 space-y-4 sm:p-5 lg:order-none lg:rounded-none lg:border-0 lg:p-0 ${step === "form" ? "max-[430px]:hidden" : ""}`}>
             <h2 className="font-display text-lg font-bold uppercase tracking-tight">Resumen</h2>
-            {appliedCouponCode ? (
+            {mounted && appliedCouponCode ? (
               <p className="mt-3 text-sm text-green-700">
                 Cupón <strong>{appliedCouponCode}</strong> aplicado: -
                 {formatMoney({ amountCop: appliedCouponDiscount, currency: checkoutCurrency.currency, copPerUsd: checkoutCurrency.copPerUsd ?? undefined })}
@@ -658,17 +658,17 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
                 El cupón se aplica en el carrito antes de continuar al pago.
               </p>
             )}
-            {summaryItems}
+            {mounted ? summaryItems : <p className="text-sm text-muted-foreground">Cargando tu carrito…</p>}
 
             <Separator />
 
-            {summaryTotals}
+            {mounted ? summaryTotals : null}
 
             <Separator />
 
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
               <span className="text-sm font-medium">Total</span>
-              <span className="text-xl font-bold tabular-nums sm:text-2xl">{formatMoney({ amountCop: total, ...moneyContext })}</span>
+              <span className="text-xl font-bold tabular-nums sm:text-2xl">{mounted ? formatMoney({ amountCop: total, ...moneyContext }) : "—"}</span>
             </div>
           </div>
 
@@ -684,22 +684,28 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
                 <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm [&::-webkit-details-marker]:hidden">
                   <span className="min-w-0">
                     <span className="block font-medium">Ver resumen</span>
-                    <span className="block text-xs text-muted-foreground">{items.length} {items.length === 1 ? "artículo" : "artículos"} · envío {fee === 0 ? "gratis" : formatMoney({ amountCop: fee, ...moneyContext })}</span>
+                    <span className="block text-xs text-muted-foreground">{mounted ? `${unitLabel} · envío ${fee === 0 ? "gratis" : formatMoney({ amountCop: fee, ...moneyContext })}` : "Cargando tu carrito…"}</span>
                   </span>
                   <span className="inline-flex shrink-0 items-center gap-2 font-bold tabular-nums">
-                    {formatMoney({ amountCop: total, ...moneyContext })}
+                    {mounted ? formatMoney({ amountCop: total, ...moneyContext }) : "—"}
                     <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
                   </span>
                 </summary>
                 <div className="space-y-4 border-t border-border px-4 pb-4 pt-3">
-                  {summaryItems}
-                  <Separator />
-                  {summaryTotals}
-                  <Separator />
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <span className="text-sm font-medium">Total</span>
-                    <span className="text-xl font-bold tabular-nums">{formatMoney({ amountCop: total, ...moneyContext })}</span>
-                  </div>
+                  {mounted ? (
+                    <>
+                      {summaryItems}
+                      <Separator />
+                      {summaryTotals}
+                      <Separator />
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                        <span className="text-sm font-medium">Total</span>
+                        <span className="text-xl font-bold tabular-nums">{formatMoney({ amountCop: total, ...moneyContext })}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Cargando tu carrito…</p>
+                  )}
                 </div>
               </details>
               <Button
