@@ -38,6 +38,8 @@ import {
 import { CheckoutConsents } from "@/app/checkout/consents";
 import type { LegalConfig } from "@/shared/config/legal";
 import { validateConsents } from "@/features/checkout/validation";
+import { withRecipientContact } from "@/features/checkout/domain/recipient-contact";
+import { PurchaseTrustLinks } from "@/features/checkout/components/purchase-trust-links";
 import { createPaymentIdempotencyKey, readRecoveredCartItems, rememberPaymentRecovery } from "@/features/payments/recovery";
 import { cartUnitCount, cartUnitLabel } from "@/features/cart/domain/cart-units";
 import type { CartItem } from "@/shared/stores/cart-store";
@@ -143,6 +145,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
   const [paymentStatus, setPaymentStatus] = useState<CheckoutPaymentPhase>("idle");
   const [prepared, setPrepared] = useState<ReservedOrder | null>(null);
   const [payError, setPayError] = useState("");
+  const [recipientIsCustomer, setRecipientIsCustomer] = useState(true);
   const formRef = useRef<CheckoutFormValues | null>(null);
   const paymentKeyRef = useRef<string>("");
   if (!paymentKeyRef.current) paymentKeyRef.current = createPaymentIdempotencyKey();
@@ -178,7 +181,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
   useLayoutEffect(() => {
     if (!mounted) return;
     window.scrollTo(0, 0);
-  }, [mounted]);
+  }, [mounted, step]);
   const cartItemsKey = items.map((item) => `${item.lineId}:${item.quantity}`).join("|");
   useEffect(() => {
     // A cart mutation invalidates any previously validated promotion.
@@ -203,7 +206,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
     };
   }, [mounted, items.length]);
 
-  const { register, handleSubmit, setError, watch, formState: { errors, isValid } } = useForm<CheckoutFormValues>({
+  const { register, handleSubmit, setError, setValue, watch, formState: { errors, isValid } } = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema) as any,
     mode: "onChange",
     defaultValues: {
@@ -224,6 +227,18 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
       consentDataProcessing: false,
     },
   });
+  const contactName = watch("fullName");
+  const contactPhone = watch("phone");
+  const consentTerms = watch("consentTerms");
+  const consentPrivacy = watch("consentPrivacy");
+  const fullNameField = register("fullName");
+  const phoneField = register("phone");
+
+  useEffect(() => {
+    if (!recipientIsCustomer) return;
+    setValue("shippingFullName", contactName, { shouldValidate: contactName.trim().length > 0 });
+    setValue("shippingPhone", contactPhone, { shouldValidate: contactPhone.trim().length > 0 });
+  }, [recipientIsCustomer, contactName, contactPhone, setValue]);
 
   const destinationCountry = watch("shippingCountry") || SITE.country;
   const productSubtotal = useMemo(
@@ -402,7 +417,8 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
   };
 
   const onValid = (values: CheckoutFormValues) => {
-    const missing = validateConsents({ TERMS: values.consentTerms, PRIVACY: values.consentPrivacy, DATA_PROCESSING: values.consentDataProcessing });
+    const next = withRecipientContact(values, recipientIsCustomer);
+    const missing = validateConsents({ TERMS: next.consentTerms, PRIVACY: next.consentPrivacy, DATA_PROCESSING: next.consentDataProcessing });
     if (missing.length > 0) {
       for (const error of missing) {
         const field = error.field === "TERMS" ? "consentTerms" : error.field === "PRIVACY" ? "consentPrivacy" : "consentDataProcessing";
@@ -410,7 +426,11 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
       }
       return;
     }
-    formRef.current = values;
+    if (recipientIsCustomer) {
+      setValue("shippingFullName", next.shippingFullName);
+      setValue("shippingPhone", next.shippingPhone);
+    }
+    formRef.current = next;
     setPayError("");
     setStep("payment");
     const payingWithPayPal = normalizeCountry(values.shippingCountry) !== normalizeCountry(SITE.country);
@@ -424,7 +444,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
       return;
     }
     setPaymentStatus("preparing");
-    void reserveBoldOrder(values).then((order) => {
+    void reserveBoldOrder(next).then((order) => {
       if (order) setPaymentStatus("idle");
     });
   };
@@ -647,7 +667,16 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label htmlFor="fullName">Nombre completo</Label>
-                    <Input id="fullName" {...register("fullName")} placeholder="Tu nombre" autoComplete="name" />
+                    <Input
+                      id="fullName"
+                      placeholder="Tu nombre"
+                      autoComplete="name"
+                      {...fullNameField}
+                      onChange={(event) => {
+                        void fullNameField.onChange(event);
+                        if (recipientIsCustomer) setValue("shippingFullName", event.target.value, { shouldValidate: true });
+                      }}
+                    />
                     {errors.fullName && <p className="text-xs text-destructive">{errors.fullName.message}</p>}
                   </div>
                   <div className="space-y-1.5">
@@ -657,7 +686,18 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="phone">Teléfono</Label>
-                    <Input id="phone" type="tel" {...register("phone")} placeholder="300 000 0000" autoComplete="tel" />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      inputMode="tel"
+                      placeholder="300 000 0000"
+                      autoComplete="tel"
+                      {...phoneField}
+                      onChange={(event) => {
+                        void phoneField.onChange(event);
+                        if (recipientIsCustomer) setValue("shippingPhone", event.target.value, { shouldValidate: true });
+                      }}
+                    />
                     {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
                   </div>
                 </div>
@@ -669,17 +709,41 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
                   {destinationCountry} · {shippingScope} ·{" "}
                   {fee === 0 ? "Gratis en este pedido" : formatMoney({ amountCop: fee, ...moneyContext })}
                 </p>
+                <label htmlFor="recipient-is-customer" className="mb-4 flex min-h-11 cursor-pointer items-center gap-3">
+                  <input
+                    id="recipient-is-customer"
+                    type="checkbox"
+                    checked={recipientIsCustomer}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setRecipientIsCustomer(checked);
+                      if (checked) {
+                        setValue("shippingFullName", contactName, { shouldValidate: true });
+                        setValue("shippingPhone", contactPhone, { shouldValidate: true });
+                      }
+                    }}
+                    className="h-6 w-6 shrink-0"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">El destinatario soy yo</span>
+                    <span className="block text-xs text-muted-foreground">Mismos datos de contacto</span>
+                  </span>
+                </label>
                 <div className="grid sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="shippingFullName">Destinatario</Label>
-                    <Input id="shippingFullName" {...register("shippingFullName")} placeholder="Quién recibe el pedido" autoComplete="name" />
-                    {errors.shippingFullName && <p className="text-xs text-destructive">{errors.shippingFullName.message}</p>}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="shippingPhone">Teléfono de contacto</Label>
-                    <Input id="shippingPhone" type="tel" {...register("shippingPhone")} placeholder="300 000 0000" autoComplete="tel" />
-                    {errors.shippingPhone && <p className="text-xs text-destructive">{errors.shippingPhone.message}</p>}
-                  </div>
+                  {!recipientIsCustomer && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="shippingFullName">Destinatario</Label>
+                        <Input id="shippingFullName" {...register("shippingFullName")} placeholder="Quién recibe el pedido" autoComplete="section-shipping name" />
+                        {errors.shippingFullName && <p className="text-xs text-destructive">{errors.shippingFullName.message}</p>}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="shippingPhone">Teléfono de contacto</Label>
+                        <Input id="shippingPhone" type="tel" inputMode="tel" {...register("shippingPhone")} placeholder="300 000 0000" autoComplete="tel" />
+                        {errors.shippingPhone && <p className="text-xs text-destructive">{errors.shippingPhone.message}</p>}
+                      </div>
+                    </>
+                  )}
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label htmlFor="shippingLine1">Dirección</Label>
                     <Input id="shippingLine1" {...register("shippingLine1")} placeholder="Calle 1 # 2-3, apartamento 4" autoComplete="street-address" />
@@ -723,7 +787,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="shippingZipCode">Código postal</Label>
-                    <Input id="shippingZipCode" {...register("shippingZipCode")} placeholder="110111" autoComplete="postal-code" />
+                    <Input id="shippingZipCode" inputMode="numeric" pattern="[0-9]*" {...register("shippingZipCode")} placeholder="110111" autoComplete="postal-code" />
                     {errors.shippingZipCode && <p className="text-xs text-destructive">{errors.shippingZipCode.message}</p>}
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
@@ -734,13 +798,16 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
                 </div>
               </section>
 
-              <Button
-                type="submit"
-                className="w-full !flex-nowrap !whitespace-nowrap max-lg:hidden sm:w-auto"
-                disabled={!isValid}
-              >
-                {continueButtonContent}
-              </Button>
+              <div className="hidden space-y-3 lg:block">
+                <Button
+                  type="submit"
+                  className="w-full !flex-nowrap !whitespace-nowrap sm:w-auto"
+                  disabled={!isValid}
+                >
+                  {continueButtonContent}
+                </Button>
+                <PurchaseTrustLinks returnsHref={legalConfig?.returns.url} />
+              </div>
             </form>
           ) : (
             <div className="space-y-6">
@@ -782,6 +849,9 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
                 {reviewContact && (
                   <div className="text-sm text-muted-foreground">
                     <p>{reviewContact.fullName} · {reviewContact.email} · {reviewContact.phone}</p>
+                    {(reviewContact.shippingFullName !== reviewContact.fullName || reviewContact.shippingPhone !== reviewContact.phone) && (
+                      <p>Recibe {reviewContact.shippingFullName} · {reviewContact.shippingPhone}</p>
+                    )}
                     <p>
                       {[reviewContact.shippingLine1, reviewContact.shippingLine2, reviewContact.shippingCity, reviewContact.shippingState, reviewContact.shippingCountry]
                         .filter(Boolean)
@@ -864,6 +934,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
               {!isColombiaDestination && (
                 <p className="text-sm text-muted-foreground">El cobro se hace en dólares con PayPal.</p>
               )}
+              <PurchaseTrustLinks returnsHref={legalConfig?.returns.url} />
             </div>
           )}
         </div>
@@ -899,7 +970,14 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
 
           {step === "form" && (
             <section className="order-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5 lg:order-none lg:mt-4 lg:border-0 lg:p-0">
-              <CheckoutConsents register={register} errors={errors} legal={legalConfig ?? null} />
+              <CheckoutConsents
+                register={register}
+                setValue={setValue}
+                errors={errors}
+                legal={legalConfig ?? null}
+                consentTerms={consentTerms}
+                consentPrivacy={consentPrivacy}
+              />
             </section>
           )}
 
@@ -942,6 +1020,7 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
               >
                 {continueButtonContent}
               </Button>
+              <PurchaseTrustLinks returnsHref={legalConfig?.returns.url} />
             </div>
           )}
         </aside>

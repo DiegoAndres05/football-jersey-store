@@ -23,6 +23,7 @@ import { validateCoupon } from "@/features/coupons/server/coupon-actions";
 import { SHIPPING } from "@/shared/config/site";
 import { calculateOrderBreakdown } from "@/features/checkout/domain/order-breakdown";
 import type { ShippingRates } from "@/features/checkout/shipping";
+import { PurchaseTrustLinks } from "@/features/checkout/components/purchase-trust-links";
 
 export function CartPageClient({ currencyContext, shippingRates }: { currencyContext?: CurrencyContext; shippingRates?: ShippingRates }) {
   const items = useCartStore((s) => s.items);
@@ -351,6 +352,8 @@ export function CartPageClient({ currencyContext, shippingRates }: { currencyCon
               Ir a pagar <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
+
+          <PurchaseTrustLinks className="mt-3" />
 
           <p className="mt-3 text-[11px] text-muted-foreground text-center leading-relaxed">
             En Colombia el pago se completa con Bold. Fuera de Colombia, con PayPal.
