@@ -98,7 +98,13 @@ export function AddToCartButton({
     }
 
     setAdded(true);
-    toast({ title: "Agregado al carrito", variant: "success" });
+    toast({
+      title: "Agregado al carrito",
+      description: productName,
+      variant: "success",
+      duration: 8000,
+      action: { label: "Ver carrito", href: "/carrito" },
+    });
 
     setTimeout(() => setAdded(false), 2000);
   }, [variantId, productSlug, productName, teamName, versionName, sizeName, imageUrl, unitPrice, baseUnitPriceCop, personalizationSurchargeCop, customizationType, customizationName, customizationNumber, deliveryMode, immediateStock, remainingImmediateUnits, lineKind, disabled, sizeRequired, onMissingSize, addItem]);

@@ -12,3 +12,13 @@ export function sortPurchasableFirst<T>(items: readonly T[], isSoldOut: (item: T
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .map(({ item }) => item);
 }
+
+/** Disponibles primero, mismo equipo antes que el resto, y el orden original dentro de cada grupo. */
+export function compareRelatedProducts(
+  a: { soldOut: boolean; sameTeam: boolean; index: number },
+  b: { soldOut: boolean; sameTeam: boolean; index: number },
+): number {
+  return Number(a.soldOut) - Number(b.soldOut)
+    || Number(b.sameTeam) - Number(a.sameTeam)
+    || a.index - b.index;
+}

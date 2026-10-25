@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { whatsappLink, SHIPPING } from "@/shared/config/site";
+import { restockAlertHref } from "@/features/products/domain/restock-alert";
 import { ProductGallery } from "./product-gallery";
 import { ProductVariantSelector } from "./product-variant-selector";
 import { ProductCustomization } from "./product-customization";
@@ -330,9 +331,9 @@ export function ProductDetailClient({ product, currencyContext, shippingRates }:
               <p className="text-sm text-muted-foreground">Este producto está agotado y no se puede reservar.</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <Button size="xl" variant="outline" className="w-full" asChild>
-                  <a href={whatsappLink(`Hola Flashsport, quiero avisarme cuando vuelva a estar disponible ${product.name}.`)} target="_blank" rel="noopener noreferrer">
+                  <a href={restockAlertHref(product.name)} target="_blank" rel="noopener noreferrer">
                     <WhatsappIcon />
-                    Avisarme
+                    Avísame por WhatsApp
                   </a>
                 </Button>
                 <Button size="xl" variant="outline" className="w-full" asChild>
@@ -362,9 +363,9 @@ export function ProductDetailClient({ product, currencyContext, shippingRates }:
               <p className="text-sm text-muted-foreground">Esta talla está agotada.</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <Button size="xl" variant="outline" className="w-full" asChild>
-                  <a href={whatsappLink(`Hola Flashsport, quiero avisarme cuando esté disponible la talla ${currentVariant.size.name} de ${product.name}.`)} target="_blank" rel="noopener noreferrer">
+                  <a href={restockAlertHref(product.name, currentVariant.size.name)} target="_blank" rel="noopener noreferrer">
                     <WhatsappIcon />
-                    Avisarme
+                    Avísame por WhatsApp
                   </a>
                 </Button>
                 <Button size="xl" variant="outline" className="w-full" asChild>

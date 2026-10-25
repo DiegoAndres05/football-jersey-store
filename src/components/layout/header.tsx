@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Menu, X, Search, User, Heart, History } from "lucide-react";
 import { CartIcon } from "@/components/ui/cart-icon";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NavLinks } from "./nav-links";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,14 @@ import { useCartStore } from "@/shared/stores/cart-store";
 import { SITE } from "@/shared/config/site";
 import { useFavoritesStore } from "@/shared/stores/favorites-store";
 import { MobileCartFab } from "@/features/cart/components/mobile-cart-fab";
+
+function SearchQuerySync({ onQuery }: { onQuery: (value: string) => void }) {
+  const query = useSearchParams().get("q") ?? "";
+  useEffect(() => {
+    onQuery(query);
+  }, [onQuery, query]);
+  return null;
+}
 
 export function Header({
   currencySlot,
@@ -67,13 +75,16 @@ export function Header({
     e.preventDefault();
     const q = query.trim();
     router.push(q ? `/productos?q=${encodeURIComponent(q)}` : "/productos");
-    setQuery("");
-    setIsSearchOpen(false);
+    setQuery(q);
+    if (!q) setIsSearchOpen(false);
     setIsMobileOpen(false);
   };
 
   return (
     <>
+      <Suspense fallback={null}>
+        <SearchQuerySync onQuery={setQuery} />
+      </Suspense>
       <header
         className={cn(
           "fixed top-0 inset-x-0 w-full z-[var(--z-navbar)] transition-all duration-200",

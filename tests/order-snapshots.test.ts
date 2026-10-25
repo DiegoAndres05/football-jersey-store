@@ -7,7 +7,7 @@ test("checkout form contract carries independent consent snapshots", () => {
     fullName: "Ana Pérez", email: "ana@example.com", phone: "3001234567",
     shippingFullName: "Ana Pérez", shippingPhone: "3001234567",
     shippingLine1: "Calle 1 # 2-3", shippingCity: "Bogotá", shippingState: "Cundinamarca",
-    shippingCountry: "CO", consentTerms: true, consentPrivacy: true, consentDataProcessing: true,
+    shippingCountry: "CO", shippingZipCode: "110111", consentTerms: true, consentPrivacy: true, consentDataProcessing: true,
   });
   assert.equal(parsed.consentTerms, true);
   assert.equal(parsed.consentPrivacy, true);

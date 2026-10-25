@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { processMockPayment } from "../src/features/payments/services/mock-payment.ts";
-import { whatsappLink, SHIPPING } from "../src/shared/config/site.ts";
+import { SITE, whatsappLink, SHIPPING } from "../src/shared/config/site.ts";
 
 test("mock payment: éxito con referencia SIM y datos passthrough", async () => {
   const res = await processMockPayment({ method: "CARD", amount: 104900 });
@@ -20,7 +20,8 @@ test("mock payment: otro método (PSE) devuelve el método recibido", async () =
 
 test("whatsappLink: usa el número de la app y codifica el mensaje", () => {
   const link = whatsappLink("¿Tienes la camiseta de Colombia?");
-  assert.equal(link, "https://wa.me/573000000000?text=%C2%BFTienes%20la%20camiseta%20de%20Colombia%3F");
+  const digits = SITE.whatsappNumber.replace(/\D/g, "");
+  assert.equal(link, `https://wa.me/${digits}?text=%C2%BFTienes%20la%20camiseta%20de%20Colombia%3F`);
 });
 
 test("whatsappLink: número personalizado con formato pasa a dígitos", () => {

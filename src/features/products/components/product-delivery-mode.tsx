@@ -59,7 +59,7 @@ export function ProductDeliveryMode({
               aria-pressed={isSelected}
               onClick={() => onSelect(mode)}
               className={cn(
-                "rounded-xl border-2 p-3 text-left transition-all",
+                "min-h-[5.5rem] rounded-xl border-2 p-3 text-left transition-all",
                 "disabled:pointer-events-none",
                 isSelected
                   ? "border-primary bg-primary/5"
@@ -79,15 +79,13 @@ export function ProductDeliveryMode({
                   {info.label}
                 </span>
               </span>
-              <span className="mt-1 block text-xs text-muted-foreground leading-relaxed">
-                {reason ?? info.description}
-                {!disabled && (
-                  <span className="block">
-                    {mode === "INMEDIATA" && isLowStock
-                      ? `¡Solo ${stock} disponibles! Despacho en 24–48 horas.`
-                      : info.eta}
-                  </span>
-                )}
+              <span className="mt-1 block min-h-10 text-xs leading-relaxed text-muted-foreground">
+                <span className="block">{reason ?? info.description}</span>
+                <span className={cn("block", disabled && "invisible")} aria-hidden={disabled || undefined}>
+                  {mode === "INMEDIATA" && isLowStock && !disabled
+                    ? `¡Solo ${stock} disponibles! Despacho en 24–48 horas.`
+                    : info.eta}
+                </span>
               </span>
             </button>
           );

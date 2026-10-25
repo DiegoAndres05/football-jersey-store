@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { PUBLIC_CATALOG_TAG, PUBLIC_READ_REVALIDATE_SECONDS } from "@/shared/cache/public-store";
 import { buildProductWhere } from "./product-where";
 import { productMatchesCatalogFilters } from "../domain/catalog-filter-match";
-import { isSoldOutListing, sortPurchasableFirst } from "../domain/catalog-listing-order";
+import { compareRelatedProducts, isSoldOutListing, sortPurchasableFirst } from "../domain/catalog-listing-order";
 import type {
   ProductCardData,
   ProductListResult,
@@ -207,13 +207,10 @@ export async function getRelatedProducts(
   const mapped = await mapProductCards(candidates);
   return mapped
     .map((card, index) => ({ card, index }))
-    .sort((a, b) => {
-      const soldOutA = a.card.availability === "OUT_OF_STOCK" ? 1 : 0;
-      const soldOutB = b.card.availability === "OUT_OF_STOCK" ? 1 : 0;
-      const otherTeamA = a.card.team.id === product.team.id ? 0 : 1;
-      const otherTeamB = b.card.team.id === product.team.id ? 0 : 1;
-      return soldOutA - soldOutB || otherTeamA - otherTeamB || a.index - b.index;
-    })
+    .sort((a, b) => compareRelatedProducts(
+      { soldOut: a.card.availability === "OUT_OF_STOCK", sameTeam: a.card.team.id === product.team.id, index: a.index },
+      { soldOut: b.card.availability === "OUT_OF_STOCK", sameTeam: b.card.team.id === product.team.id, index: b.index },
+    ))
     .slice(0, limit)
     .map(({ card }) => card);
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { X, CheckCircle2, XCircle, AlertTriangle, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToastStore } from "./toast";
@@ -24,7 +25,10 @@ export function Toaster() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[var(--z-toast)] flex w-full max-w-sm flex-col gap-2 pointer-events-none">
+    <div
+      aria-live="polite"
+      className="pointer-events-none fixed inset-x-4 top-[4.75rem] z-[var(--z-toast)] flex flex-col gap-2 md:inset-x-auto md:right-4 md:top-[5.25rem] md:w-full md:max-w-sm"
+    >
       {toasts.map((t) => {
         const Icon = iconMap[t.variant ?? "info"];
         return (
@@ -32,7 +36,7 @@ export function Toaster() {
             key={t.id}
             className={cn(
               "pointer-events-auto flex items-start gap-3 rounded-xl border bg-card p-4 shadow-lg",
-              "animate-in slide-in-from-right-2 fade-in-0",
+              "animate-in slide-in-from-top-2 fade-in-0",
               borderColorMap[t.variant ?? "info"],
             )}
           >
@@ -49,10 +53,18 @@ export function Toaster() {
               {t.description && (
                 <p className="mt-0.5 text-xs text-muted-foreground">{t.description}</p>
               )}
+              {t.action && (
+                <Link
+                  href={t.action.href}
+                  className="mt-2 inline-flex min-h-11 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
+                >
+                  {t.action.label}
+                </Link>
+              )}
             </div>
             <button
               onClick={() => dismiss(t.id)}
-              className="text-muted-foreground hover:text-foreground transition-colors rounded-lg p-0.5"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground"
             >
               <X className="h-4 w-4" />
               <span className="sr-only">Cerrar</span>
