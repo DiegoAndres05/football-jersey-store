@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -147,6 +147,10 @@ export function CheckoutPageClient({ currencyContext, legalConfig, paypalNotice,
   if (!paymentKeyRef.current) paymentKeyRef.current = createPaymentIdempotencyKey();
 
   useEffect(() => setMounted(true), []);
+  useLayoutEffect(() => {
+    if (!mounted) return;
+    window.scrollTo(0, 0);
+  }, [mounted]);
   const cartItemsKey = items.map((item) => `${item.lineId}:${item.quantity}`).join("|");
   useEffect(() => {
     // A cart mutation invalidates any previously validated promotion.
