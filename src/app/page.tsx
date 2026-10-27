@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   BadgeCheck,
+  Check,
   Headphones,
   MessageCircle,
   ShieldCheck,
@@ -37,7 +38,9 @@ import { Suspense } from "react";
 import { appendKeywords } from "@/features/seo/domain/keywords";
 import { HeroCopyAnimation } from "@/components/home/hero-copy-animation";
 import { HeroHalloween } from "@/components/home/hero-halloween";
-import { Marquee } from "@/components/ui/marquee";
+import { NameNumberPreview } from "@/components/home/name-number-preview";
+import { formatMoney } from "@/shared/money/format";
+import { discountPercent } from "@/features/products/domain/product-price-display";
 
 export const metadata: Metadata = {
   title: "Camisetas de Fútbol en Colombia | Envíos Flashsport",
@@ -70,10 +73,10 @@ export const metadata: Metadata = {
 const BIG_LEAGUES = BIG_LEAGUE_SLUGS;
 
 const TRUST_ITEMS = [
-  { icon: Truck, label: "Envíos a todo el país" },
-  { icon: ShieldCheck, label: "Pagos seguros" },
-  { icon: BadgeCheck, label: "Productos de calidad" },
-  { icon: Headphones, label: "Atención personalizada" },
+  { icon: Truck, title: "Envíos a todo el país", body: "Interrapidísimo y Servientrega con número de guía." },
+  { icon: ShieldCheck, title: "Pagos 100% seguros", body: "PSE, Nequi, Bancolombia y tarjetas bancarias." },
+  { icon: BadgeCheck, title: "Productos de calidad", body: "Ediciones Fan y Player con bordados y vinilos HD." },
+  { icon: Headphones, title: "Atención personalizada", body: "Asesoría directa en WhatsApp +57 304 614 9525." },
 ] as const;
 
 export default async function HomePage() {
@@ -85,6 +88,14 @@ export default async function HomePage() {
   ]);
 
   const heroProduct = featured[0] ?? null;
+  const heroDiscount =
+    heroProduct?.showPrice && heroProduct.displayPrice !== null
+      ? discountPercent(heroProduct.displayPrice, heroProduct.compareAtPrice)
+      : null;
+  const money = {
+    currency: currencyCtx.currency,
+    copPerUsd: currencyCtx.copPerUsd ?? undefined,
+  };
 
   const leaguesBySlug = new Map(leagues.map((l) => [l.slug, l]));
   const bigLeagues = BIG_LEAGUES.map((slug) => leaguesBySlug.get(slug)).filter(
@@ -96,68 +107,106 @@ export default async function HomePage() {
   return (
     <div>
       {/* ── HERO ───────────────────────────────────────────────────── */}
-      <section className="relative overflow-x-clip border-b border-border">
-        <div className="container-page relative z-10 grid items-center gap-6 pb-12 pt-6 sm:gap-10 sm:pb-16 sm:pt-10 md:pb-20 md:pt-14 lg:grid-cols-12 lg:gap-6">
-          {/* Texto */}
-          <div className="relative z-20 lg:col-span-6 lg:pr-8">
-            <HeroCopyAnimation>
-              <p
-                data-hero-eyebrow
-                className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground"
-              >
-                Tienda de camisetas de fútbol
-              </p>
-              <h1
-                data-hero-title
-                className="mt-3 font-display text-4xl font-bold uppercase leading-[0.95] tracking-[-0.01em] min-[390px]:text-5xl sm:mt-5 md:text-6xl xl:text-7xl"
-              >
-                Camisetas de fútbol
-                <br />
-                en Colombia
-              </h1>
-              <p
-                data-hero-description
-                className="mt-4 max-w-md text-muted-foreground leading-relaxed sm:mt-5"
-              >
-                Camisetas de fútbol de las mejores ligas del mundo. Equipos,
-                temporadas y tallas reales, con envío a todo el país.
-              </p>
-              <div
-                data-hero-actions
-                className="mt-6 flex flex-wrap items-center gap-3 sm:mt-8 sm:gap-4"
-              >
-                <Button size="lg" asChild>
-                  <Link href="/productos">
-                    Comprar ahora
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button size="lg" variant="outline" asChild>
-                  <Link href="/ligas">Explorar ligas</Link>
-                </Button>
+      <section className="relative overflow-x-clip">
+        <div className="container-page relative z-10 pb-8 pt-4 md:pb-12 md:pt-5">
+          <div className="grid items-stretch gap-8 rounded-[24px] border border-[#ece8e3] bg-white p-5 sm:p-6 lg:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)]">
+            <div className="relative z-20 flex h-full flex-col">
+              <div className="flex flex-1 flex-col justify-center py-4">
+              <HeroCopyAnimation>
+                <p data-hero-eyebrow className="inline-flex items-center gap-2 rounded-full bg-[#f4f3f0] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#3f3f3f]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" />
+                  Temporada oficial 2026/27
+                </p>
+                <h1
+                  data-hero-title
+                  className="mt-5 text-[40px] font-extrabold uppercase leading-[0.9] tracking-[-0.045em] text-[#111] [font-family:var(--font-ui-heavy),var(--font-sans)] sm:text-[48px]"
+                >
+                  <span className="block">Camisetas de fútbol</span>
+                  <span className="block">en Colombia</span>
+                </h1>
+                <p data-hero-description className="mt-4 max-w-[440px] text-[15px] leading-[1.55] text-[#6d6964]">
+                  Camisetas de fútbol de las mejores ligas del mundo. Equipos,
+                  temporadas y tallas reales, con envío seguro a todo el país y
+                  personalización con nombre y dorsal.
+                </p>
+                <div data-hero-actions className="mt-6 flex flex-wrap items-center gap-3">
+                  <Button size="lg" className="h-12 rounded-full px-6 text-[13px] font-bold uppercase tracking-[0.06em]" asChild>
+                    <Link href="/productos">
+                      Comprar ahora
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button size="lg" variant="outline" className="h-12 rounded-full border-[#e4e0da] bg-white px-6 text-[13px] font-bold uppercase tracking-[0.06em]" asChild>
+                    <Link href="/ligas">Explorar ligas</Link>
+                  </Button>
+                </div>
+              </HeroCopyAnimation>
               </div>
-            </HeroCopyAnimation>
-          </div>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  ["100%", "Garantizadas"],
+                  ["Fan & Player", "Versiones reales"],
+                  ["Nacional", "Cobertura total"],
+                ].map(([title, subtitle]) => (
+                  <div key={title} className="rounded-2xl border border-[#eeeae5] bg-[#fbfaf8] px-3 py-3">
+                    <p className="text-[14px] font-extrabold text-[#171717] [font-family:var(--font-ui-heavy),var(--font-sans)]">{title}</p>
+                    <p className="mt-0.5 text-[12px] text-[#8a857f]">{subtitle}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          {/* Fotografía de producto */}
-          <div className="relative mx-auto w-[92%] max-w-[22rem] sm:w-full sm:max-w-[28rem] lg:col-span-6 lg:mx-0 lg:max-w-none">
-            <HeroProduct product={heroProduct} />
-            <HeroHalloween />
+            <div className="relative mx-auto w-full max-w-[28rem] rounded-[22px] border border-[#eeeae5] bg-white p-4 lg:max-w-none">
+              <div className="relative z-20 mb-3 flex items-center justify-between gap-3">
+                <span className="shrink-0 rounded-md bg-black px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white [font-family:var(--font-ui-heavy),var(--font-sans)]">
+                  {heroDiscount ? `Destacada -${heroDiscount}%` : "Destacada"}
+                </span>
+                <span className="min-w-0 truncate text-right text-[11px] font-medium uppercase tracking-[0.14em] text-[#9a958e]">
+                  {heroProduct?.team.league?.name ?? "Ligas"} · {heroProduct?.season.name ?? "2026/27"}
+                </span>
+              </div>
+              <HeroProduct product={heroProduct} />
+              <HeroHalloween />
+              {heroProduct && (
+                <div className="mt-4 flex items-end justify-between gap-3 border-t border-[#f0ece7] pt-4">
+                  <div className="min-w-0">
+                    <p className="text-[16px] font-extrabold leading-tight text-[#171717] [font-family:var(--font-ui-heavy),var(--font-sans)]">
+                      {heroProduct.name}
+                    </p>
+                    <p className="mt-1 text-[13px] text-[#8a857f]">
+                      {heroProduct.versionNames[0] ?? heroProduct.team.name}
+                    </p>
+                  </div>
+                  {heroProduct.showPrice && heroProduct.displayPrice !== null && (
+                    <div className="shrink-0 text-right">
+                      {heroProduct.compareAtPrice !== null && heroDiscount ? (
+                        <p className="whitespace-nowrap text-[12px] text-[#b0aaa3] line-through">
+                          {formatMoney({ amountCop: heroProduct.compareAtPrice, ...money })}
+                        </p>
+                      ) : null}
+                      <p className="whitespace-nowrap text-[22px] font-extrabold leading-none tracking-[-0.03em] [font-family:var(--font-ui-heavy),var(--font-sans)]">
+                        {formatMoney({ amountCop: heroProduct.displayPrice, ...money })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── TRUST BAR ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-px border-b border-border bg-border md:grid-cols-4">
+      <div className="container-page grid gap-3 pb-4 sm:grid-cols-2 xl:grid-cols-4">
         {TRUST_ITEMS.map((item) => (
-          <div
-            key={item.label}
-            className="flex items-center justify-center gap-2.5 bg-background px-3 py-4"
-          >
-            <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              {item.label}
+          <div key={item.title} className="flex gap-3 rounded-[18px] border border-[#ece8e3] bg-white p-4">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#f4f2ee] text-[#2a2a2a]">
+              <item.icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
             </span>
+            <div>
+              <p className="text-[14px] font-extrabold leading-tight text-[#171717] [font-family:var(--font-ui-heavy),var(--font-sans)]">{item.title}</p>
+              <p className="mt-1 text-[12.5px] leading-[1.35] text-[#8a857f]">{item.body}</p>
+            </div>
           </div>
         ))}
       </div>
@@ -185,13 +234,13 @@ export default async function HomePage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
                   Una elección sorpresa
                 </p>
-                <h2 className="mt-2 font-display text-3xl font-bold uppercase tracking-tight md:text-4xl">
+                <h2 className="mt-2 text-3xl font-extrabold uppercase tracking-[-0.03em] [font-family:var(--font-ui-heavy),var(--font-sans)] md:text-4xl">
                   Caja misteriosa
                 </h2>
                 <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
                   {mysteryBox.description}
                 </p>
-                <Button className="mt-6" asChild>
+                <Button className="mt-6 h-12 rounded-full px-6" asChild>
                   <Link href="/caja-misteriosa">
                     Descubrir la caja
                     <ArrowRight className="h-4 w-4" />
@@ -204,31 +253,27 @@ export default async function HomePage() {
       )}
 
       {/* ── LAS GRANDES LIGAS ──────────────────────────────────────── */}
-      <section className="container-page py-16 md:py-20">
+      <section className="container-page py-10 md:py-14">
+        <div className="rounded-[24px] border border-[#ece8e3] bg-white px-5 py-6 sm:px-6">
         <div className="flex items-end justify-between gap-6">
           <div>
-            <h2 className="font-display text-3xl font-bold uppercase tracking-tight md:text-4xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#a39e97]">
+              Colecciones oficiales
+            </p>
+            <h2 className="mt-1 text-[28px] font-extrabold uppercase leading-none tracking-[-0.03em] [font-family:var(--font-ui-heavy),var(--font-sans)]">
               Las grandes ligas
             </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Encuentra las camisetas de tus equipos por liga.
-            </p>
           </div>
           <Link
             href="/productos"
-            className="hidden items-center gap-1.5 text-sm font-semibold uppercase tracking-[0.14em] hover:underline underline-offset-4 sm:inline-flex"
+            className="hidden items-center gap-1 text-[12px] font-extrabold uppercase tracking-[0.08em] underline decoration-1 underline-offset-4 sm:inline-flex [font-family:var(--font-ui-heavy),var(--font-sans)]"
           >
-            Ver todo el catálogo
+            Ver catálogo completo
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
 
-        <Marquee
-          className="mt-8"
-          pauseOnHover={false}
-          speed={36}
-          aria-label="Principales ligas de fútbol"
-        >
+        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           {bigLeagues.map((league) => {
             const liga = league.name;
             const logo = leagueLogo(league.slug, league.name);
@@ -239,31 +284,45 @@ export default async function HomePage() {
                 key={league.slug}
                 href={`/productos?liga=${league.slug}&sort=default`}
                 aria-label={`Ver camisetas de ${liga}`}
-                className="group flex h-36 w-36 shrink-0 items-center justify-center rounded-full p-3 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-4 sm:h-44 sm:w-44 sm:p-4"
+                className="rounded-2xl border border-[#eeeae5] bg-white px-3 py-5 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
               >
-                {logoSrc ? (
-                  <Image
-                    src={logoSrc}
-                    alt={leagueLogoAlt(league.name)}
-                    width={176}
-                    height={176}
-                    unoptimized
-                    loading="eager"
-                    sizes="(max-width: 639px) 144px, 176px"
-                    className="block h-full w-full object-contain transition-transform group-hover:scale-105"
-                  />
-                ) : (
-                  <span
-                    className="font-display text-4xl font-bold uppercase"
-                    aria-hidden="true"
-                  >
-                    {fallbackMonogram}
-                  </span>
-                )}
+                <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#f5f3ef]">
+                  {logoSrc ? (
+                    <Image
+                      src={logoSrc}
+                      alt={leagueLogoAlt(league.name)}
+                      width={36}
+                      height={36}
+                      unoptimized
+                      className="h-8 w-8 object-contain"
+                    />
+                  ) : (
+                    <span className="text-[11px] font-extrabold uppercase [font-family:var(--font-ui-heavy),var(--font-sans)]" aria-hidden="true">
+                      {fallbackMonogram}
+                    </span>
+                  )}
+                </span>
+                <p className="mt-3 text-[12px] font-extrabold uppercase tracking-[0.04em] text-[#1a1a1a] [font-family:var(--font-ui-heavy),var(--font-sans)]">
+                  {liga}
+                </p>
+                <p className="mt-0.5 text-[12px] text-[#9a958e]">{league.country}</p>
               </Link>
             );
           })}
-        </Marquee>
+          <Link
+            href="/ligas"
+            className="rounded-2xl border border-[#eeeae5] bg-white px-3 py-5 text-center"
+          >
+            <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#f5f3ef] text-[18px]" aria-hidden="true">
+              🌐
+            </span>
+            <p className="mt-3 text-[12px] font-extrabold uppercase tracking-[0.04em] [font-family:var(--font-ui-heavy),var(--font-sans)]">
+              Selecciones
+            </p>
+            <p className="mt-0.5 text-[12px] text-[#9a958e]">Mundiales</p>
+          </Link>
+        </div>
+        </div>
       </section>
 
       {/* ── LAS MÁS BUSCADAS ───────────────────────────────────────── */}
@@ -271,7 +330,7 @@ export default async function HomePage() {
         <div className="container-page py-16 md:py-20">
           <div className="flex items-end justify-between gap-6">
             <div>
-              <h2 className="font-display text-3xl font-bold uppercase tracking-tight md:text-4xl">
+              <h2 className="text-3xl font-extrabold uppercase tracking-[-0.03em] [font-family:var(--font-ui-heavy),var(--font-sans)] md:text-4xl">
                 Las más buscadas
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -293,30 +352,67 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── WHATSAPP ───────────────────────────────────────────────── */}
-      <section className="container-page py-16 md:py-20">
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-card px-6 py-14 text-center md:px-14">
-          <div className="relative mx-auto max-w-xl">
-            <h2 className="font-display text-3xl font-bold uppercase leading-[0.95] tracking-tight md:text-4xl">
-              ¿No encuentras la camiseta
-              <br />
-              que buscas?
+      <section className="container-page py-4 md:py-8">
+        <div className="grid items-center gap-8 rounded-[24px] border border-[#ece8e3] bg-white px-6 py-7 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
+          <div>
+            <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a857f]">
+              <span aria-hidden="true">✎</span> Estampado oficial matchday
+            </p>
+            <h2 className="mt-4 text-[32px] font-extrabold uppercase leading-[0.95] tracking-[-0.035em] [font-family:var(--font-ui-heavy),var(--font-sans)] sm:text-[36px]">
+              Personalización con nombre y número
             </h2>
-            <p className="mt-4 text-muted-foreground leading-relaxed">
-              Tenemos acceso a muchas más camisetas, equipos y temporadas de
-              las que publicamos. Escríbenos y te ayudamos a conseguirla.
+            <p className="mt-3 max-w-[460px] text-[14.5px] leading-[1.5] text-[#6f6b66]">
+              Agrega tu nombre, el de tu jugador favorito o fecha especial con tipografías oficiales termofijadas con acabado profesional de larga duración.
             </p>
-            <div className="mt-8 flex justify-center">
-              <Button size="lg" asChild>
-                <a href={whatsappLink()} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle className="h-5 w-5" />
-                  Consultar por WhatsApp
-                </a>
-              </Button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {["Tipografías Oficiales de Liga", "Parches de Competición", "Fijación Térmica HD"].map((chip) => (
+                <span key={chip} className="rounded-full bg-[#f3f1ed] px-3 py-1.5 text-[12px] text-[#5f5b56]">
+                  {chip}
+                </span>
+              ))}
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">
-              Pedidos por encargo · Las 5 grandes ligas y muchas más
+            <p className="mt-6 text-[13.5px] text-[#6f6b66]">
+              Disponible en todas las camisetas bajo pedido:{" "}
+              <span className="font-extrabold text-[#171717] [font-family:var(--font-ui-heavy),var(--font-sans)]">+$15.000 COP</span>
             </p>
+          </div>
+          <NameNumberPreview />
+        </div>
+      </section>
+
+      {/* ── WHATSAPP ───────────────────────────────────────────────── */}
+      <section className="container-page py-10 md:py-14">
+        <div className="flex flex-col gap-8 rounded-[24px] border border-[#ece8e3] bg-white px-6 py-7 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+          <div className="max-w-[640px]">
+            <span className="inline-flex items-center gap-2 rounded-full bg-[#eefbf3] px-3 py-1 text-[12px] font-semibold text-[#178a45]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" />
+              Servicio Concierge Directo
+            </span>
+            <h2 className="mt-4 text-[30px] font-extrabold uppercase leading-[0.95] tracking-[-0.035em] [font-family:var(--font-ui-heavy),var(--font-sans)] sm:text-[34px]">
+              ¿No encuentras la camiseta que buscas?
+            </h2>
+            <p className="mt-3 max-w-[560px] text-[14.5px] leading-[1.5] text-[#6f6b66]">
+              Tenemos acceso a muchas más camisetas, clubes exóticos, selecciones de época y
+              temporadas históricas de las que publicamos. Escríbenos directamente y te ayudamos
+              a conseguirla.
+            </p>
+            <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-[#3f3f3f]">
+              {["Pedidos por encargo", "Las 5 grandes ligas", "Copas del Mundo y retro"].map((item) => (
+                <span key={item} className="inline-flex items-center gap-1.5">
+                  <Check className="h-3.5 w-3.5" strokeWidth={2.4} />
+                  {item}
+                </span>
+              ))}
+            </p>
+          </div>
+          <div className="shrink-0">
+            <Button size="lg" className="h-12 rounded-full px-5 text-[13px] font-bold uppercase tracking-[0.04em]" asChild>
+              <a href={whatsappLink()} target="_blank" rel="noopener noreferrer">
+                <MessageCircle className="h-4 w-4 text-[#25D366]" />
+                Consultar por WhatsApp
+              </a>
+            </Button>
+            <p className="mt-2 text-[12px] text-[#8a857f]">+57 304 614 9525 · Respuesta en minutos</p>
           </div>
         </div>
       </section>

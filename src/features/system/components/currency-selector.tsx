@@ -49,18 +49,18 @@ export function CurrencySelector({ current, rateInfo }: CurrencySelectorProps) {
           </div>
         </div>
       )}
-      <div className="flex rounded-lg border border-border overflow-hidden" aria-busy={switchingTo !== null}>
+      <div className="flex items-center rounded-md bg-[#f4f2ee] p-0.5 text-[12px] font-semibold" aria-busy={switchingTo !== null}>
         <button
           type="button"
           onClick={() => handleChange("COP")}
           disabled={switchingTo !== null}
-          className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`rounded px-2 py-1 transition-colors ${
             current === "COP"
-              ? "bg-foreground text-background"
-              : "bg-background text-muted-foreground hover:text-foreground"
+              ? "bg-white text-[#171717] shadow-sm"
+              : "text-[#8a857f] hover:text-[#171717]"
           } disabled:cursor-wait disabled:opacity-70`}
         >
-          COP
+          COP ($)
         </button>
         <button
           type="button"
@@ -68,10 +68,10 @@ export function CurrencySelector({ current, rateInfo }: CurrencySelectorProps) {
           disabled={!usdAvailable || switchingTo !== null}
           aria-disabled={!usdAvailable}
           title={usdAvailable ? "Ver precios en dólares" : "Los dólares no están disponibles"}
-          className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`rounded px-2 py-1 transition-colors ${
             current === "USD"
-              ? "bg-foreground text-background"
-              : "bg-background text-muted-foreground hover:text-foreground"
+              ? "bg-white text-[#171717] shadow-sm"
+              : "text-[#8a857f] hover:text-[#171717]"
           } disabled:cursor-not-allowed disabled:opacity-50`}
         >
           USD

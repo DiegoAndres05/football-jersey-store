@@ -46,10 +46,32 @@ export function ProductCustomization({
     ...(hasPlayerPrint && players.length > 0 ? [{ value: "OFFICIAL_PLAYER" as const, label: "Jugador" }] : []),
   ];
 
+  const selectedPlayer = players.find((player) => player.id === selectedPlayerId);
+  const previewName =
+    type === "CUSTOM" ? name.trim() || "Tu nombre aquí" : type === "OFFICIAL_PLAYER" ? selectedPlayer?.name ?? "Tu nombre aquí" : "Tu nombre aquí";
+  const previewNumber =
+    type === "CUSTOM" ? number.trim() || "10" : type === "OFFICIAL_PLAYER" ? selectedPlayer?.number ?? "10" : "10";
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4 rounded-[22px] border border-[#ece8e3] bg-white p-4">
+      <div className="rounded-[22px] bg-[#12141a] px-5 py-5 text-white">
+        <p className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#9aa0aa]">
+          Vista previa de estampado
+        </p>
+        <div className="mt-4 rounded-2xl border border-dashed border-[#3a3f4a] px-4 py-6 text-center">
+          <p className="text-[18px] font-extrabold uppercase tracking-[0.08em] [font-family:var(--font-ui-heavy),var(--font-sans)]">
+            {previewName}
+          </p>
+          <p className="mt-1 text-[64px] font-extrabold leading-none tracking-[-0.04em] [font-family:var(--font-ui-heavy),var(--font-sans)]">
+            {previewNumber}
+          </p>
+          <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9aa0aa]">
+            Parche oficial incluido
+          </p>
+        </div>
+      </div>
       <div className="flex items-baseline justify-between">
-        <label className="text-sm font-medium block">Personalización</label>
+        <label className="block text-sm font-extrabold uppercase tracking-[-0.03em] [font-family:var(--font-ui-heavy),var(--font-sans)]">Personalización</label>
         {surcharge > 0 && (
           <span className="text-xs text-muted-foreground">
             Adicional:{" "}
@@ -68,6 +90,7 @@ export function ProductCustomization({
           return (
             <button
               key={o.value}
+              type="button"
               aria-pressed={isSelected}
               onClick={() => onTypeChange(o.value)}
               className={cn(

@@ -27,7 +27,7 @@ export function NavLinks({
     <nav
       className={cn(
         "flex",
-        mobile ? "flex-col gap-1" : "items-center gap-4 whitespace-nowrap xl:gap-6",
+        mobile ? "flex-col gap-1" : "items-center gap-7 whitespace-nowrap",
         className,
       )}
     >
@@ -49,10 +49,8 @@ export function NavLinks({
                       : "border-transparent text-muted-foreground hover:text-foreground",
                   )
                 : cn(
-                    "whitespace-nowrap border-b-2 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors xl:text-[13px] xl:tracking-[0.12em]",
-                    isActive
-                      ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+                    "whitespace-nowrap py-1 text-[15px] font-medium text-[#2c2c2c] transition-colors hover:text-black",
+                    isActive && "font-bold text-black underline decoration-2 underline-offset-[7px]",
                   ),
             )}
           >

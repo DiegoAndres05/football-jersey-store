@@ -87,63 +87,62 @@ export function Header({
       </Suspense>
       <header
         className={cn(
-          "fixed top-0 inset-x-0 w-full z-[var(--z-navbar)] transition-all duration-200",
-          isScrolled
-            ? "bg-background/85 backdrop-blur-xl border-b border-border shadow-sm"
-            : "bg-background border-b border-border",
+          "fixed top-0 inset-x-0 z-[var(--z-navbar)] border-b border-[#ece8e3] bg-[#faf9f7]",
+          isScrolled && "shadow-sm",
         )}
       >
-        <div className="container-page relative flex h-16 items-center md:h-[4.5rem] lg:grid lg:grid-cols-[max-content_minmax(0,1fr)_auto] lg:gap-3">
+        <div className="container-page relative flex h-14 items-center">
           <Button
             variant="ghost"
             size="icon"
-            className="h-11 w-11 lg:hidden"
+            className="mr-1 h-11 w-11 lg:hidden"
             onClick={() => setIsMobileOpen(true)}
             aria-label="Menú"
           >
             <Menu className="h-5 w-5" />
           </Button>
 
-          <Link
-            href="/"
-            aria-label={SITE.brand}
-            className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 lg:static lg:z-auto lg:translate-x-0 lg:translate-y-0"
-          >
-            <picture>
-              <source media="(min-width: 1024px)" srcSet="/flashsport-logo-halloween.png" />
-              <img
-                src="/flashsport-mark.png"
-                alt=""
-                className="h-10 w-auto lg:-ml-3 lg:h-9 lg:w-[13.5rem] lg:translate-y-1 lg:object-contain lg:object-left"
-              />
-            </picture>
+          <Link href="/" aria-label={SITE.brand} className="shrink-0">
+            <img src="/flashsport-logo.png" alt="" className="h-8 w-auto sm:h-9" />
           </Link>
+          <NavLinks className="absolute left-1/2 hidden -translate-x-1/2 lg:flex" />
 
-          <div className="hidden min-w-0 lg:block">
-            <NavLinks className="hidden justify-center lg:flex" />
-          </div>
-
-          <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             {currencySlot && (
-              <div className="hidden border-l border-border pl-3 sm:ml-3 sm:block xl:ml-4 xl:pl-4">{currencySlot}</div>
+              <div className="hidden sm:block">{currencySlot}</div>
             )}
 
-            <form
-              role="search"
-              onSubmit={submitSearch}
-              className="hidden md:flex items-center relative"
-            >
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <input
-                type="search"
-                name="q"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar camisetas..."
-                aria-label="Buscar camisetas"
-                className="h-9 w-36 rounded-md border border-input bg-background pl-9 pr-3 text-sm transition-all hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground lg:w-40 xl:w-56"
-              />
-            </form>
+            <div className="relative hidden md:block">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => setIsSearchOpen((open) => !open)}
+                aria-label="Buscar"
+                aria-expanded={isSearchOpen}
+              >
+                <Search className="h-[18px] w-[18px]" />
+              </Button>
+              {isSearchOpen && (
+                <form
+                  role="search"
+                  onSubmit={submitSearch}
+                  className="absolute right-0 top-full z-20 mt-2 w-64"
+                >
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="search"
+                    name="q"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Buscar camisetas..."
+                    aria-label="Buscar camisetas"
+                    className="h-10 w-full rounded-full border border-[#e6e2dc] bg-white pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
+                    autoFocus
+                  />
+                </form>
+              )}
+            </div>
 
             <Button
               variant="ghost"
@@ -155,38 +154,32 @@ export function Header({
               <Search className="h-5 w-5" />
             </Button>
 
-            <Button variant="ghost" size="icon" asChild aria-label="Cuenta" className="hidden h-11 w-11 md:inline-flex">
-              <Link href="/cuenta">
-                <User className="h-5 w-5" />
-              </Link>
-            </Button>
-
-            {/* <div className="hidden xl:block">
-              <FavoritesBadge />
-            </div> */}
-
-            {/* <Button variant="ghost" size="icon" asChild aria-label="Vistos recientemente" className="hidden xl:inline-flex"><Link href="/productos#vistos-recientemente"><History className="h-5 w-5" /></Link></Button> */}
-
-            <CartBadge />
-
             <Popover open={isDesktopMenuOpen} onOpenChange={setIsDesktopMenuOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="hidden lg:inline-flex"
-                  aria-label={isDesktopMenuOpen ? "Cerrar menú" : "Abrir menú"}
+                  className="hidden h-10 w-10 md:inline-flex"
+                  aria-label={isDesktopMenuOpen ? "Cerrar cuenta" : "Cuenta"}
                   aria-expanded={isDesktopMenuOpen}
                 >
-                  <Menu className="h-5 w-5" aria-hidden="true" />
+                  <User className="h-[18px] w-[18px]" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64">
-                <nav aria-label="Accesos rápidos" className="space-y-1">
+                <nav aria-label="Cuenta" className="space-y-1">
+                  <Link
+                    href="/cuenta"
+                    onClick={() => setIsDesktopMenuOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#3a3a3a] transition-colors hover:bg-[#f4f2ee] hover:text-black"
+                  >
+                    <User className="h-4 w-4" aria-hidden="true" />
+                    Mi cuenta
+                  </Link>
                   <Link
                     href="/favoritos"
                     onClick={() => setIsDesktopMenuOpen(false)}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#3a3a3a] transition-colors hover:bg-[#f4f2ee] hover:text-black"
                   >
                     <Heart className="h-4 w-4" aria-hidden="true" />
                     Favoritos
@@ -194,7 +187,7 @@ export function Header({
                   <Link
                     href="/productos#vistos-recientemente"
                     onClick={() => setIsDesktopMenuOpen(false)}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#3a3a3a] transition-colors hover:bg-[#f4f2ee] hover:text-black"
                   >
                     <History className="h-4 w-4" aria-hidden="true" />
                     Vistos recientemente
@@ -203,6 +196,7 @@ export function Header({
               </PopoverContent>
             </Popover>
 
+            <CartBadge />
           </div>
         </div>
 
@@ -224,7 +218,7 @@ export function Header({
           </div>
         )}
       </header>
-      <div aria-hidden="true" className="h-16 md:h-[4.5rem]" />
+      <div aria-hidden="true" className="h-14" />
 
       <MobileCartFab isMobileMenuOpen={isMobileOpen} />
 
@@ -294,18 +288,20 @@ export function Header({
 
 function CartBadge() {
   const count = useCartStore((s) => s.items.reduce((acc, i) => acc + i.quantity, 0));
+  const label = count > 99 ? "99+" : String(count);
 
   return (
-    <Button variant="ghost" size="icon" aria-label="Carrito" className="relative h-11 w-11" asChild>
-      <Link href="/carrito">
-        <CartIcon className="h-5 w-5" />
-        {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-            {count > 99 ? "99+" : count}
-          </span>
-        )}
-      </Link>
-    </Button>
+    <Link
+      href="/carrito"
+      aria-label={`Carrito, ${count} ${count === 1 ? "producto" : "productos"}`}
+      className="inline-flex h-9 items-center gap-1.5 rounded-full bg-black pl-3 pr-1 text-[13px] font-bold text-white [font-family:var(--font-ui-heavy),var(--font-sans)]"
+    >
+      <CartIcon className="h-4 w-4" />
+      <span className="hidden sm:inline">Carrito</span>
+      <span className="grid h-6 min-w-6 place-items-center rounded-full bg-white px-1 text-[11px] font-bold text-black">
+        {label}
+      </span>
+    </Link>
   );
 }
 

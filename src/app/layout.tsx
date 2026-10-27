@@ -26,6 +26,15 @@ const barlowCondensed = localFont({
   display: "swap",
 });
 
+const interHeavy = localFont({
+  src: [
+    { path: "./fonts/inter-700.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/inter-800.woff2", weight: "800", style: "normal" },
+  ],
+  variable: "--font-ui-heavy",
+  display: "swap",
+});
+
 const siteUrl = resolvePublicOrigin();
 
 export const metadata: Metadata = {
@@ -101,7 +110,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <html lang="es" className={`${inter.variable} ${barlowCondensed.variable}`}>
+    <html lang="es" className={`${inter.variable} ${barlowCondensed.variable} ${interHeavy.variable}`}>
       <head>
         <script
           type="application/ld+json"

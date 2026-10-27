@@ -13,7 +13,7 @@ export function HeroProduct({ product }: { product: ProductCardData | null }) {
   const seasonYear = product?.season.name.replace(/^temporada\s*/i, "");
 
   const card = (
-      <div className="hero-jersey-card relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-border bg-secondary shadow-[0_20px_50px_-24px_rgba(0,0,0,0.18)]">
+      <div className="hero-jersey-card relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-[#eeeae5] bg-[#f4f2ee]">
       {image && product ? (
         <Image
           src={image.url}

@@ -45,6 +45,6 @@ test("public header boundary remains separate from admin layout", () => {
 test("public header stays fixed to the viewport and reserves its row height", () => {
   assert.match(header, /fixed top-0 inset-x-0 w-full/);
   assert.doesNotMatch(header, /sticky top-0/);
-  assert.match(header, /aria-hidden="true" className="h-16 md:h-\[4\.5rem\]"/);
+  assert.match(header, /aria-hidden="true" className="h-14"/);
   assert.doesNotMatch(adminLayout, /<Header/);
 });

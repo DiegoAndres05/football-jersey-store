@@ -55,11 +55,9 @@ test("homepage Las grandes ligas uses leagueLogoSrc and object-contain", () => {
   assert.match(page, /leagueMonogram/);
   assert.match(domain, /\/leagues\//);
   assert.match(page, /object-contain/);
-  assert.match(page, /h-36 w-36/);
   assert.match(page, /Las grandes ligas/);
   assert.match(page, /\/productos\?liga=\$\{league\.slug\}&sort=default/);
-  assert.match(page, /<Marquee/);
-  assert.match(page, /pauseOnHover/);
+  assert.match(page, /Selecciones/);
   assert.doesNotMatch(page, /cdn\.21st\.dev/);
   assert.doesNotMatch(page, /LEAGUE_MONOGRAMS/);
 });

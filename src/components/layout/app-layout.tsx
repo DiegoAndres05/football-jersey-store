@@ -6,7 +6,13 @@ import { CookieConsentBanner } from "@/components/privacy/cookie-consent-banner"
 import { headers } from "next/headers";
 
 export async function AppLayout({ children }: { children: React.ReactNode }) {
-  const isAdminRoute = (await headers()).get("x-admin-route") === "true";
+  const requestHeaders = await headers();
+  const isAdminRoute = requestHeaders.get("x-admin-route") === "true";
+  const pathname = requestHeaders.get("x-pathname") ?? "";
+
+  if (pathname === "/design-system") {
+    return <div className="min-h-screen bg-[#faf9f7] text-[#141414]">{children}</div>;
+  }
 
   if (isAdminRoute) {
     return (
