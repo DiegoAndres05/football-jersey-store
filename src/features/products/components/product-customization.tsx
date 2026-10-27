@@ -70,18 +70,16 @@ export function ProductCustomization({
           </p>
         </div>
       </div>
-      <div className="flex items-baseline justify-between">
+      <div className="space-y-1">
         <label className="block text-sm font-extrabold uppercase tracking-[-0.03em] [font-family:var(--font-ui-heavy),var(--font-sans)]">Personalización</label>
-        {surcharge > 0 && (
-          <span className="text-xs text-muted-foreground">
-            Adicional:{" "}
-            {formatMoney({
-              amountCop: surcharge,
-              currency: currencyContext?.currency ?? "COP",
-              copPerUsd: currencyContext?.copPerUsd ?? undefined,
-            })}
-          </span>
-        )}
+        <p className="text-sm font-medium">
+          Nombre y dorsal en esta camiseta:{" "}
+          {formatMoney({
+            amountCop: surcharge,
+            currency: currencyContext?.currency ?? "COP",
+            copPerUsd: currencyContext?.copPerUsd ?? undefined,
+          })}
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">

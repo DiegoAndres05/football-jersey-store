@@ -45,7 +45,7 @@ const productCardSelect = {
   },
 } satisfies Prisma.ProductSelect;
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 20;
 
 function cacheCatalog<Args extends unknown[], Result>(
   fn: (...args: Args) => Promise<Result>,
@@ -126,7 +126,7 @@ async function loadProducts(filters: ProductFilters): Promise<ProductListResult>
   return { products: mapped, total, page, totalPages: Math.ceil(total / PAGE_SIZE) };
 }
 
-export const getProducts = cacheCatalog(loadProducts, "public-products-v1");
+export const getProducts = cacheCatalog(loadProducts, "public-products-v2");
 
 async function loadProductBySlug(slug: string): Promise<ProductDetailData | null> {
   const product = await prisma.product.findUnique({

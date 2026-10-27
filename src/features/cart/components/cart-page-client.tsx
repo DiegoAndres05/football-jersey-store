@@ -28,7 +28,7 @@ import { PurchaseTrustLinks } from "@/features/checkout/components/purchase-trus
 export function CartPageClient({ currencyContext, shippingRates }: { currencyContext?: CurrencyContext; shippingRates?: ShippingRates }) {
   const items = useCartStore((s) => s.items);
   const itemCount = useCartStore((s) => s.items.reduce((acc, i) => acc + i.quantity, 0));
-  const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0));
+  const subtotal = useCartStore((s) => s.items.reduce((acc, i) => acc + (i.baseUnitPriceCop ?? i.unitPrice) * i.quantity, 0));
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
   const reconcileWithStock = useCartStore((s) => s.reconcileWithStock);
@@ -42,7 +42,7 @@ export function CartPageClient({ currencyContext, shippingRates }: { currencyCon
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponMessage, setCouponMessage] = useState("");
   const [stockByVariant, setStockByVariant] = useState<Map<string, number> | null>(null);
-  const personalizationFee = items.reduce((sum, item) => sum + item.quantity * (item.personalizationSurchargeCop ?? 0), 0);
+  const personalizationFee = items.reduce((sum, item) => sum + item.quantity * (item.personalizationSurchargeCop ?? (item.customizationType !== "NONE" ? Math.max(0, item.unitPrice - (item.baseUnitPriceCop ?? item.unitPrice)) : 0)), 0);
   const orderBreakdown = useMemo(
     () => calculateOrderBreakdown({
       productSubtotal: subtotal,

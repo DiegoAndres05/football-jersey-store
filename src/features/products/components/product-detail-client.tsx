@@ -227,6 +227,8 @@ export function ProductDetailClient({ product, currencyContext, shippingRates }:
           variantId: currentVariant.id,
           versionName: currentVariant.version.name,
           sizeName: currentVariant.size.name,
+          baseUnitPriceCop: currentVariant.salePrice,
+          personalizationSurchargeCop: surcharge,
           unitPrice: currentVariant.salePrice + surcharge,
           immediateStock: currentVariant.stock ?? 0,
           disabled: !personalizationValidation.ok || !selectedSize,
@@ -237,7 +239,9 @@ export function ProductDetailClient({ product, currencyContext, shippingRates }:
           variantId: currentVariant?.id ?? "",
           versionName: selectedVersion ? product.variants.find((variant) => variant.version.slug === selectedVersion)?.version.name ?? "" : "",
           sizeName: selectedSize || "",
-          unitPrice: currentVariant?.salePrice ?? 0,
+          baseUnitPriceCop: currentVariant?.salePrice ?? 0,
+          personalizationSurchargeCop: surcharge,
+          unitPrice: (currentVariant?.salePrice ?? 0) + surcharge,
           immediateStock: currentVariant?.stock ?? 0,
           disabled: !personalizationValidation.ok || !selectedSize || !currentVariant,
           sizeRequired: !selectedSize || !currentVariant,
@@ -257,7 +261,9 @@ export function ProductDetailClient({ product, currencyContext, shippingRates }:
       </div>
 
       <div className="grid gap-8 md:grid-cols-2 lg:gap-12 min-w-0">
-        <ProductGallery images={product.images} product={product} />
+        <div className="lg:sticky lg:top-20 lg:self-start">
+          <ProductGallery images={product.images} product={product} />
+        </div>
 
         <div className="space-y-6 min-w-0">
           <div>

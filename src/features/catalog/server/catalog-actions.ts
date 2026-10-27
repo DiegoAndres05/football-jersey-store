@@ -256,6 +256,10 @@ export async function createProductAction(formData: FormData) {
   }
 
   await prisma.product.create({ data: { slug, ...parsed.data } });
+  revalidatePath("/admin/productos");
+  revalidatePath("/productos");
+  revalidatePath("/");
+  invalidatePublicCatalog();
   redirect("/admin/productos");
 }
 
@@ -271,6 +275,11 @@ export async function updateProductAction(productId: string, formData: FormData)
   }
 
   await prisma.product.update({ where: { id: productId }, data: { slug, ...parsed.data } });
+  revalidatePath("/admin/productos");
+  revalidatePath("/productos");
+  revalidatePath(`/productos/${slug}`);
+  revalidatePath("/");
+  invalidatePublicCatalog();
   redirect("/admin/productos");
 }
 
@@ -315,6 +324,9 @@ export async function updateAllProductsAction(formData: FormData) {
     }),
   );
   revalidatePath("/admin/productos");
+  revalidatePath("/productos");
+  revalidatePath("/");
+  invalidatePublicCatalog();
   redirect("/admin/productos");
 }
 

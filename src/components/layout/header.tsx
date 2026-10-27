@@ -103,7 +103,10 @@ export function Header({
           </Button>
 
           <Link href="/" aria-label={SITE.brand} className="shrink-0">
-            <img src="/flashsport-logo.png" alt="" className="h-8 w-auto sm:h-9" />
+            <picture>
+              <source media="(min-width: 1024px)" srcSet="/flashsport-logo.png" />
+              <img src="/flashsport-mark.png" alt="" className="h-9 w-auto" />
+            </picture>
           </Link>
           <NavLinks className="absolute left-1/2 hidden -translate-x-1/2 lg:flex" />
 
