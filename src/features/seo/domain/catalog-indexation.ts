@@ -13,6 +13,8 @@ const SEO_NOISE_KEYS = new Set([
   "modalidad",
   "temporada",
   "version",
+  "precioMin",
+  "precioMax",
 ]);
 
 export function decideCatalogIndexation(

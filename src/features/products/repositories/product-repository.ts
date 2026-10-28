@@ -45,7 +45,7 @@ const productCardSelect = {
   },
 } satisfies Prisma.ProductSelect;
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 21;
 
 function cacheCatalog<Args extends unknown[], Result>(
   fn: (...args: Args) => Promise<Result>,
@@ -126,7 +126,7 @@ async function loadProducts(filters: ProductFilters): Promise<ProductListResult>
   return { products: mapped, total, page, totalPages: Math.ceil(total / PAGE_SIZE) };
 }
 
-export const getProducts = cacheCatalog(loadProducts, "public-products-v2");
+export const getProducts = cacheCatalog(loadProducts, "public-products-v3");
 
 async function loadProductBySlug(slug: string): Promise<ProductDetailData | null> {
   const product = await prisma.product.findUnique({
@@ -389,6 +389,19 @@ async function loadSizes() {
 export const getSeasons = cacheCatalog(loadSeasons, "public-seasons-v1");
 export const getVersions = cacheCatalog(loadVersions, "public-versions-v1");
 export const getSizes = cacheCatalog(loadSizes, "public-sizes-v1");
+
+async function loadCatalogPriceBounds(): Promise<{ min: number; max: number }> {
+  const row = await prisma.productVariant.aggregate({
+    where: { salePrice: { gt: 0 }, product: { isActive: true } },
+    _min: { salePrice: true },
+    _max: { salePrice: true },
+  });
+  const min = row._min.salePrice ?? 0;
+  const max = Math.max(min, row._max.salePrice ?? 0);
+  return { min, max };
+}
+
+export const getCatalogPriceBounds = cacheCatalog(loadCatalogPriceBounds, "public-price-bounds-v1");
 
 /** Misma regla que las fichas: hay stock en alguna talla, o alguna admite bajo pedido. */
 async function countCatalogProducts(where: Prisma.ProductWhereInput) {

@@ -11,14 +11,16 @@ import {
   getVersions,
   getSizes,
   getTeamsByLeague,
+  getCatalogPriceBounds,
 } from "@/features/products/repositories/product-repository";
 import { ProductGrid } from "@/features/products/components/product-grid";
-import { ProductFilters } from "@/features/products/components/product-filters";
+import { CatalogSortControl, ProductFilters } from "@/features/products/components/product-filters";
+import { MobileFilterSheet } from "@/features/products/components/mobile-filter-sheet";
 import { EmptyState } from "@/features/products/components/empty-state";
-import { parseProductFiltersParams } from "@/features/products/schemas/product-filters-schema";
+import { parseProductFiltersParams, productFiltersFromParams } from "@/features/products/schemas/product-filters-schema";
 import type { ProductFilters as FilterParams } from "@/features/products/types/product-types";
 import { RecentlyViewed } from "@/features/products/components/recently-viewed";
-import { getCurrencyContext } from "@/shared/money/server-helpers";
+import { formatPriceWithCurrency, getCurrencyContext } from "@/shared/money/server-helpers";
 import { resolvePublicOrigin } from "@/shared/config/public-origin";
 import { INDEXABLE, NOINDEX_FOLLOW } from "@/features/seo/domain/robots-policy";
 import { buildBreadcrumbJsonLd } from "@/features/seo/domain/breadcrumb-json-ld";
@@ -71,36 +73,29 @@ export default async function ProductosPage({ searchParams }: PageProps) {
   }
 
   const raw = parseProductFiltersParams(params);
+  const filters = productFiltersFromParams(raw);
 
-  const filters: FilterParams = {
-    league: raw.liga,
-    team: raw.equipo,
-    season: raw.temporada,
-    version: raw.version,
-    size: raw.talla,
-    availability: raw.disponibilidad,
-    deliveryMode: raw.modalidad,
-    search: raw.q,
-    sort: raw.sort,
-    page: raw.page ?? 1,
-  };
-
-  const [result, leagues, teams, seasons, versions, sizes, currencyCtx] = await Promise.all([
+  const [result, leagues, allTeams, seasons, versions, sizes, currencyCtx, priceBounds] = await Promise.all([
     getProducts(filters),
     getLeagues(),
-    filters.league ? getTeamsByLeague(filters.league) : Promise.resolve([]),
+    getTeamsByLeague(),
     getSeasons(),
     getVersions(),
     getSizes(),
     getCurrencyContext(),
+    getCatalogPriceBounds(),
   ]);
+  const leagueSlugs = new Set((filters.league ?? "").split(",").filter(Boolean));
+  const teams = leagueSlugs.size === 0
+    ? []
+    : allTeams.filter((team) => team.league != null && leagueSlugs.has(team.league.slug));
 
   const activeFilters = buildActiveFilters(raw, {
     league: new Map(leagues.map((l) => [l.slug, l.name])),
-    team: new Map(teams.map((t) => [t.slug, t.name])),
+    team: new Map(allTeams.map((t) => [t.slug, t.name])),
     season: new Map(seasons.map((s) => [s.slug, s.name])),
     version: new Map(versions.map((v) => [v.slug, v.name])),
-  });
+  }, currencyCtx);
   const hasActiveFilters = activeFilters.length > 0;
 
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
@@ -153,33 +148,26 @@ export default async function ProductosPage({ searchParams }: PageProps) {
             </p>
           </div>
 
-          {/* Mobile filters */}
-          <div className="lg:hidden my-6">
-            <details className="group">
-              <summary className="flex min-h-12 items-center justify-between rounded-lg border border-border bg-card p-3 text-sm font-medium cursor-pointer hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                <span id="mobile-filter-label">
-                  {hasActiveFilters ? `Filtros (${activeFilters.length})` : "Filtros"}
-                </span>
-                <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
-              </summary>
-              <div className="mt-3" aria-labelledby="mobile-filter-label">
-                {hasActiveFilters && (
-                  <Link
-                    href="/productos"
-                    className="mb-4 inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4 hover:text-foreground"
-                  >
-                    Limpiar todo
-                  </Link>
-                )}
-                <ProductFilters
-                  leagues={leagues.map((l) => ({ slug: l.slug, name: l.name, country: l.country }))}
-                  teams={teams.map((t) => ({ slug: t.slug, name: t.name }))}
-                  seasons={seasons}
-                  versions={versions}
-                  sizes={sizes}
-                />
-              </div>
-            </details>
+          <div className="my-5 grid grid-cols-2 gap-3 lg:hidden">
+            <MobileFilterSheet
+              leagues={leagues.map((league) => ({ slug: league.slug, name: league.name }))}
+              teams={allTeams.map((team) => ({
+                slug: team.slug,
+                name: team.name,
+                leagueSlug: team.league?.slug ?? null,
+              }))}
+              seasons={seasons.map((season) => ({
+                slug: season.slug,
+                name: season.name,
+                isRetro: season.isRetro,
+              }))}
+              versions={versions.map((version) => ({ slug: version.slug, name: version.name }))}
+              sizes={sizes.map((size) => ({ code: size.code }))}
+              priceBounds={priceBounds}
+              total={result.total}
+              currency={{ currency: currencyCtx.currency, copPerUsd: currencyCtx.copPerUsd }}
+            />
+            <CatalogSortControl />
           </div>
 
           {/* Active filter chips */}
@@ -197,7 +185,7 @@ export default async function ProductosPage({ searchParams }: PageProps) {
               ))}
               <Link
                 href="/productos"
-                className="hidden text-xs font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors lg:inline"
+                className="inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors lg:min-h-0"
               >
                 Limpiar todo
               </Link>
@@ -304,6 +292,7 @@ type FilterLookups = {
 function buildActiveFilters(
   raw: ReturnType<typeof parseProductFiltersParams>,
   lookups: FilterLookups,
+  currencyCtx: Awaited<ReturnType<typeof getCurrencyContext>>,
 ): {
   param: string;
   label: string;
@@ -336,21 +325,60 @@ function buildActiveFilters(
     { key: "sort", param: "sort", label: "Orden", format: (v) => SORT_LABELS[v] ?? v },
   ];
 
-  return labels.flatMap(({ key, param, label, format }) => {
+  const chips = labels.flatMap(({ key, param, label, format }) => {
     const value = raw[key];
     if (typeof value !== "string" || !value || (key === "sort" && value === "default")) return [];
-    const url = new URLSearchParams();
-    for (const [k, v] of Object.entries(raw)) {
-      if (k === param || typeof v !== "string" || !v || (k === "sort" && v === "default")) continue;
-      url.set(k, v);
-    }
-    return [{ param, label: `${label}: ${format(value)}`, removeHref: `/productos?${url.toString()}` }];
+    return [{ param, label: `${label}: ${format(value)}`, removeHref: catalogHrefWithout(raw, [param]) }];
   });
+
+  if (raw.precioMin != null || raw.precioMax != null) {
+    const low = raw.precioMin != null ? formatPriceWithCurrency(raw.precioMin, currencyCtx) : null;
+    const high = raw.precioMax != null ? formatPriceWithCurrency(raw.precioMax, currencyCtx) : null;
+    const label = low && high
+      ? `Precio: ${low} – ${high}`
+      : low
+        ? `Precio: desde ${low}`
+        : `Precio: hasta ${high}`;
+    chips.push({
+      param: "precio",
+      label,
+      removeHref: catalogHrefWithout(raw, ["precioMin", "precioMax"]),
+    });
+  }
+
+  return chips;
+}
+
+function catalogHrefWithout(
+  raw: ReturnType<typeof parseProductFiltersParams>,
+  skip: string[],
+): string {
+  const skipped = new Set(skip);
+  const url = new URLSearchParams();
+  const pairs: [string, string | number | undefined][] = [
+    ["q", raw.q],
+    ["liga", raw.liga],
+    ["equipo", raw.equipo],
+    ["temporada", raw.temporada],
+    ["version", raw.version],
+    ["talla", raw.talla],
+    ["disponibilidad", raw.disponibilidad],
+    ["modalidad", raw.modalidad],
+    ["sort", raw.sort && raw.sort !== "default" ? raw.sort : undefined],
+    ["precioMin", raw.precioMin],
+    ["precioMax", raw.precioMax],
+  ];
+  for (const [key, value] of pairs) {
+    if (skipped.has(key) || value == null || value === "") continue;
+    url.set(key, String(value));
+  }
+  const query = url.toString();
+  return query ? `/productos?${query}` : "/productos";
 }
 
 function CatalogSkeleton() {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-5">
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="rounded-xl border border-border overflow-hidden">
           <Skeleton variant="rectangular" className="aspect-[3/4]" />
@@ -388,6 +416,8 @@ function paramsToQuery(filters: FilterParams): string {
   if (filters.size) p.set("talla", filters.size);
   if (filters.availability) p.set("disponibilidad", filters.availability);
   if (filters.deliveryMode) p.set("modalidad", filters.deliveryMode);
+  if (filters.minPrice != null) p.set("precioMin", String(filters.minPrice));
+  if (filters.maxPrice != null) p.set("precioMax", String(filters.maxPrice));
   if (filters.search) p.set("q", filters.search);
   if (filters.sort && filters.sort !== "default") p.set("sort", filters.sort);
   return p.toString() ? `&${p.toString()}` : "";

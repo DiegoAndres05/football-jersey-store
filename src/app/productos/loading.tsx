@@ -16,7 +16,7 @@ export default function ProductosLoading() {
 
         <div className="flex-1">
           <Skeleton variant="text" className="h-8 w-40 mb-4" />
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="rounded-xl border border-border overflow-hidden">
                 <Skeleton variant="rectangular" className="aspect-[3/4]" />

@@ -102,7 +102,11 @@ export function Header({
             <Menu className="h-5 w-5" />
           </Button>
 
-          <Link href="/" aria-label={SITE.brand} className="shrink-0">
+          <Link
+            href="/"
+            aria-label={SITE.brand}
+            className="absolute left-1/2 z-10 shrink-0 -translate-x-1/2 lg:static lg:z-auto lg:translate-x-0"
+          >
             <picture>
               <source media="(min-width: 1024px)" srcSet="/flashsport-logo.png" />
               <img src="/flashsport-mark.png" alt="" className="h-9 w-auto" />

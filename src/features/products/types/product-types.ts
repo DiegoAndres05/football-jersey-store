@@ -48,6 +48,10 @@ export type ProductFilters = {
   search?: string;
   sort?: SortOption;
   page?: number;
+  /** Precio mínimo de alguna variante, en COP. */
+  minPrice?: number;
+  /** Precio máximo de alguna variante, en COP. */
+  maxPrice?: number;
 };
 
 export type SortOption = "default" | "price-asc" | "price-desc" | "name-asc" | "name-desc" | "newest";

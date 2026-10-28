@@ -32,5 +32,6 @@ describe("mobile catalog filters", () => {
       4,
     );
     assert.equal(countActiveProductFilters(new URLSearchParams("sort=default&page=1")), 0);
+    assert.equal(countActiveProductFilters(new URLSearchParams("precioMin=85000&precioMax=140000")), 1);
   });
 });

@@ -13,6 +13,8 @@ const CATALOG_QUERY_KEYS = new Set([
   "talla",
   "disponibilidad",
   "modalidad",
+  "precioMin",
+  "precioMax",
   "sort",
   "page",
 ]);
@@ -94,6 +96,9 @@ function isCatalogQueryValue(key: string, value: string): boolean {
   if (key === "talla") return value.length <= 10;
   if (key === "disponibilidad") return value === "AVAILABLE" || value === "OUT_OF_STOCK";
   if (key === "modalidad") return value === "INMEDIATA" || value === "BAJO_PEDIDO";
+  if (key === "precioMin" || key === "precioMax") {
+    return /^\d+$/.test(value) && Number(value) <= 100_000_000;
+  }
   if (key === "sort") return SORTS.has(value);
   if (key === "page") return /^[1-9]\d{0,3}$/.test(value) && Number(value) <= 1000;
   return false;

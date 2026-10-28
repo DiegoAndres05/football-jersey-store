@@ -27,13 +27,21 @@ export function buildProductWhere(filters: ProductFilters): Prisma.ProductWhereI
     where.productKind = { not: "MYSTERY_BOX" };
   }
 
-  if (filters.version || filters.size) {
+  const hasPrice = filters.minPrice != null || filters.maxPrice != null;
+  if (filters.version || filters.size || hasPrice) {
     const variantFilters: Prisma.ProductVariantWhereInput[] = [];
     if (filters.version) {
       variantFilters.push({ version: { slug: filters.version } });
     }
     if (filters.size) {
       variantFilters.push({ size: { code: { equals: filters.size, mode: "insensitive" } } });
+    }
+    if (hasPrice) {
+      const salePrice: Prisma.IntFilter = {};
+      if (filters.minPrice != null && filters.minPrice > 0) salePrice.gte = filters.minPrice;
+      if (filters.maxPrice != null && filters.maxPrice > 0) salePrice.lte = filters.maxPrice;
+      if (salePrice.gte == null) salePrice.gt = 0;
+      variantFilters.push({ salePrice });
     }
     where.variants = { some: { AND: variantFilters } };
   }

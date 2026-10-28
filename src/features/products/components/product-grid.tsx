@@ -19,7 +19,7 @@ export function ProductGrid({
   }
 
   return (
-    <div className="grid min-w-0 grid-cols-2 gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4">
+    <div className="grid min-w-0 grid-cols-2 gap-4 md:grid-cols-3 md:gap-5">
       {products.map((product, i) => (
         <ProductCard key={product.id} product={product} priority={priority && i < 4} currencyContext={currencyContext} contextQuery={contextQuery} />
       ))}

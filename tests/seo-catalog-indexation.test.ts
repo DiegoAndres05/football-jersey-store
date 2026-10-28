@@ -64,6 +64,11 @@ describe("decideCatalogIndexation", () => {
     assert.deepStrictEqual(result, { action: "noindex" });
   });
 
+  it("precioMin → noindex", () => {
+    const result = decideCatalogIndexation({ precioMin: "85000" });
+    assert.deepStrictEqual(result, { action: "noindex" });
+  });
+
   it("liga=x&equipo=y → noindex", () => {
     const result = decideCatalogIndexation({ liga: "liga-x", equipo: "equipo-y" });
     assert.deepStrictEqual(result, { action: "noindex" });

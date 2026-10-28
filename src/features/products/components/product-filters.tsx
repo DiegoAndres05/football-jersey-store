@@ -4,7 +4,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, X } from "lucide-react";
+import { ChevronDown, Loader2, Search, X } from "lucide-react";
 import { seasonFilterLabel } from "@/features/products/domain/season-label";
 
 type League = { slug: string; name: string; country: string | null };
@@ -48,8 +48,42 @@ export function buildFilterHref(
 }
 
 export function countActiveProductFilters(params: URLSearchParams): number {
-  return ["liga", "equipo", "temporada", "version", "talla", "disponibilidad", "modalidad", "q"]
-    .filter((key) => Boolean(params.get(key))).length + (params.get("sort") && params.get("sort") !== "default" ? 1 : 0);
+  const listed = ["liga", "equipo", "temporada", "version", "talla", "disponibilidad", "modalidad", "q"]
+    .filter((key) => Boolean(params.get(key))).length;
+  const sort = params.get("sort") && params.get("sort") !== "default" ? 1 : 0;
+  const price = params.get("precioMin") || params.get("precioMax") ? 1 : 0;
+  return listed + sort + price;
+}
+
+export function CatalogSortControl({ className }: { className?: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  const sort = searchParams.get("sort") ?? "default";
+
+  return (
+    <div className={cn("relative min-w-0", className)}>
+      <select
+        id="catalog-sort-mobile"
+        aria-label="Ordenar"
+        value={sort}
+        disabled={isPending}
+        onChange={(event) => {
+          const value = event.target.value === "default" ? "" : event.target.value;
+          startTransition(() => {
+            router.push(buildFilterHref(pathname, searchParams.toString(), "sort", value), { scroll: false });
+          });
+        }}
+        className="h-12 w-full appearance-none rounded-xl border border-border bg-card pl-4 pr-10 text-sm font-medium text-foreground shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+      >
+        {SORT_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+    </div>
+  );
 }
 
 function Chip({
