@@ -61,12 +61,14 @@ export const metadata: Metadata = {
     siteName: "Flashsport",
     type: "website",
     locale: "es_CO",
+    images: [{ url: "/flashsport-logo.png", alt: "Flashsport" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Camisetas de Fútbol en Colombia | Envíos Flashsport",
     description:
       "Camisetas de fútbol de las principales ligas y equipos del mundo. Elige tu temporada, talla y versión, con envíos a toda Colombia.",
+    images: ["/flashsport-logo.png"],
   },
 };
 

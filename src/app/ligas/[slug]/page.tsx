@@ -23,11 +23,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!league) return { title: "Liga no encontrada" };
 
-  const description = `Camisetas de fútbol de ${league.name}. Explora equipos y temporadas disponibles.`;
+  const description = `Compra camisetas de fútbol de ${league.name} en Colombia. Explora equipos, temporadas y tallas disponibles en Flashsport, con personalización y envíos nacionales.`;
   const canonical = `${siteUrl}/ligas/${league.slug}`;
+  const socialImage = leagueLogoSrc(league.slug) ?? "/flashsport-mark.png";
+  const socialImageAlt = leagueLogoSrc(league.slug)
+    ? `Logo de ${league.name}`
+    : `Flashsport — camisetas de fútbol de ${league.name}`;
 
   return {
-    title: `${league.name} — Camisetas de fútbol`,
+    title: `Camisetas de fútbol de ${league.name} en Colombia | Flashsport`,
     description,
     keywords: appendKeywords(
       `camisetas de fútbol ${league.name}`,
@@ -42,15 +46,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       siteName: "Flashsport",
       type: "website",
       locale: "es_CO",
-      images: leagueLogoSrc(league.slug)
-        ? [{ url: leagueLogoSrc(league.slug)!, alt: `Logo de ${league.name}` }]
-        : undefined,
+      images: [{ url: socialImage, alt: socialImageAlt }],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${league.name} — Camisetas de fútbol`,
+      title: `Camisetas de fútbol de ${league.name} en Colombia | Flashsport`,
       description,
-      images: leagueLogoSrc(league.slug) ? [leagueLogoSrc(league.slug)!] : undefined,
+      images: [socialImage],
     },
   };
 }

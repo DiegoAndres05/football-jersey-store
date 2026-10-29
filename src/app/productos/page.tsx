@@ -41,9 +41,9 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
   const robots = decision.action === "noindex" ? NOINDEX_FOLLOW : INDEXABLE;
 
   return {
-    title: "Catálogo de camisetas de fútbol",
+    title: "Camisetas de fútbol en Colombia | Equipos y ligas",
     description:
-      "Explora nuestro catálogo de camisetas de fútbol: ligas, equipos, temporadas y tallas. Envío a toda Colombia.",
+      "Compra camisetas de fútbol en Colombia de tus equipos y ligas favoritas. Elige temporada, talla y versión, con personalización y envíos nacionales.",
     keywords: appendKeywords(
       "catálogo de camisetas de fútbol",
       "camisetas de fútbol por liga",
@@ -53,13 +53,21 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
     robots,
     alternates: { canonical: `${siteUrl}/productos` },
     openGraph: {
-      title: "Catálogo de camisetas de fútbol | Flashsport",
+      title: "Camisetas de fútbol en Colombia | Flashsport",
       description:
-        "Explora nuestro catálogo de camisetas de fútbol: ligas, equipos, temporadas y tallas.",
+        "Compra camisetas de fútbol en Colombia de tus equipos y ligas favoritas. Elige temporada, talla y versión, con personalización y envíos nacionales.",
       url: `${siteUrl}/productos`,
       siteName: "Flashsport",
       type: "website",
       locale: "es_CO",
+      images: [{ url: "/flashsport-logo.png", alt: "Flashsport — camisetas de fútbol" }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Camisetas de fútbol en Colombia | Flashsport",
+      description:
+        "Compra camisetas de fútbol en Colombia de tus equipos y ligas favoritas. Elige temporada, talla y versión, con personalización y envíos nacionales.",
+      images: ["/flashsport-logo.png"],
     },
   };
 }
